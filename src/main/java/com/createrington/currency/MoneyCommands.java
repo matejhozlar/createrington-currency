@@ -271,6 +271,18 @@ public class MoneyCommands {
     }
     private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
         String uuid = player.getUUID().toString();
+        Item billItemCheck = getBillItem(denomination);
+
+        if (billItemCheck == null) {
+            player.sendSystemMessage(message("[ERROR]", "Invalid denomination.", ChatFormatting.RED));
+            return 0;
+        }
+
+        if (!hasInvetorySpace(player, billItemCheck, count)) {
+            String formatted = NumberFormat.getInstance().format(count);
+            player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
+            return 0;
+        }
 
         new Thread(() -> {
             try {
@@ -346,6 +358,19 @@ public class MoneyCommands {
             return 0;
         }
 
+        for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
+            Item billItem = getBillItem(entry.getKey());
+            if(billItem == null) {
+                player.sendSystemMessage(message("[ERROR]", "Invalid denomination: $" + entry.getKey(), ChatFormatting.RED));
+                return 0;
+            }
+            if (!hasInvetorySpace(player, billItem, entry.getValue())) {
+                String formatted = NumberFormat.getInstance().format(entry.getValue());
+                player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
+                return 0;
+            }
+        }
+
         new Thread(() -> {
             boolean allSucceeded = true;
 
@@ -393,6 +418,13 @@ public class MoneyCommands {
 
     private static void withdrawFixedSilent(ServerPlayer player, int denomination, int count) {
         String uuid = player.getUUID().toString();
+        Item billItemCheck = getBillItem(denomination);
+        if (billItemCheck == null) return;
+
+        if (!hasInvetorySpace(player, billItemCheck, count)) {
+            LOGGER.warn("Silent withdraw skipped due to insufficient inventory space for {}x${}", count, denomination);
+            return;
+        }
 
         new Thread(() -> {
             try {
@@ -492,5 +524,24 @@ public class MoneyCommands {
     }
 
     // Inventory space checker (to overcome overflow)
+    private static boolean hasInvetorySpace(ServerPlayer player, Item item, int totalCount) {
+        int maxStackSize = new ItemStack(item).getMaxStackSize();
+        int freeSlots = 0;
 
+        for(int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack slot = player.getInventory().getItem(i);
+            if(slot.isEmpty()) {
+                freeSlots++;
+            } else if (slot.getItem() == item && slot.getCount() < maxStackSize) {
+                int spaceLeft = maxStackSize - slot.getCount();
+                if(spaceLeft > 0) {
+                    totalCount -= spaceLeft;
+                    if (totalCount <= 0) return true;
+                }
+            }
+        }
+
+        int requiredEmpty = (int) Math.ceil((double) totalCount / maxStackSize);
+        return freeSlots >= requiredEmpty;
+    }
 }
