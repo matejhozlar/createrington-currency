@@ -2,12 +2,14 @@ package com.createrington.currency;
 
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
+
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -26,15 +28,30 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.text.NumberFormat;
 
 import org.slf4j.Logger;
 
+@net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MoneyCommands {
     private static Component message(String emoji, String text, ChatFormatting color) {
         return Component.literal(emoji + " " + text).withStyle(color);
     }
     private static final Logger LOGGER = LogUtils.getLogger();
+    // Reusing threads instead of creating new ones
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(10);
+    // Shutdown EXECUTOR on server stop
+    public static void shutdownExecutor() {
+        EXECUTOR.shutdown();
+    }
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        LOGGER.info("Server is stopping, shutting down MoneyCommands executor.");
+        shutdownExecutor();
+    }
+
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
@@ -44,7 +61,7 @@ public class MoneyCommands {
                             ServerPlayer player = context.getSource().getPlayerOrException();
                             String uuid = player.getUUID().toString();
 
-                            new Thread(() -> {
+                            EXECUTOR.submit(() -> {
                                 try {
                                     URL url = URI.create("http://127.0.0.1:5000/api/currency/balance?uuid=" + uuid).toURL();
                                     HttpResponse response = sendGet(url);
@@ -66,7 +83,7 @@ public class MoneyCommands {
                                     player.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                                     LOGGER.error("Exception in /money command", e);
                                 }
-                            }).start();
+                            });
 
                             return 1;
                         })
@@ -101,7 +118,7 @@ public class MoneyCommands {
                         }
                         """, fromUuid, toUuid, amount);
 
-                                            new Thread(() -> {
+                                            EXECUTOR.submit(() -> {
                                                 try {
                                                     URL url = URI.create("http://127.0.0.1:5000/api/currency/pay").toURL();
                                                     sendPost(url, json);
@@ -113,7 +130,7 @@ public class MoneyCommands {
                                                     sender.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                                                     LOGGER.error("Exception in /pay command", e);
                                                 }
-                                            }).start();
+                                            });
 
 
                                             return 1;
@@ -170,7 +187,7 @@ public class MoneyCommands {
 
                             player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
 
-                            new Thread(() -> {
+                            EXECUTOR.submit(() -> {
                                 try {
                                     URL url = URI.create("http://127.0.0.1:5000/api/currency/deposit").toURL();
                                     HttpResponse response = sendPost(url, json);
@@ -191,7 +208,7 @@ public class MoneyCommands {
                                     player.sendSystemMessage(message("[ERROR]", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
                                     LOGGER.error("Exception in /deposit command", e);
                                 }
-                            }).start();
+                            });
 
                             return 1;
                         })
@@ -232,7 +249,7 @@ public class MoneyCommands {
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
 
-                            new Thread(() -> {
+                            EXECUTOR.submit(() -> {
                                 try {
                                     URL url = URI.create("http://127.0.0.1:5000/api/currency/top").toURL();
                                     HttpResponse response = sendGet(url);
@@ -263,7 +280,7 @@ public class MoneyCommands {
                                     player.sendSystemMessage(message("[ERROR]", "Baltop failed: " + e.getMessage(), ChatFormatting.RED));
                                     LOGGER.error("Exception in /baltop command", e);
                                 }
-                            }).start();
+                            });
 
                             return 1;
                         })
@@ -278,13 +295,13 @@ public class MoneyCommands {
             return 0;
         }
 
-        if (!hasInvetorySpace(player, billItemCheck, count)) {
+        if (hasInventorySpace(player, billItemCheck, count)) {
             String formatted = NumberFormat.getInstance().format(count);
             player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
             return 0;
         }
 
-        new Thread(() -> {
+        EXECUTOR.submit(() -> {
             try {
                 String json = String.format("""
         {
@@ -318,7 +335,7 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                 LOGGER.error("Exception in /withdrawFixed", e);
             }
-        }).start();
+        });
 
         return 1;
     }
@@ -364,14 +381,14 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Invalid denomination: $" + entry.getKey(), ChatFormatting.RED));
                 return 0;
             }
-            if (!hasInvetorySpace(player, billItem, entry.getValue())) {
+            if (hasInventorySpace(player, billItem, entry.getValue())) {
                 String formatted = NumberFormat.getInstance().format(entry.getValue());
                 player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
                 return 0;
             }
         }
 
-        new Thread(() -> {
+        EXECUTOR.submit(() -> {
             boolean allSucceeded = true;
 
             for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
@@ -411,22 +428,23 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
             }
 
-        }).start();
+        });
 
         return 1;
     }
 
+    @SuppressWarnings("unused")
     private static void withdrawFixedSilent(ServerPlayer player, int denomination, int count) {
         String uuid = player.getUUID().toString();
         Item billItemCheck = getBillItem(denomination);
         if (billItemCheck == null) return;
 
-        if (!hasInvetorySpace(player, billItemCheck, count)) {
+        if (hasInventorySpace(player, billItemCheck, count)) {
             LOGGER.warn("Silent withdraw skipped due to insufficient inventory space for {}x${}", count, denomination);
             return;
         }
 
-        new Thread(() -> {
+        EXECUTOR.submit(() -> {
             try {
                 String json = String.format("""
             {
@@ -452,7 +470,7 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Request failed during silent withdraw: " + e.getMessage(), ChatFormatting.RED));
                 LOGGER.error("Exception in /withdrawFixedSilent", e);
             }
-        }).start();
+        });
     }
 
     private static Item getBillItem(int denomination) {
@@ -524,24 +542,22 @@ public class MoneyCommands {
     }
 
     // Inventory space checker (to overcome overflow)
-    private static boolean hasInvetorySpace(ServerPlayer player, Item item, int totalCount) {
+    private static boolean hasInventorySpace(ServerPlayer player, Item item, int totalCount) {
         int maxStackSize = new ItemStack(item).getMaxStackSize();
-        int freeSlots = 0;
+        int remaining = totalCount;
 
-        for(int i = 0; i < player.getInventory().getContainerSize(); i++) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack slot = player.getInventory().getItem(i);
-            if(slot.isEmpty()) {
-                freeSlots++;
+
+            if (slot.isEmpty()) {
+                remaining -= maxStackSize;
             } else if (slot.getItem() == item && slot.getCount() < maxStackSize) {
-                int spaceLeft = maxStackSize - slot.getCount();
-                if(spaceLeft > 0) {
-                    totalCount -= spaceLeft;
-                    if (totalCount <= 0) return true;
-                }
+                remaining -= (maxStackSize - slot.getCount());
             }
+
+            if (remaining <= 0) return false; // not enough room
         }
 
-        int requiredEmpty = (int) Math.ceil((double) totalCount / maxStackSize);
-        return freeSlots >= requiredEmpty;
+        return true;
     }
 }
