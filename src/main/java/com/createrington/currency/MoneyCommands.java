@@ -1,6 +1,7 @@
 package com.createrington.currency;
 
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.ChatFormatting;
@@ -32,6 +33,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.text.NumberFormat;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import org.slf4j.Logger;
 
 @net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)
@@ -51,6 +55,8 @@ public class MoneyCommands {
         LOGGER.info("Server is stopping, shutting down MoneyCommands executor.");
         shutdownExecutor();
     }
+    // JSON parser
+    private static final Gson GSON = new GsonBuilder().create();
 
 
     @SubscribeEvent
@@ -90,7 +96,7 @@ public class MoneyCommands {
         );
         event.getDispatcher().register(
                 Commands.literal("pay")
-                        .then(Commands.argument("target", StringArgumentType.word())
+                        .then(Commands.argument("target", EntityArgument.player())
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))
                                         .executes(context -> {
                                             ServerPlayer sender = context.getSource().getPlayerOrException();
@@ -110,13 +116,12 @@ public class MoneyCommands {
                                                 return 0;
                                             }
 
-                                            String json = String.format("""
-                        {
-                            "from_uuid": "%s",
-                            "to_uuid": "%s",
-                            "amount": %d
-                        }
-                        """, fromUuid, toUuid, amount);
+                                            Map<String, Object> payload = new HashMap<>();
+                                            payload.put("fromUuid", fromUuid);
+                                            payload.put("toUuid", toUuid);
+                                            payload.put("amount", amount);
+
+                                            String json = GSON.toJson(payload);
 
                                             EXECUTOR.submit(() -> {
                                                 try {
@@ -177,12 +182,11 @@ public class MoneyCommands {
                             final int totalAmount = computedTotal; // must be final for use in thread
 
                             // Step 2: Make API request
-                            final String json = String.format("""
-            {
-                "uuid": "%s",
-                "amount": %d
-            }
-            """, uuid, totalAmount);
+                            Map<String, Object> payload = new HashMap<>();
+                            payload.put("uuid", uuid);
+                            payload.put("amount", totalAmount);
+
+                            final String json = GSON.toJson(payload);
                             String formatted = NumberFormat.getInstance().format(totalAmount);
 
                             player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
@@ -295,7 +299,7 @@ public class MoneyCommands {
             return 0;
         }
 
-        if (hasSufficientInventorySpace(player, billItemCheck, count)) {
+        if (isInventoryFullFor(player, billItemCheck, count)) {
             String formatted = NumberFormat.getInstance().format(count);
             player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
             return 0;
@@ -303,13 +307,12 @@ public class MoneyCommands {
 
         EXECUTOR.submit(() -> {
             try {
-                String json = String.format("""
-        {
-            "uuid": "%s",
-            "count": %d,
-            "denomination": %d
-        }
-        """, uuid, count, denomination);
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("uuid", uuid);
+                payload.put("count", count);
+                payload.put("denomination", denomination);
+
+                String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
                         URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
@@ -372,7 +375,7 @@ public class MoneyCommands {
                 return 0;
             }
 
-            if (hasSufficientInventorySpace(player, item, count)) {
+            if (isInventoryFullFor(player, item, count)) {
                 player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for $" + denom + " x " + count, ChatFormatting.RED));
                 return 0;
             }
@@ -392,13 +395,13 @@ public class MoneyCommands {
 
                 try {
                     String uuid = player.getUUID().toString();
-                    String json = String.format("""
-                    {
-                        "uuid": "%s",
-                        "count": %d,
-                        "denomination": %d
-                    }
-                    """, uuid, count, denom);
+
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("uuid", uuid);
+                    payload.put("count", count);
+                    payload.put("denomination", denom);
+
+                    String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
                             URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
@@ -454,7 +457,7 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Invalid denomination: $" + entry.getKey(), ChatFormatting.RED));
                 return 0;
             }
-            if (hasSufficientInventorySpace(player, billItem, entry.getValue())) {
+            if (isInventoryFullFor(player, billItem, entry.getValue())) {
                 String formatted = NumberFormat.getInstance().format(entry.getValue());
                 player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
                 return 0;
@@ -467,13 +470,13 @@ public class MoneyCommands {
             for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
                 try {
                     String uuid = player.getUUID().toString();
-                    String json = String.format("""
-                {
-                    "uuid": "%s",
-                    "count": %d,
-                    "denomination": %d
-                }
-                """, uuid, entry.getValue(), entry.getKey());
+
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("uuid", uuid);
+                    payload.put("count", entry.getValue());
+                    payload.put("denomination", entry.getKey());
+
+                    String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
                             URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
@@ -512,20 +515,19 @@ public class MoneyCommands {
         Item billItemCheck = getBillItem(denomination);
         if (billItemCheck == null) return;
 
-        if (hasSufficientInventorySpace(player, billItemCheck, count)) {
+        if (isInventoryFullFor(player, billItemCheck, count)) {
             LOGGER.warn("Silent withdraw skipped due to insufficient inventory space for {}x${}", count, denomination);
             return;
         }
 
         EXECUTOR.submit(() -> {
             try {
-                String json = String.format("""
-            {
-                "uuid": "%s",
-                "count": %d,
-                "denomination": %d
-            }
-            """, uuid, count, denomination);
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("uuid", uuid);
+                payload.put("count", count);
+                payload.put("denomination", denomination);
+
+                String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
                         URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
@@ -615,7 +617,7 @@ public class MoneyCommands {
     }
 
     // Inventory space checker (to overcome overflow)
-    private static boolean hasSufficientInventorySpace(ServerPlayer player, Item item, int totalCount) {
+    private static boolean isInventoryFullFor(ServerPlayer player, Item item, int totalCount) {
         int maxStackSize = new ItemStack(item).getMaxStackSize();
         int remaining = totalCount;
 
