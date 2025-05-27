@@ -1,5 +1,6 @@
 package com.createrington.currency;
 
+import com.google.gson.*;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
@@ -32,9 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.text.NumberFormat;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 import org.slf4j.Logger;
 
@@ -75,19 +73,18 @@ public class MoneyCommands {
                                     String body = response.body;
 
                                     // Parse balance from JSON
-                                    Pattern pattern = Pattern.compile("\"balance\"\\s*:\\s*(\\d+)");
-                                    Matcher matcher = pattern.matcher(body);
-                                    if (matcher.find()) {
-                                        int balance = Integer.parseInt(matcher.group(1));
+                                    JsonObject json = GSON.fromJson(body, JsonObject.class);
+                                    if(json.has("balance")) {
+                                        int balance = json.get("balance").getAsInt();
                                         String formatted = NumberFormat.getInstance().format(balance);
                                         player.sendSystemMessage(message("💰", "Balance: $" + formatted, ChatFormatting.GREEN));
                                     } else {
-                                        player.sendSystemMessage(message("[ERROR]", "Failed to parse balance: " + body, ChatFormatting.RED));
+                                        player.sendSystemMessage(message("[ERROR]", "Missing 'balance' in response: " + body, ChatFormatting.RED));
                                     }
 
                                 } catch (Exception e) {
                                     player.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
-                                    LOGGER.error("Exception in /money command", e);
+                                    LOGGER.error("Exception in /money command for {} (UUID: {}",player.getName().getString(), uuid, e);
                                 }
                             });
 
@@ -133,7 +130,7 @@ public class MoneyCommands {
 
                                                 } catch (Exception e) {
                                                     sender.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
-                                                    LOGGER.error("Exception in /pay command", e);
+                                                    LOGGER.error("Exception in /pay command for {} (UUID: {})", sender.getName().getString(), fromUuid, e);
                                                 }
                                             });
 
@@ -210,7 +207,7 @@ public class MoneyCommands {
 
                                 } catch (Exception e) {
                                     player.sendSystemMessage(message("[ERROR]", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
-                                    LOGGER.error("Exception in /deposit command", e);
+                                    LOGGER.error("Exception in /deposit command for {} (UUID: {})",player.getName().getString(), uuid, e);
                                 }
                             });
 
@@ -261,16 +258,17 @@ public class MoneyCommands {
                                     if (response.code == 200) {
                                         String body = response.body;
 
-                                        Pattern entryPattern = Pattern.compile("\\{\\s*\"name\"\\s*:\\s*\"([^\"]+)\",\\s*\"balance\"\\s*:\\s*(\\d+)\\s*}");
-                                        Matcher matcher = entryPattern.matcher(body);
+                                        JsonArray topList = GSON.fromJson(body, JsonArray.class);
                                         int rank = 1;
 
                                         player.sendSystemMessage(message("🏆", "Top 10 Richest Players:", ChatFormatting.GREEN));
-                                        while (matcher.find()) {
-                                            String name = matcher.group(1);
-                                            int balance = Integer.parseInt(matcher.group(2));
-                                            String formattedBalance = NumberFormat.getInstance().format(balance);
-                                            player.sendSystemMessage(Component.literal(" " + rank + ". " + name + ": $" + formattedBalance));
+                                        for (JsonElement entryElement: topList){
+                                            JsonObject entry = entryElement.getAsJsonObject();
+                                            String name = entry.get("name").getAsString();
+                                            int balance = entry.get("balance").getAsInt();
+                                            String formatted = NumberFormat.getInstance().format(balance);
+
+                                            player.sendSystemMessage(Component.literal(" " + rank + ". " + name + ": $" + formatted));
                                             rank++;
                                         }
 
@@ -283,7 +281,7 @@ public class MoneyCommands {
 
                                 } catch (Exception e) {
                                     player.sendSystemMessage(message("[ERROR]", "Baltop failed: " + e.getMessage(), ChatFormatting.RED));
-                                    LOGGER.error("Exception in /baltop command", e);
+                                    LOGGER.error("Exception in /baltop command for {} (UUID: {})", player.getName().getString(), player.getUUID().toString(), e);
                                 }
                             });
 
