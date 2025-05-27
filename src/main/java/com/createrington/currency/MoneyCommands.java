@@ -295,7 +295,7 @@ public class MoneyCommands {
             return 0;
         }
 
-        if (hasInventorySpace(player, billItemCheck, count)) {
+        if (hasSufficientInventorySpace(player, billItemCheck, count)) {
             String formatted = NumberFormat.getInstance().format(count);
             player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
             return 0;
@@ -341,18 +341,91 @@ public class MoneyCommands {
     }
 
     private static int withdrawCustomBundle(ServerPlayer player, String input) {
-        Map<Integer, Integer> bundle = new HashMap<>();
+        Map<Integer, Integer> bundle = new LinkedHashMap<>();
+        int totalAmount = 0;
+
+        // Phase 1: Parse and validate
         for (String part : input.split(" ")) {
             String[] pair = part.split(":");
-            if (pair.length != 2) continue;
-            int denom = Integer.parseInt(pair[0]);
-            int count = Integer.parseInt(pair[1]);
-            bundle.put(denom, bundle.getOrDefault(denom, 0) + count);
+            if (pair.length != 2) {
+                player.sendSystemMessage(message("[ERROR]", "Invalid format: " + part, ChatFormatting.RED));
+                return 0;
+            }
+
+            int denom, count;
+            try {
+                denom = Integer.parseInt(pair[0]);
+                count = Integer.parseInt(pair[1]);
+            } catch (NumberFormatException e) {
+                player.sendSystemMessage(message("[ERROR]", "Invalid number in: " + part, ChatFormatting.RED));
+                return 0;
+            }
+
+            if (count <= 0 || denom <= 0) {
+                player.sendSystemMessage(message("[ERROR]", "Invalid denomination or count: " + part, ChatFormatting.RED));
+                return 0;
+            }
+
+            Item item = getBillItem(denom);
+            if (item == null) {
+                player.sendSystemMessage(message("[ERROR]", "Unsupported denomination: $" + denom, ChatFormatting.RED));
+                return 0;
+            }
+
+            if (hasSufficientInventorySpace(player, item, count)) {
+                player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for $" + denom + " x " + count, ChatFormatting.RED));
+                return 0;
+            }
+
+            bundle.put(denom, count);
+            totalAmount += denom * count;
         }
 
-        for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
-            withdrawFixed(player, entry.getKey(), entry.getValue());
-        }
+        // Phase 2: Submit all withdrawals in 1 task
+        final int finalTotal = totalAmount;
+        EXECUTOR.submit(() -> {
+            boolean allSucceeded = true;
+
+            for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
+                int denom = entry.getKey();
+                int count = entry.getValue();
+
+                try {
+                    String uuid = player.getUUID().toString();
+                    String json = String.format("""
+                    {
+                        "uuid": "%s",
+                        "count": %d,
+                        "denomination": %d
+                    }
+                    """, uuid, count, denom);
+
+                    HttpResponse response = sendPost(
+                            URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
+
+                    if (response.code == 200) {
+                        Item billItem = getBillItem(denom);
+                        if (billItem != null) {
+                            ItemStack stack = new ItemStack(billItem, count);
+                            player.getInventory().placeItemBackInInventory(stack);
+                        }
+                    } else {
+                        allSucceeded = false;
+                        player.sendSystemMessage(message("[ERROR]", "Withdraw failed for $" + (denom * count) + ": " + response.body, ChatFormatting.RED));
+                    }
+
+                } catch (Exception e) {
+                    allSucceeded = false;
+                    player.sendSystemMessage(message("[ERROR]", "Withdraw failed for $" + (denom * count) + ": " + e.getMessage(), ChatFormatting.RED));
+                    LOGGER.error("Error during /withdrawCustomBundle", e);
+                }
+            }
+
+            if (allSucceeded) {
+                String formatted = NumberFormat.getInstance().format(finalTotal);
+                player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+            }
+        });
 
         return 1;
     }
@@ -381,7 +454,7 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Invalid denomination: $" + entry.getKey(), ChatFormatting.RED));
                 return 0;
             }
-            if (hasInventorySpace(player, billItem, entry.getValue())) {
+            if (hasSufficientInventorySpace(player, billItem, entry.getValue())) {
                 String formatted = NumberFormat.getInstance().format(entry.getValue());
                 player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
                 return 0;
@@ -439,7 +512,7 @@ public class MoneyCommands {
         Item billItemCheck = getBillItem(denomination);
         if (billItemCheck == null) return;
 
-        if (hasInventorySpace(player, billItemCheck, count)) {
+        if (hasSufficientInventorySpace(player, billItemCheck, count)) {
             LOGGER.warn("Silent withdraw skipped due to insufficient inventory space for {}x${}", count, denomination);
             return;
         }
@@ -542,7 +615,7 @@ public class MoneyCommands {
     }
 
     // Inventory space checker (to overcome overflow)
-    private static boolean hasInventorySpace(ServerPlayer player, Item item, int totalCount) {
+    private static boolean hasSufficientInventorySpace(ServerPlayer player, Item item, int totalCount) {
         int maxStackSize = new ItemStack(item).getMaxStackSize();
         int remaining = totalCount;
 
