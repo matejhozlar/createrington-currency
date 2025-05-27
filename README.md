@@ -24,7 +24,7 @@ You're welcome to watch or contribute — but please understand things may be un
 
 ## Development
 
-This mod is being built using **Minecraft Forge** (NeoForge) and integrates with a **Flask-based backend API**.
+This mod is being built using **Minecraft NeoForge** and integrates with a **Backend API**.
 
 ---
 
