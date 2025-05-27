@@ -269,7 +269,8 @@ public class MoneyCommands {
                                         while (matcher.find()) {
                                             String name = matcher.group(1);
                                             int balance = Integer.parseInt(matcher.group(2));
-                                            player.sendSystemMessage(Component.literal(" " + rank + ". " + name + ": $" + balance));
+                                            String formattedBalance = NumberFormat.getInstance().format(balance);
+                                            player.sendSystemMessage(Component.literal(" " + rank + ". " + name + ": $" + formattedBalance));
                                             rank++;
                                         }
 
