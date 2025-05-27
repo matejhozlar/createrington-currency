@@ -46,6 +46,10 @@ public class Config {
             .comment("Global cooldown for all currency commands in milliseconds")
             .define("commandCooldownMs", 5000L);
 
+    private static final ModConfigSpec.ConfigValue<String> API_KEY = BUILDER
+            .comment("Secret API key to authorize requests to the backend")
+            .define("apiKey", "changeme-secret-key");
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     public static long commandCooldownMs;
@@ -56,6 +60,9 @@ public class Config {
     public static String apiWithdrawUrl;
     public static String apiTopUrl;
 
+    // api key
+    public static String apiKey;
+
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
         commandCooldownMs = COMMAND_COOLDOWN_MS.get();
@@ -65,5 +72,6 @@ public class Config {
         apiDepositUrl = API_DEPOSIT_URL.get();
         apiWithdrawUrl = API_WITHDRAW_URL.get();
         apiTopUrl = API_TOP_URL.get();
+        apiKey = API_KEY.get();
     }
 }

@@ -601,6 +601,7 @@ public class MoneyCommands {
 
     private static HttpResponse sendGet(URL url) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestProperty("x-api-key", Config.apiKey);
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(5000);
@@ -632,6 +633,7 @@ public class MoneyCommands {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("x-api-key", Config.apiKey);
         conn.setDoOutput(true);
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(5000);
