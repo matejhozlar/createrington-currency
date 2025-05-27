@@ -50,7 +50,6 @@ public class CreateringtonCurrency
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
     // bills
-    public static final DeferredItem<Item> CASH_BUNDLE = ITEMS.register("cash_bundle", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_1 = ITEMS.register( "bill_1", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_5 = ITEMS.register( "bill_5", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_10 = ITEMS.register( "bill_10", () -> new Item(new Item.Properties().stacksTo(64)));
@@ -76,7 +75,6 @@ public class CreateringtonCurrency
             .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(EXAMPLE_ITEM.get());
-                output.accept(CASH_BUNDLE.get());
                 output.accept(BILL_1.get());
                 output.accept(BILL_5.get());
                 output.accept(BILL_10.get());

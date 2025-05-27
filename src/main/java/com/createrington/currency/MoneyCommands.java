@@ -23,10 +23,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.List;
 import java.util.ArrayList;
-
 import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.text.NumberFormat;
 
 import org.slf4j.Logger;
 
@@ -56,7 +56,8 @@ public class MoneyCommands {
                                     Matcher matcher = pattern.matcher(body);
                                     if (matcher.find()) {
                                         int balance = Integer.parseInt(matcher.group(1));
-                                        player.sendSystemMessage(message("💰", "Balance: $" + balance, ChatFormatting.GREEN));
+                                        String formatted = NumberFormat.getInstance().format(balance);
+                                        player.sendSystemMessage(message("💰", "Balance: $" + formatted, ChatFormatting.GREEN));
                                     } else {
                                         player.sendSystemMessage(message("❌", "Failed to parse balance: " + body, ChatFormatting.RED));
                                     }
@@ -104,8 +105,9 @@ public class MoneyCommands {
                                                 try {
                                                     URL url = URI.create("http://127.0.0.1:5000/api/currency/pay").toURL();
                                                     sendPost(url, json);
+                                                    String formatted = NumberFormat.getInstance().format(amount);
 
-                                                    sender.sendSystemMessage(message("✅", "Sent $" + amount + " to " + toName, ChatFormatting.GREEN));
+                                                    sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
 
                                                 } catch (Exception e) {
                                                     sender.sendSystemMessage(message("❌", "Request failed: " + e.getMessage(), ChatFormatting.RED));
@@ -164,8 +166,9 @@ public class MoneyCommands {
                 "amount": %d
             }
             """, uuid, totalAmount);
+                            String formatted = NumberFormat.getInstance().format(totalAmount);
 
-                            player.sendSystemMessage(message("Processing deposit of $", totalAmount + "...", ChatFormatting.YELLOW));
+                            player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
 
                             new Thread(() -> {
                                 try {
@@ -179,7 +182,7 @@ public class MoneyCommands {
                                                 player.getInventory().setItem(slot, ItemStack.EMPTY);
                                             }
                                         }
-                                        player.sendSystemMessage(message("✅", "Deposited $" + totalAmount + " into your account!", ChatFormatting.GREEN));
+                                        player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
                                     } else {
                                         player.sendSystemMessage(message("❌", "Deposit failed: " + response.body, ChatFormatting.RED));
                                     }
@@ -293,7 +296,8 @@ public class MoneyCommands {
                     player.getInventory().placeItemBackInInventory(stack);
 
                     final int amount = denomination * count;
-                    player.sendSystemMessage(message("✅", "Successfully withdrew $" + amount, ChatFormatting.GREEN));
+                    String formatted = NumberFormat.getInstance().format(amount);
+                    player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
                 } else {
                     player.sendSystemMessage(message("❌", "Withdraw failed: " + response.body, ChatFormatting.RED));
                 }
@@ -342,12 +346,48 @@ public class MoneyCommands {
             return 0;
         }
 
-        for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
-            withdrawFixedSilent(player, entry.getKey(), entry.getValue());
-        }
+        new Thread(() -> {
+            boolean allSucceeded = true;
 
-        //  Single clean message
-        player.sendSystemMessage(message("✅", "Successfully withdrew $" + originalTotal, ChatFormatting.GREEN));
+            for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
+                try {
+                    String uuid = player.getUUID().toString();
+                    String json = String.format("""
+                {
+                    "uuid": "%s",
+                    "count": %d,
+                    "denomination": %d
+                }
+                """, uuid, entry.getValue(), entry.getKey());
+
+                    HttpResponse response = sendPost(
+                            URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
+
+                    if (response.code == 200) {
+                        Item billItem = getBillItem(entry.getKey());
+                        if (billItem != null) {
+                            ItemStack stack = new ItemStack(billItem, entry.getValue());
+                            player.getInventory().placeItemBackInInventory(stack);
+                        }
+                    } else {
+                        allSucceeded = false;
+                        player.sendSystemMessage(message("❌", "Withdraw failed for $" + (entry.getKey() * entry.getValue()) + ": " + response.body, ChatFormatting.RED));
+                    }
+
+                } catch (Exception e) {
+                    allSucceeded = false;
+                    player.sendSystemMessage(message("❌", "Request failed:" + e.getMessage(), ChatFormatting.RED));
+                    LOGGER.error("Exception in /withdrawOptimized", e);
+                }
+            }
+
+            if (allSucceeded) {
+                String formatted = NumberFormat.getInstance().format(originalTotal);
+                player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+            }
+
+        }).start();
+
         return 1;
     }
 
@@ -357,12 +397,12 @@ public class MoneyCommands {
         new Thread(() -> {
             try {
                 String json = String.format("""
-        {
-            "uuid": "%s",
-            "count": %d,
-            "denomination": %d
-        }
-        """, uuid, count, denomination);
+            {
+                "uuid": "%s",
+                "count": %d,
+                "denomination": %d
+            }
+            """, uuid, count, denomination);
 
                 HttpResponse response = sendPost(
                         URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
@@ -372,9 +412,12 @@ public class MoneyCommands {
                     if (billItem == null) return;
                     ItemStack stack = new ItemStack(billItem, count);
                     player.getInventory().placeItemBackInInventory(stack);
+                } else {
+                    player.sendSystemMessage(message("❌", "Withdraw failed: " + response.body, ChatFormatting.RED));
                 }
 
             } catch (Exception e) {
+                player.sendSystemMessage(message("❌", "Request failed during silent withdraw: " + e.getMessage(), ChatFormatting.RED));
                 LOGGER.error("Exception in /withdrawFixedSilent", e);
             }
         }).start();
