@@ -23,16 +23,17 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URI;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.UUID;
 import java.text.NumberFormat;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 
@@ -47,27 +48,61 @@ public class MoneyCommands {
     // Shutdown EXECUTOR on server stop
     public static void shutdownExecutor() {
         EXECUTOR.shutdown();
+        try {
+            if (!EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                EXECUTOR.shutdownNow();
+                LOGGER.warn("Executor force-shutdown due to timeout");
+            }
+        } catch (InterruptedException e) {
+            LOGGER.error("Interrupted during shutdown", e);
+            Thread.currentThread().interrupt();
+        }
     }
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         LOGGER.info("Server is stopping, shutting down MoneyCommands executor.");
         shutdownExecutor();
+        COOLDOWNS.clear();
     }
     // JSON parser
     private static final Gson GSON = new GsonBuilder().create();
-
+    // Cooldown
+    private static final Map<UUID, Long> COOLDOWNS = new ConcurrentHashMap<>();
+    private static long getCooldownMs() {
+        return Config.commandCooldownMs;
+    }
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
+        if (!Config.apiBaseUrl.endsWith("/")) {
+            LOGGER.warn("API base URL is missing a trailing slash. This may cause URL errors.");
+        }
+        if (Config.apiDepositUrl.startsWith("/")){
+            LOGGER.warn("API deposit URL starts with a slash. This may cause URL errors");
+        }
+        if (Config.apiPayUrl.startsWith("/")) {
+            LOGGER.warn("API pay URL starts with a slash. This may cause URL errors");
+        }
+        if (Config.apiWithdrawUrl.startsWith("/")) {
+            LOGGER.warn("API withdraw URL starts with a slash. This may cause URL errors");
+        }
+        if (Config.apiTopUrl.startsWith("/")) {
+            LOGGER.warn("API top URL starts with a slash. This may cause URL errors");
+        }
+        if (Config.apiBalanceUrl.startsWith("/")) {
+            LOGGER.warn("API balance URL starts with a slash. This may cause URL errors");
+        }
         event.getDispatcher().register(
                 Commands.literal("money")
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
+                            if (isOnCooldown(player)) return 0;
+
                             String uuid = player.getUUID().toString();
 
                             EXECUTOR.submit(() -> {
                                 try {
-                                    URL url = URI.create("http://127.0.0.1:5000/api/currency/balance?uuid=" + uuid).toURL();
+                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiBalanceUrl) + "?uuid=" + uuid).toURL();
                                     HttpResponse response = sendGet(url);
 
                                     String body = response.body;
@@ -97,6 +132,7 @@ public class MoneyCommands {
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))
                                         .executes(context -> {
                                             ServerPlayer sender = context.getSource().getPlayerOrException();
+                                            if (isOnCooldown(sender)) return 0;
                                             String toName = StringArgumentType.getString(context, "target");
                                             int amount = IntegerArgumentType.getInteger(context, "amount");
 
@@ -106,8 +142,6 @@ public class MoneyCommands {
                                             // Dev-only UUID map
                                             if (toName.equalsIgnoreCase("self")) {
                                                 toUuid = fromUuid;
-                                            } else if (toName.equalsIgnoreCase("dummy")) {
-                                                toUuid = "091b900c-4174-478c-900c-a0fe5a31a329"; // must exist in DB
                                             } else {
                                                 context.getSource().sendFailure(message("[ERROR]" ,"Unknown target: " + toName, ChatFormatting.RED));
                                                 return 0;
@@ -122,7 +156,7 @@ public class MoneyCommands {
 
                                             EXECUTOR.submit(() -> {
                                                 try {
-                                                    URL url = URI.create("http://127.0.0.1:5000/api/currency/pay").toURL();
+                                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiPayUrl)).toURL();
                                                     sendPost(url, json);
                                                     String formatted = NumberFormat.getInstance().format(amount);
 
@@ -142,6 +176,7 @@ public class MoneyCommands {
                 Commands.literal("deposit")
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
+                            if (isOnCooldown(player)) return 0;
                             final String uuid = player.getUUID().toString();
 
                             // Define the bill items and their values
@@ -190,7 +225,7 @@ public class MoneyCommands {
 
                             EXECUTOR.submit(() -> {
                                 try {
-                                    URL url = URI.create("http://127.0.0.1:5000/api/currency/deposit").toURL();
+                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiDepositUrl)).toURL();
                                     HttpResponse response = sendPost(url, json);
 
                                     if (response.code == 200) {
@@ -219,6 +254,7 @@ public class MoneyCommands {
                         .then(Commands.argument("input", StringArgumentType.greedyString())
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
+                                    if (isOnCooldown(player)) return 0;
                                     String input = StringArgumentType.getString(context, "input").trim();
 
                                     // Match: "50 2"
@@ -249,10 +285,11 @@ public class MoneyCommands {
                 Commands.literal("baltop")
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
+                            if (isOnCooldown(player)) return 0;
 
                             EXECUTOR.submit(() -> {
                                 try {
-                                    URL url = URI.create("http://127.0.0.1:5000/api/currency/top").toURL();
+                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiTopUrl)).toURL();
                                     HttpResponse response = sendGet(url);
 
                                     if (response.code == 200) {
@@ -314,7 +351,8 @@ public class MoneyCommands {
                 String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
-                        URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
+                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
+
 
                 if (response.code == 200) {
                     Item billItem = getBillItem(denomination);
@@ -403,7 +441,7 @@ public class MoneyCommands {
                     String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
-                            URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
+                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
 
                     if (response.code == 200) {
                         Item billItem = getBillItem(denom);
@@ -478,7 +516,7 @@ public class MoneyCommands {
                     String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
-                            URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
+                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
 
                     if (response.code == 200) {
                         Item billItem = getBillItem(entry.getKey());
@@ -529,7 +567,7 @@ public class MoneyCommands {
                 String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
-                        URI.create("http://127.0.0.1:5000/api/currency/withdraw").toURL(), json);
+                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
 
                 if (response.code == 200) {
                     Item billItem = getBillItem(denomination);
@@ -633,5 +671,30 @@ public class MoneyCommands {
         }
 
         return true;
+    }
+
+    // Cooldowns
+    private static boolean isOnCooldown(ServerPlayer player) {
+        long now = System.currentTimeMillis();
+        UUID uuid = player.getUUID();
+
+        if (COOLDOWNS.containsKey(uuid)) {
+            long lastUsed = COOLDOWNS.get(uuid);
+            if(now - lastUsed < getCooldownMs()) {
+                long secondsLeft = (getCooldownMs() - (now - lastUsed)) / 1000;
+                player.sendSystemMessage(message("[COOLDOWN]", "Please wait " + secondsLeft + "s before using this command again.", ChatFormatting.RED));
+                return true;
+            }
+        }
+
+        COOLDOWNS.put(uuid, now);
+        return false;
+    }
+
+    // Safe join for urls
+    private static String safeJoin(String base, String path) {
+        if (!base.endsWith("/")) base += "/";
+        if (path.startsWith("/")) path = path.substring(1);
+        return base + path;
     }
 }
