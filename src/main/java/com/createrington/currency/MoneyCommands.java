@@ -59,11 +59,11 @@ public class MoneyCommands {
                                         String formatted = NumberFormat.getInstance().format(balance);
                                         player.sendSystemMessage(message("💰", "Balance: $" + formatted, ChatFormatting.GREEN));
                                     } else {
-                                        player.sendSystemMessage(message("❌", "Failed to parse balance: " + body, ChatFormatting.RED));
+                                        player.sendSystemMessage(message("[ERROR]", "Failed to parse balance: " + body, ChatFormatting.RED));
                                     }
 
                                 } catch (Exception e) {
-                                    player.sendSystemMessage(message("❌", "Request failed: " + e.getMessage(), ChatFormatting.RED));
+                                    player.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                                     LOGGER.error("Exception in /money command", e);
                                 }
                             }).start();
@@ -89,7 +89,7 @@ public class MoneyCommands {
                                             } else if (toName.equalsIgnoreCase("dummy")) {
                                                 toUuid = "091b900c-4174-478c-900c-a0fe5a31a329"; // must exist in DB
                                             } else {
-                                                context.getSource().sendFailure(message("❌" ,"Unknown target: " + toName, ChatFormatting.RED));
+                                                context.getSource().sendFailure(message("[ERROR]" ,"Unknown target: " + toName, ChatFormatting.RED));
                                                 return 0;
                                             }
 
@@ -110,7 +110,7 @@ public class MoneyCommands {
                                                     sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
 
                                                 } catch (Exception e) {
-                                                    sender.sendSystemMessage(message("❌", "Request failed: " + e.getMessage(), ChatFormatting.RED));
+                                                    sender.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                                                     LOGGER.error("Exception in /pay command", e);
                                                 }
                                             }).start();
@@ -153,7 +153,7 @@ public class MoneyCommands {
                             }
 
                             if (computedTotal == 0) {
-                                player.sendSystemMessage(message("❌" , "No bills to deposit.", ChatFormatting.RED));
+                                player.sendSystemMessage(message("[ERROR]" , "No bills to deposit.", ChatFormatting.RED));
                                 return 1;
                             }
 
@@ -184,11 +184,11 @@ public class MoneyCommands {
                                         }
                                         player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
                                     } else {
-                                        player.sendSystemMessage(message("❌", "Deposit failed: " + response.body, ChatFormatting.RED));
+                                        player.sendSystemMessage(message("[ERROR]", "Deposit failed: " + response.body, ChatFormatting.RED));
                                     }
 
                                 } catch (Exception e) {
-                                    player.sendSystemMessage(message("❌", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
+                                    player.sendSystemMessage(message("[ERROR]", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
                                     LOGGER.error("Exception in /deposit command", e);
                                 }
                             }).start();
@@ -222,7 +222,7 @@ public class MoneyCommands {
                                         return withdrawOptimized(player, total);
                                     }
 
-                                    player.sendSystemMessage(message("❌" , "Invalid command format.", ChatFormatting.RED));
+                                    player.sendSystemMessage(message("[ERROR]" , "Invalid command format.", ChatFormatting.RED));
                                     return 0;
                                 })
                         )
@@ -253,14 +253,14 @@ public class MoneyCommands {
                                         }
 
                                         if (rank == 1) {
-                                            player.sendSystemMessage(message("❌", "No data found.", ChatFormatting.RED));
+                                            player.sendSystemMessage(message("[ERROR]", "No data found.", ChatFormatting.RED));
                                         }
                                     } else {
-                                        player.sendSystemMessage(message("❌", "Baltop failed: " + response.body, ChatFormatting.RED));
+                                        player.sendSystemMessage(message("[ERROR]", "Baltop failed: " + response.body, ChatFormatting.RED));
                                     }
 
                                 } catch (Exception e) {
-                                    player.sendSystemMessage(message("❌", "Baltop failed: " + e.getMessage(), ChatFormatting.RED));
+                                    player.sendSystemMessage(message("[ERROR]", "Baltop failed: " + e.getMessage(), ChatFormatting.RED));
                                     LOGGER.error("Exception in /baltop command", e);
                                 }
                             }).start();
@@ -288,7 +288,7 @@ public class MoneyCommands {
                 if (response.code == 200) {
                     Item billItem = getBillItem(denomination);
                     if (billItem == null) {
-                        player.sendSystemMessage(message("❌", "Invalid denomination.", ChatFormatting.RED));
+                        player.sendSystemMessage(message("[ERROR]", "Invalid denomination.", ChatFormatting.RED));
                         return;
                     }
 
@@ -303,7 +303,7 @@ public class MoneyCommands {
                 }
 
             } catch (Exception e) {
-                player.sendSystemMessage(message("❌", "Request failed: " + e.getMessage(), ChatFormatting.RED));
+                player.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                 LOGGER.error("Exception in /withdrawFixed", e);
             }
         }).start();
@@ -342,7 +342,7 @@ public class MoneyCommands {
         }
 
         if (totalAmount > 0) {
-            player.sendSystemMessage(message("❌", "Cannot make exact change.", ChatFormatting.RED));
+            player.sendSystemMessage(message("[ERROR]", "Cannot make exact change.", ChatFormatting.RED));
             return 0;
         }
 
@@ -371,12 +371,12 @@ public class MoneyCommands {
                         }
                     } else {
                         allSucceeded = false;
-                        player.sendSystemMessage(message("❌", "Withdraw failed for $" + (entry.getKey() * entry.getValue()) + ": " + response.body, ChatFormatting.RED));
+                        player.sendSystemMessage(message("[ERROR]", "Withdraw failed for $" + (entry.getKey() * entry.getValue()) + ": " + response.body, ChatFormatting.RED));
                     }
 
                 } catch (Exception e) {
                     allSucceeded = false;
-                    player.sendSystemMessage(message("❌", "Request failed:" + e.getMessage(), ChatFormatting.RED));
+                    player.sendSystemMessage(message("[ERROR]", "Request failed:" + e.getMessage(), ChatFormatting.RED));
                     LOGGER.error("Exception in /withdrawOptimized", e);
                 }
             }
@@ -413,11 +413,11 @@ public class MoneyCommands {
                     ItemStack stack = new ItemStack(billItem, count);
                     player.getInventory().placeItemBackInInventory(stack);
                 } else {
-                    player.sendSystemMessage(message("❌", "Withdraw failed: " + response.body, ChatFormatting.RED));
+                    player.sendSystemMessage(message("[ERROR]", "Withdraw failed: " + response.body, ChatFormatting.RED));
                 }
 
             } catch (Exception e) {
-                player.sendSystemMessage(message("❌", "Request failed during silent withdraw: " + e.getMessage(), ChatFormatting.RED));
+                player.sendSystemMessage(message("[ERROR]", "Request failed during silent withdraw: " + e.getMessage(), ChatFormatting.RED));
                 LOGGER.error("Exception in /withdrawFixedSilent", e);
             }
         }).start();
@@ -490,5 +490,7 @@ public class MoneyCommands {
 
         return new HttpResponse(responseCode, response.toString());
     }
+
+    // Inventory space checker (to overcome overflow)
 
 }
