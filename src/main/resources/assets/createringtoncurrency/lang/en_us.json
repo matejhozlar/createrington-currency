@@ -1,0 +1,14 @@
+{
+  "itemGroup.createringtoncurrency": "Example Mod Tab",
+  "block.createringtoncurrency.example_block": "Example Block",
+  "item.createringtoncurrency.example_item": "Example Item",
+  "item.createringtoncurrency.cash_bundle": "Cash Bundle ($1000)",
+  "item.createringtoncurrency.bill_1": "$1 Bill",
+  "item.createringtoncurrency.bill_5": "$5 Bill",
+  "item.createringtoncurrency.bill_10": "$10 Bill",
+  "item.createringtoncurrency.bill_20": "$20 Bill",
+  "item.createringtoncurrency.bill_50": "$50 Bill",
+  "item.createringtoncurrency.bill_100": "$100 Bill",
+  "item.createringtoncurrency.bill_500": "$500 Bill",
+  "item.createringtoncurrency.bill_1000": "$1000 Bill"
+}
