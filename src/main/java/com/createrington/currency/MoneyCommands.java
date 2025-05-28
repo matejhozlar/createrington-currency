@@ -12,6 +12,7 @@ import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -35,10 +36,16 @@ import java.util.UUID;
 import java.text.NumberFormat;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.logging.log4j.core.jmx.Server;
 import org.slf4j.Logger;
 
 @net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MoneyCommands {
+    // Refetching JWT
+    private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
+    private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
+    // JWT Authentication
+    private static final Map<UUID, String> TOKEN_CACHE = new ConcurrentHashMap<>();
     private static Component message(String emoji, String text, ChatFormatting color) {
         return Component.literal(emoji + " " + text).withStyle(color);
     }
@@ -64,6 +71,13 @@ public class MoneyCommands {
         shutdownExecutor();
         COOLDOWNS.clear();
     }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        COOLDOWNS.remove(event.getEntity().getUUID());
+        TOKEN_CACHE.remove(event.getEntity().getUUID());
+        TOKEN_EXPIRATION.remove(event.getEntity().getUUID());
+    }
     // JSON parser
     private static final Gson GSON = new GsonBuilder().create();
     // Cooldown
@@ -77,21 +91,6 @@ public class MoneyCommands {
         if (!Config.apiBaseUrl.endsWith("/")) {
             LOGGER.warn("API base URL is missing a trailing slash. This may cause URL errors.");
         }
-        if (Config.apiDepositUrl.startsWith("/")){
-            LOGGER.warn("API deposit URL starts with a slash. This may cause URL errors");
-        }
-        if (Config.apiPayUrl.startsWith("/")) {
-            LOGGER.warn("API pay URL starts with a slash. This may cause URL errors");
-        }
-        if (Config.apiWithdrawUrl.startsWith("/")) {
-            LOGGER.warn("API withdraw URL starts with a slash. This may cause URL errors");
-        }
-        if (Config.apiTopUrl.startsWith("/")) {
-            LOGGER.warn("API top URL starts with a slash. This may cause URL errors");
-        }
-        if (Config.apiBalanceUrl.startsWith("/")) {
-            LOGGER.warn("API balance URL starts with a slash. This may cause URL errors");
-        }
         event.getDispatcher().register(
                 Commands.literal("money")
                         .executes(context -> {
@@ -103,7 +102,7 @@ public class MoneyCommands {
                             EXECUTOR.submit(() -> {
                                 try {
                                     URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiBalanceUrl) + "?uuid=" + uuid).toURL();
-                                    HttpResponse response = sendGet(url);
+                                    HttpResponse response = sendGet(url, player);
 
                                     String body = response.body;
 
@@ -157,7 +156,7 @@ public class MoneyCommands {
                                             EXECUTOR.submit(() -> {
                                                 try {
                                                     URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiPayUrl)).toURL();
-                                                    sendPost(url, json);
+                                                    sendPost(url, sender,  json);
                                                     String formatted = NumberFormat.getInstance().format(amount);
 
                                                     sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
@@ -226,7 +225,7 @@ public class MoneyCommands {
                             EXECUTOR.submit(() -> {
                                 try {
                                     URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiDepositUrl)).toURL();
-                                    HttpResponse response = sendPost(url, json);
+                                    HttpResponse response = sendPost(url, player, json);
 
                                     if (response.code == 200) {
                                         // Step 3: Remove items AFTER successful deposit
@@ -290,7 +289,7 @@ public class MoneyCommands {
                             EXECUTOR.submit(() -> {
                                 try {
                                     URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiTopUrl)).toURL();
-                                    HttpResponse response = sendGet(url);
+                                    HttpResponse response = sendGet(url, player);
 
                                     if (response.code == 200) {
                                         String body = response.body;
@@ -318,7 +317,7 @@ public class MoneyCommands {
 
                                 } catch (Exception e) {
                                     player.sendSystemMessage(message("[ERROR]", "Baltop failed: " + e.getMessage(), ChatFormatting.RED));
-                                    LOGGER.error("Exception in /baltop command for {} (UUID: {})", player.getName().getString(), player.getUUID().toString(), e);
+                                    LOGGER.error("Exception in /baltop command for {} (UUID: {})", player.getName().getString(), player.getUUID(), e);
                                 }
                             });
 
@@ -351,7 +350,7 @@ public class MoneyCommands {
                 String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
-                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
+                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player, json);
 
 
                 if (response.code == 200) {
@@ -441,7 +440,7 @@ public class MoneyCommands {
                     String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
-                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
+                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player,json);
 
                     if (response.code == 200) {
                         Item billItem = getBillItem(denom);
@@ -516,7 +515,7 @@ public class MoneyCommands {
                     String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
-                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
+                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player, json);
 
                     if (response.code == 200) {
                         Item billItem = getBillItem(entry.getKey());
@@ -567,7 +566,7 @@ public class MoneyCommands {
                 String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
-                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), json);
+                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player, json);
 
                 if (response.code == 200) {
                     Item billItem = getBillItem(denomination);
@@ -599,14 +598,20 @@ public class MoneyCommands {
         };
     }
 
-    private static HttpResponse sendGet(URL url) throws Exception {
+    private static HttpResponse sendGet(URL url, ServerPlayer player) throws Exception {
+        String token = getOrFetchToken(player);
+
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestProperty("x-api-key", Config.apiKey);
+        conn.setRequestProperty("Authorization", "Bearer " + token);
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(5000);
 
         int responseCode = conn.getResponseCode();
+        if (responseCode == 401) {
+            TOKEN_CACHE.remove(player.getUUID());
+            TOKEN_EXPIRATION.remove(player.getUUID());
+        }
         try (BufferedReader in = new BufferedReader(new InputStreamReader(
                 responseCode == 200 ? conn.getInputStream() : conn.getErrorStream()
         ))) {
@@ -629,17 +634,23 @@ public class MoneyCommands {
         }
     }
 
-    private static HttpResponse sendPost(URL url, String json) throws Exception {
+    private static HttpResponse sendPost(URL url,ServerPlayer player, String json) throws Exception {
+        String token = getOrFetchToken(player);
+
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("x-api-key", Config.apiKey);
+        conn.setRequestProperty("Authorization", "Bearer " + token);
         conn.setDoOutput(true);
         conn.setConnectTimeout(5000);
         conn.setReadTimeout(5000);
         conn.getOutputStream().write(json.getBytes());
 
         int responseCode = conn.getResponseCode();
+        if (responseCode == 401) {
+            TOKEN_CACHE.remove(player.getUUID());
+            TOKEN_EXPIRATION.remove(player.getUUID());
+        }
         InputStream inputStream = (responseCode == 200)
                 ? conn.getInputStream()
                 : conn.getErrorStream();
@@ -653,6 +664,18 @@ public class MoneyCommands {
         in.close();
 
         return new HttpResponse(responseCode, response.toString());
+    }
+
+    private static String getOrFetchToken(ServerPlayer player) throws Exception {
+        UUID uuid = player.getUUID();
+        long now = System.currentTimeMillis();
+
+        if (!TOKEN_CACHE.containsKey(uuid) || TOKEN_EXPIRATION.getOrDefault(uuid, 0L) < now) {
+            String token = fetchJwtToken(player);
+            TOKEN_CACHE.put(uuid, token);
+            TOKEN_EXPIRATION.put(uuid, now + TOKEN_TTL_MS);
+        }
+        return TOKEN_CACHE.get(uuid);
     }
 
     // Inventory space checker (to overcome overflow)
@@ -691,6 +714,33 @@ public class MoneyCommands {
 
         COOLDOWNS.put(uuid, now);
         return false;
+    }
+
+    private static String fetchJwtToken(ServerPlayer player) throws Exception {
+        String uuid = player.getUUID().toString();
+        String name = player.getName().getString();
+
+        URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiLoginUrl)).toURL();
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setDoOutput(true);
+
+        String json = new Gson().toJson(Map.of("uuid", uuid, "name", name));
+        conn.getOutputStream().write(json.getBytes());
+
+        int responseCode = conn.getResponseCode();
+        InputStream input = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+        StringBuilder sb = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) sb.append(line);
+
+        if(responseCode != 200) throw new Exception("Failed to fetch JWT: " + sb);
+
+        JsonObject obj = JsonParser.parseString(sb.toString()).getAsJsonObject();
+        return obj.get("token").getAsString();
     }
 
     // Safe join for urls
