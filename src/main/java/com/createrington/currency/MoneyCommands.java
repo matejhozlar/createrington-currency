@@ -36,7 +36,6 @@ import java.util.UUID;
 import java.text.NumberFormat;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.logging.log4j.core.jmx.Server;
 import org.slf4j.Logger;
 
 @net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)

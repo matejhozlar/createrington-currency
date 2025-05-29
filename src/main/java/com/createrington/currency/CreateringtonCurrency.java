@@ -1,11 +1,11 @@
 package com.createrington.currency;
 
+import net.minecraft.world.inventory.MenuType;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.food.FoodProperties;
@@ -14,7 +14,6 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.api.distmarker.Dist;
@@ -34,6 +33,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(CreateringtonCurrency.MODID)
 public class CreateringtonCurrency
@@ -49,7 +49,7 @@ public class CreateringtonCurrency
     // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "createringtoncurrency" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    // bills
+    // Bills
     public static final DeferredItem<Item> BILL_1 = ITEMS.register( "bill_1", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_5 = ITEMS.register( "bill_5", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_10 = ITEMS.register( "bill_10", () -> new Item(new Item.Properties().stacksTo(64)));
@@ -58,6 +58,8 @@ public class CreateringtonCurrency
     public static final DeferredItem<Item> BILL_100 = ITEMS.register( "bill_100", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_500 = ITEMS.register( "bill_500", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_1000 = ITEMS.register( "bill_1000", () -> new Item(new Item.Properties().stacksTo(64)));
+
+    public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
 
     // Creates a new Block with the id "createringtoncurrency:example_block", combining the namespace and path
     public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
@@ -74,15 +76,6 @@ public class CreateringtonCurrency
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
-                output.accept(EXAMPLE_ITEM.get());
-                output.accept(BILL_1.get());
-                output.accept(BILL_5.get());
-                output.accept(BILL_10.get());
-                output.accept(BILL_20.get());
-                output.accept(BILL_50.get());
-                output.accept(BILL_100.get());
-                output.accept(BILL_500.get());
-                output.accept(BILL_1000.get());
             }).build());
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
@@ -98,6 +91,8 @@ public class CreateringtonCurrency
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
+
+        MENUS.register(modEventBus);
 
         // Register ourselves for server and other game events we are interested in.
         // Note that this is necessary if and only if we want *this* class (CreateringtonCurrency) to respond directly to events.

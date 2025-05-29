@@ -10,5 +10,6 @@
   "item.createringtoncurrency.bill_50": "$50 Bill",
   "item.createringtoncurrency.bill_100": "$100 Bill",
   "item.createringtoncurrency.bill_500": "$500 Bill",
-  "item.createringtoncurrency.bill_1000": "$1000 Bill"
+  "item.createringtoncurrency.bill_1000": "$1000 Bill",
+  "item.createringtoncurrency.wallet": "Wallet"
 }
