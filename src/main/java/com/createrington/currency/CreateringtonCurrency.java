@@ -1,6 +1,10 @@
 package com.createrington.currency;
 
+import com.createrington.currency.items.WalletItem;
+import com.createrington.currency.menu.WalletMenu;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -33,6 +37,11 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import java.util.function.Supplier;
+
+import net.minecraft.client.gui.screens.MenuScreens;
+import com.createrington.currency.client.WalletScreen;
+
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(CreateringtonCurrency.MODID)
@@ -60,6 +69,12 @@ public class CreateringtonCurrency
     public static final DeferredItem<Item> BILL_1000 = ITEMS.register( "bill_1000", () -> new Item(new Item.Properties().stacksTo(64)));
 
     public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
+
+    public static final DeferredItem<Item> WALLET = ITEMS.register("wallet",
+            () -> new WalletItem(new Item.Properties().stacksTo(1)));
+
+    public static final Supplier<MenuType<WalletMenu>> WALLET_MENU_TYPE =
+            MENUS.register("wallet", () -> new MenuType<>(WalletMenu::new, FeatureFlags.VANILLA_SET));
 
     // Creates a new Block with the id "createringtoncurrency:example_block", combining the namespace and path
     public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
@@ -131,14 +146,14 @@ public class CreateringtonCurrency
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
     @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ClientModEvents
-    {
+    public class ClientModEvents {
         @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event)
-        {
-            // Some client setup code
-            LOGGER.info("HELLO FROM CLIENT SETUP");
-            LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+        public static void onRegisterScreens(RegisterMenuScreensEvent event) {
+            // this is now public; MenuScreens.register was made private
+            event.register(
+                    CreateringtonCurrency.WALLET_MENU_TYPE.get(),
+                    WalletScreen::new
+            );
         }
     }
 }
