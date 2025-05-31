@@ -1,5 +1,6 @@
 package com.createrington.currency;
 
+import com.createrington.currency.mobdrops.MobDrops;
 import net.minecraft.world.inventory.MenuType;
 import org.slf4j.Logger;
 
@@ -87,6 +88,7 @@ public class CreateringtonCurrency
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
+        NeoForge.EVENT_BUS.register(MobDrops.class);
 
         MENUS.register(modEventBus);
 

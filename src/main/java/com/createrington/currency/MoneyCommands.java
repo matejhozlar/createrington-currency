@@ -50,7 +50,7 @@ public class MoneyCommands {
     }
     private static final Logger LOGGER = LogUtils.getLogger();
     // Reusing threads instead of creating new ones
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(10);
+    public static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(10);
     // Shutdown EXECUTOR on server stop
     public static void shutdownExecutor() {
         EXECUTOR.shutdown();
@@ -665,7 +665,7 @@ public class MoneyCommands {
         return new HttpResponse(responseCode, response.toString());
     }
 
-    private static String getOrFetchToken(ServerPlayer player) throws Exception {
+    public static String getOrFetchToken(ServerPlayer player) throws Exception {
         UUID uuid = player.getUUID();
         long now = System.currentTimeMillis();
 
@@ -743,7 +743,7 @@ public class MoneyCommands {
     }
 
     // Safe join for urls
-    private static String safeJoin(String base, String path) {
+    public static String safeJoin(String base, String path) {
         if (!base.endsWith("/")) base += "/";
         if (path.startsWith("/")) path = path.substring(1);
         return base + path;

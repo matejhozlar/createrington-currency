@@ -41,6 +41,10 @@ public class Config {
             .comment("API URL for a safe login to your back-end (should prevent Unauthorized access. Works on JWT verification every 10 mins, eg. '/currency/login")
             .define("apiLoginUrl", "api/currency/login");
 
+    private static final ModConfigSpec.ConfigValue<String> API_MOB_LIMIT_URL = BUILDER
+            .comment("API URL for mob limit earnings, eg. '/currency/mob-limit")
+            .define("apiMobLimitUrl", "api/currency/mob-limit");
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     public static long commandCooldownMs;
@@ -51,6 +55,7 @@ public class Config {
     public static String apiWithdrawUrl;
     public static String apiTopUrl;
     public static String apiLoginUrl;
+    public static String apiMobLimitUrl;
 
     @SubscribeEvent
     public static void onReloading(final ModConfigEvent.Reloading event) {
@@ -71,5 +76,6 @@ public class Config {
         apiWithdrawUrl = API_WITHDRAW_URL.get();
         apiTopUrl = API_TOP_URL.get();
         apiLoginUrl = API_LOGIN_URL.get();
+        apiMobLimitUrl = API_MOB_LIMIT_URL.get();
     }
 }
