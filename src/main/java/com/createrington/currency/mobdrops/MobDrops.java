@@ -61,7 +61,7 @@ public class MobDrops {
         // If backend says limit reached, block entirely
         if (backendLimitReached.contains(uuid)) {
             if (!warnedToday.contains(uuid)) {
-                player.sendSystemMessage(message("⚠", "You've reached today's mob farming limit ($1000)."));
+                player.sendSystemMessage(message());
                 warnedToday.add(uuid);
             }
             dailyEarnings.put(uuid, progress);
@@ -72,14 +72,14 @@ public class MobDrops {
         Item billToDrop = null;
 
         if (type == EntityType.ZOMBIE || type == EntityType.CREEPER || type == EntityType.SPIDER) {
-            if (ThreadLocalRandom.current().nextDouble() < 0.02) {
+            if (ThreadLocalRandom.current().nextDouble() < (Config.zomSpiCreDrop / 100.0)) {
                 earned = 1;
                 billToDrop = CreateringtonCurrency.BILL_1.get();
             }
         }
 
         if (type == EntityType.SKELETON) {
-            if (ThreadLocalRandom.current().nextDouble() < 0.03) {
+            if (ThreadLocalRandom.current().nextDouble() < (Config.skeletonDrop) / 100.0) {
                 earned = 1;
                 billToDrop = CreateringtonCurrency.BILL_1.get();
             }
@@ -97,7 +97,7 @@ public class MobDrops {
                     dropBill(dead, billToDrop);
                 } else {
                     if (!warnedToday.contains(uuid)) {
-                        player.sendSystemMessage(message("⚠", "You've reached today's mob farming limit ($1000)."));
+                        player.sendSystemMessage(message());
                         warnedToday.add(uuid);
                     }
                     if (!apiLimitAlreadySent.contains(uuid)) {
@@ -139,8 +139,8 @@ public class MobDrops {
                         backendLimitReached.add(uuid);
                     }
                 }
-            } catch (Exception e) {
-                player.sendSystemMessage(message("[ERROR]", "Backend limit check failed: " + e.getMessage()));
+            } catch (Exception ignored) {
+                // fail silently
             }
         });
     }
@@ -180,13 +180,13 @@ public class MobDrops {
                 conn.setReadTimeout(5000);
                 conn.getOutputStream().write(json.getBytes());
                 conn.getInputStream().close();
-            } catch (Exception e) {
-                player.sendSystemMessage(message("[ERROR]", "Failed to notify backend: " + e.getMessage()));
+            } catch (Exception ignored) {
+                // fail silently
             }
         });
     }
 
-    private static Component message(String emoji, String text) {
-        return Component.literal(emoji + " " + text).withStyle(ChatFormatting.RED);
+    private static Component message() {
+        return Component.literal("⚠" + " " + "You've reached today's mob farming limit ($1000).").withStyle(ChatFormatting.RED);
     }
 }

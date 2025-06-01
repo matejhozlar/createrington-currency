@@ -45,6 +45,14 @@ public class Config {
             .comment("API URL for mob limit earnings, eg. '/currency/mob-limit")
             .define("apiMobLimitUrl", "api/currency/mob-limit");
 
+    private static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP = BUILDER
+            .comment("Drop chance of 1$ bills from zombies, spiders, creepers, eg. '50.0' = 50% chance")
+            .define("zomSpiCreDrop", 2.0);
+
+    private static final ModConfigSpec.ConfigValue<Double> SKELETON_DROP = BUILDER
+            .comment("Drop chance of 1$ bills from skeletons, eg. '50.0' = 50% chance")
+            .define("skeletonDrop", 3.0);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     public static long commandCooldownMs;
@@ -56,6 +64,8 @@ public class Config {
     public static String apiTopUrl;
     public static String apiLoginUrl;
     public static String apiMobLimitUrl;
+    public static double zomSpiCreDrop;
+    public static double skeletonDrop;
 
     @SubscribeEvent
     public static void onReloading(final ModConfigEvent.Reloading event) {
@@ -77,5 +87,7 @@ public class Config {
         apiTopUrl = API_TOP_URL.get();
         apiLoginUrl = API_LOGIN_URL.get();
         apiMobLimitUrl = API_MOB_LIMIT_URL.get();
+        zomSpiCreDrop = ZOM_SPI_CRE_DROP.get();
+        skeletonDrop = SKELETON_DROP.get();
     }
 }
