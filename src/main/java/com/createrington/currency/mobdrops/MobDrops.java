@@ -41,6 +41,8 @@ public class MobDrops {
     @SubscribeEvent
     public static void onMobDeath(LivingDeathEvent event) {
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
+        if (player.getClass().getSimpleName().toLowerCase().contains("fakeplayer")) return;
+        if (player.isSpectator()) return;
 
         LivingEntity dead = event.getEntity();
         EntityType<?> type = dead.getType();
