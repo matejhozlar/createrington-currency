@@ -16,6 +16,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
+
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -88,7 +90,6 @@ public class CreateringtonCurrency
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
-        NeoForge.EVENT_BUS.register(MobDrops.class);
 
         MENUS.register(modEventBus);
 
@@ -103,7 +104,14 @@ public class CreateringtonCurrency
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        NeoForge.EVENT_BUS.register(MoneyCommands.class);
+        if (FMLEnvironment.dist.isDedicatedServer()) {
+            LOGGER.info("Running on dedicated server: registering currency logic");
+            NeoForge.EVENT_BUS.register(MobDrops.class);
+            NeoForge.EVENT_BUS.register(MoneyCommands.class);
+        } else {
+            LOGGER.warn("Currency system disabled: not dedicated server");
+        }
+
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)

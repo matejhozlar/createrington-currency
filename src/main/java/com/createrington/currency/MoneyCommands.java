@@ -8,7 +8,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.dedicated.DedicatedServer;
 
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -40,6 +43,11 @@ import org.slf4j.Logger;
 
 @net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MoneyCommands {
+    // disable on singleplayer
+    private static boolean isDedicatedServer() {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        return server instanceof DedicatedServer;
+    }
     // Refetching JWT
     private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
     private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
@@ -87,6 +95,10 @@ public class MoneyCommands {
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
+        if (!isDedicatedServer()) {
+            LOGGER.warn("Skipping MoneyCommands registration in non-dedicated server");
+            return;
+        }
         if (!Config.apiBaseUrl.endsWith("/")) {
             LOGGER.warn("API base URL is missing a trailing slash. This may cause URL errors.");
         }
