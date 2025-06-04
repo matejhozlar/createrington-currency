@@ -17,16 +17,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 
-import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -104,13 +101,10 @@ public class CreateringtonCurrency
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        if (FMLEnvironment.dist.isDedicatedServer()) {
-            LOGGER.info("Running on dedicated server: registering currency logic");
-            NeoForge.EVENT_BUS.register(MobDrops.class);
-            NeoForge.EVENT_BUS.register(MoneyCommands.class);
-        } else {
-            LOGGER.warn("Currency system disabled: not dedicated server");
-        }
+
+        NeoForge.EVENT_BUS.register(MobDrops.class);
+        NeoForge.EVENT_BUS.register(MoneyCommands.class);
+
 
     }
 
@@ -125,13 +119,5 @@ public class CreateringtonCurrency
     {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS)
             event.accept(EXAMPLE_BLOCK_ITEM);
-    }
-
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event)
-    {
-        // Do something when the server starts
-        LOGGER.info("HELLO from server starting");
     }
 }

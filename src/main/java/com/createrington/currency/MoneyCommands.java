@@ -8,10 +8,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.dedicated.DedicatedServer;
 
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
+
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -43,11 +41,6 @@ import org.slf4j.Logger;
 
 @net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MoneyCommands {
-    // disable on singleplayer
-    private static boolean isDedicatedServer() {
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        return server instanceof DedicatedServer;
-    }
     // Refetching JWT
     private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
     private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
@@ -90,16 +83,12 @@ public class MoneyCommands {
     // Cooldown
     private static final Map<UUID, Long> COOLDOWNS = new ConcurrentHashMap<>();
     private static long getCooldownMs() {
-        return Config.commandCooldownMs;
+        return Config.COMMAND_COOLDOWN_MS.get();
     }
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
-        if (!isDedicatedServer()) {
-            LOGGER.warn("Skipping MoneyCommands registration in non-dedicated server");
-            return;
-        }
-        if (!Config.apiBaseUrl.endsWith("/")) {
+        if (!Config.API_BASE_URL.get().endsWith("/")) {
             LOGGER.warn("API base URL is missing a trailing slash. This may cause URL errors.");
         }
         event.getDispatcher().register(
@@ -112,7 +101,7 @@ public class MoneyCommands {
 
                             EXECUTOR.submit(() -> {
                                 try {
-                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiBalanceUrl) + "?uuid=" + uuid).toURL();
+                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_BALANCE_URL.get()) + "?uuid=" + uuid).toURL();
                                     HttpResponse response = sendGet(url, player);
 
                                     String body = response.body;
@@ -166,7 +155,7 @@ public class MoneyCommands {
 
                                             EXECUTOR.submit(() -> {
                                                 try {
-                                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiPayUrl)).toURL();
+                                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_PAY_URL.get())).toURL();
                                                     sendPost(url, sender,  json);
                                                     String formatted = NumberFormat.getInstance().format(amount);
 
@@ -235,7 +224,7 @@ public class MoneyCommands {
 
                             EXECUTOR.submit(() -> {
                                 try {
-                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiDepositUrl)).toURL();
+                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get())).toURL();
                                     HttpResponse response = sendPost(url, player, json);
 
                                     if (response.code == 200) {
@@ -299,7 +288,7 @@ public class MoneyCommands {
 
                             EXECUTOR.submit(() -> {
                                 try {
-                                    URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiTopUrl)).toURL();
+                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_TOP_URL.get())).toURL();
                                     HttpResponse response = sendGet(url, player);
 
                                     if (response.code == 200) {
@@ -361,7 +350,7 @@ public class MoneyCommands {
                 String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
-                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player, json);
+                        URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player, json);
 
 
                 if (response.code == 200) {
@@ -451,7 +440,7 @@ public class MoneyCommands {
                     String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
-                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player,json);
+                            URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player,json);
 
                     if (response.code == 200) {
                         Item billItem = getBillItem(denom);
@@ -526,7 +515,7 @@ public class MoneyCommands {
                     String json = GSON.toJson(payload);
 
                     HttpResponse response = sendPost(
-                            URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player, json);
+                            URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player, json);
 
                     if (response.code == 200) {
                         Item billItem = getBillItem(entry.getKey());
@@ -577,7 +566,7 @@ public class MoneyCommands {
                 String json = GSON.toJson(payload);
 
                 HttpResponse response = sendPost(
-                        URI.create(safeJoin(Config.apiBaseUrl, Config.apiWithdrawUrl)).toURL(), player, json);
+                        URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player, json);
 
                 if (response.code == 200) {
                     Item billItem = getBillItem(denomination);
@@ -731,7 +720,7 @@ public class MoneyCommands {
         String uuid = player.getUUID().toString();
         String name = player.getName().getString();
 
-        URL url = URI.create(safeJoin(Config.apiBaseUrl, Config.apiLoginUrl)).toURL();
+        URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_LOGIN_URL.get())).toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");

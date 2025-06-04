@@ -32,12 +32,6 @@ import static com.mojang.text2speech.Narrator.LOGGER;
 
 @EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MobDrops {
-    // disable in singleplayer
-    private static boolean isDedicatedServer() {
-        var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
-        return server instanceof net.minecraft.server.dedicated.DedicatedServer;
-    }
-
     private static final Set<UUID> warnedToday = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> backendLimitReached = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, DailyEarnings> dailyEarnings = new ConcurrentHashMap<>();
@@ -46,7 +40,6 @@ public class MobDrops {
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!isDedicatedServer()) return;
 
         ServerPlayer player = (ServerPlayer) event.getEntity();
         UUID uuid = player.getUUID();
@@ -59,7 +52,6 @@ public class MobDrops {
 
     @SubscribeEvent
     public static void onMobDeath(LivingDeathEvent event) {
-        if (!isDedicatedServer()) return;
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (player instanceof FakePlayer) return;
         if (player.isSpectator()) return;
@@ -87,14 +79,14 @@ public class MobDrops {
         Item billToDrop = null;
 
         if (type == EntityType.ZOMBIE || type == EntityType.CREEPER || type == EntityType.SPIDER) {
-            if (ThreadLocalRandom.current().nextDouble() < (Config.zomSpiCreDrop / 100.0)) {
+            if (ThreadLocalRandom.current().nextDouble() < (Config.ZOM_SPI_CRE_DROP.get() / 100.0)) {
                 earned = 1;
                 billToDrop = CreateringtonCurrency.BILL_1.get();
             }
         }
 
         if (type == EntityType.SKELETON) {
-            if (ThreadLocalRandom.current().nextDouble() < Config.skeletonDrop / 100.0) {
+            if (ThreadLocalRandom.current().nextDouble() < Config.SKELETON_DROP.get() / 100.0) {
                 earned = 1;
                 billToDrop = CreateringtonCurrency.BILL_1.get();
             }
@@ -138,7 +130,7 @@ public class MobDrops {
         EXECUTOR.submit(() -> {
             try {
                 String token = MoneyCommands.getOrFetchToken(player);
-                String apiUrl = MoneyCommands.safeJoin(Config.apiBaseUrl, Config.apiMobLimitUrl + "?uuid=" + uuid);
+                String apiUrl = MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_MOB_LIMIT_URL.get() + "?uuid=" + uuid);
                 URL url = URI.create(apiUrl).toURL();
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -167,7 +159,7 @@ public class MobDrops {
         EXECUTOR.submit(() -> {
             try {
                 String token = MoneyCommands.getOrFetchToken(player);
-                String apiUrl = MoneyCommands.safeJoin(Config.apiBaseUrl, Config.apiMobLimitUrl);
+                String apiUrl = MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_MOB_LIMIT_URL.get());
                 URL url = URI.create(apiUrl).toURL();
 
                 String json = "{}";
