@@ -132,19 +132,12 @@ public class MoneyCommands {
                                         .executes(context -> {
                                             ServerPlayer sender = context.getSource().getPlayerOrException();
                                             if (isOnCooldown(sender)) return 0;
-                                            String toName = StringArgumentType.getString(context, "target");
+                                            ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "target");
+                                            String toName = targetPlayer.getName().getString();
+                                            String toUuid = targetPlayer.getUUID().toString();
                                             int amount = IntegerArgumentType.getInteger(context, "amount");
 
                                             String fromUuid = sender.getUUID().toString();
-                                            String toUuid;
-
-                                            // Dev-only UUID map
-                                            if (toName.equalsIgnoreCase("self")) {
-                                                toUuid = fromUuid;
-                                            } else {
-                                                context.getSource().sendFailure(message("[ERROR]" ,"Unknown target: " + toName, ChatFormatting.RED));
-                                                return 0;
-                                            }
 
                                             Map<String, Object> payload = new HashMap<>();
                                             payload.put("fromUuid", fromUuid);
