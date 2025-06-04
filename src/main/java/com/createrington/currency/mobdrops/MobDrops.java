@@ -32,6 +32,11 @@ import static com.mojang.text2speech.Narrator.LOGGER;
 
 @EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MobDrops {
+    // disable in singleplayer
+    private static boolean isDedicatedServer() {
+        var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        return server instanceof net.minecraft.server.dedicated.DedicatedServer;
+    }
 
     private static final Set<UUID> warnedToday = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> backendLimitReached = ConcurrentHashMap.newKeySet();
@@ -41,6 +46,8 @@ public class MobDrops {
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!isDedicatedServer()) return;
+
         ServerPlayer player = (ServerPlayer) event.getEntity();
         UUID uuid = player.getUUID();
 
@@ -52,6 +59,7 @@ public class MobDrops {
 
     @SubscribeEvent
     public static void onMobDeath(LivingDeathEvent event) {
+        if (!isDedicatedServer()) return;
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (player instanceof FakePlayer) return;
         if (player.isSpectator()) return;
