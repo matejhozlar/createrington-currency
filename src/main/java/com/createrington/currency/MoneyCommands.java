@@ -39,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 
-@net.neoforged.fml.common.EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MoneyCommands {
     // Refetching JWT
     private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();

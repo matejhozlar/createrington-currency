@@ -12,7 +12,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.common.util.FakePlayer;
@@ -30,7 +29,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static com.mojang.text2speech.Narrator.LOGGER;
 
-@EventBusSubscriber(modid = CreateringtonCurrency.MODID)
 public class MobDrops {
     private static final Set<UUID> warnedToday = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> backendLimitReached = ConcurrentHashMap.newKeySet();
@@ -48,6 +46,14 @@ public class MobDrops {
         backendLimitReached.remove(uuid);
 
         checkBackendLimitOnce(uuid, player);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        ServerPlayer player = (ServerPlayer) event.getEntity();
+        UUID uuid = player.getUUID();
+
+        warnedToday.remove(uuid);
     }
 
     @SubscribeEvent
