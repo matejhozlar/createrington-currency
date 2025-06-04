@@ -86,9 +86,9 @@ public class MobDrops {
         }
 
         if (type == EntityType.SKELETON) {
-            if (ThreadLocalRandom.current().nextDouble() < 0.5) {
-                earned = 1000;
-                billToDrop = CreateringtonCurrency.BILL_1000.get();
+            if (ThreadLocalRandom.current().nextDouble() < Config.skeletonDrop / 100.0) {
+                earned = 1;
+                billToDrop = CreateringtonCurrency.BILL_1.get();
             }
             if (ThreadLocalRandom.current().nextDouble() < 0.01) {
                 earned = 5;
