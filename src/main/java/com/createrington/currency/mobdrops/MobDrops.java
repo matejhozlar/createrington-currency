@@ -3,8 +3,10 @@ package com.createrington.currency.mobdrops;
 import com.createrington.currency.CreateringtonCurrency;
 import com.createrington.currency.Config;
 import com.createrington.currency.MoneyCommands;
+import com.createrington.currency.enchantment.ModEnchantments;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -62,6 +64,15 @@ public class MobDrops {
         if (player instanceof FakePlayer) return;
         if (player.isSpectator()) return;
 
+        ItemStack stack = player.getMainHandItem();
+        int enchantmentLevel = 0;
+        if(!stack.isEmpty()) {
+            var registryAccess = player.level().registryAccess();
+            var enchantmentRegistry = registryAccess.registryOrThrow(Registries.ENCHANTMENT);
+            var lightningStrikerHolder = enchantmentRegistry.getHolderOrThrow(ModEnchantments.CAPITALIST_GREED);
+            enchantmentLevel = stack.getEnchantmentLevel(lightningStrikerHolder);
+        }
+
         LivingEntity dead = event.getEntity();
         EntityType<?> type = dead.getType();
         UUID uuid = player.getUUID();
@@ -84,22 +95,30 @@ public class MobDrops {
         int earned = 0;
         Item billToDrop = null;
 
+        double baseChance = 0.0;
+
         if (type == EntityType.ZOMBIE || type == EntityType.CREEPER || type == EntityType.SPIDER) {
-            if (ThreadLocalRandom.current().nextDouble() < (Config.ZOM_SPI_CRE_DROP.get() / 100.0)) {
-                earned = 1;
-                billToDrop = CreateringtonCurrency.BILL_1.get();
-            }
+            baseChance = Config.ZOM_SPI_CRE_DROP.get();
         }
 
         if (type == EntityType.SKELETON) {
-            if (ThreadLocalRandom.current().nextDouble() < Config.SKELETON_DROP.get() / 100.0) {
-                earned = 1;
-                billToDrop = CreateringtonCurrency.BILL_1.get();
-            }
-            if (ThreadLocalRandom.current().nextDouble() < 0.01) {
-                earned = 5;
-                billToDrop = CreateringtonCurrency.BILL_5.get();
-            }
+            baseChance = Config.SKELETON_DROP.get();
+        }
+
+        switch (enchantmentLevel) {
+            case 1 -> baseChance += 5.0;
+            case 2 -> baseChance += 8.0;
+            case 3 -> baseChance += 10.0;
+        }
+
+        if(ThreadLocalRandom.current().nextDouble() < (baseChance / 100.0)){
+            earned = 1;
+            billToDrop = CreateringtonCurrency.BILL_1.get();
+        }
+
+        if (type == EntityType.SKELETON && ThreadLocalRandom.current().nextDouble() < 0.01){
+            earned = 5;
+            billToDrop = CreateringtonCurrency.BILL_5.get();
         }
 
         if (earned > 0) {
