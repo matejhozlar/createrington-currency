@@ -22,7 +22,7 @@ public class ModEnchantments {
         Enchantment lightningStriker = Enchantment.enchantment(Enchantment.definition(
                         items.getOrThrow(ItemTags.WEAPON_ENCHANTABLE),
                         items.getOrThrow(ItemTags.SWORD_ENCHANTABLE),
-                        100,
+                        5,
                         3,
                         Enchantment.dynamicCost(5, 7),
                         Enchantment.dynamicCost(25, 7),
