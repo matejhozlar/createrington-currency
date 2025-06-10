@@ -37,6 +37,12 @@ public class MobDrops {
     private static final Map<UUID, DailyEarnings> dailyEarnings = new ConcurrentHashMap<>();
     private static final int DAILY_LIMIT = 1000;
     private static final ExecutorService EXECUTOR = MoneyCommands.EXECUTOR;
+    private static final Set<EntityType<?>> ALLOWED_MOB_TYPES = Set.of(
+            EntityType.ZOMBIE,
+            EntityType.CREEPER,
+            EntityType.SPIDER,
+            EntityType.SKELETON
+    );
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
@@ -75,6 +81,7 @@ public class MobDrops {
 
         LivingEntity dead = event.getEntity();
         EntityType<?> type = dead.getType();
+        if (!ALLOWED_MOB_TYPES.contains(type)) return;
         UUID uuid = player.getUUID();
 
         // First, local check: is limit reached?
