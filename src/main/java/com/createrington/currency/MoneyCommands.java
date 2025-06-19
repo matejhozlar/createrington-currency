@@ -114,7 +114,6 @@ public class MoneyCommands {
                                     } else {
                                         player.sendSystemMessage(message("[ERROR]", "Missing 'balance' in response: " + body, ChatFormatting.RED));
                                     }
-
                                 } catch (Exception e) {
                                     player.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
                                     LOGGER.error("Exception in /money command for {} (UUID: {}",player.getName().getString(), uuid, e);
@@ -152,6 +151,7 @@ public class MoneyCommands {
                                                     String formatted = NumberFormat.getInstance().format(amount);
 
                                                     sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
+                                                    targetPlayer.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
 
                                                 } catch (Exception e) {
                                                     sender.sendSystemMessage(message("[ERROR]", "Request failed: " + e.getMessage(), ChatFormatting.RED));
@@ -221,11 +221,13 @@ public class MoneyCommands {
 
                                     if (response.code == 200) {
                                         // Step 3: Remove items AFTER successful deposit
-                                        for (Map.Entry<Integer, List<Integer>> entry : slotsByDenomination.entrySet()) {
-                                            for (int slot : entry.getValue()) {
-                                                player.getInventory().setItem(slot, ItemStack.EMPTY);
+                                        player.server.execute(() -> {
+                                            for (Map.Entry<Integer, List<Integer>> entry : slotsByDenomination.entrySet()) {
+                                                for (int slot : entry.getValue()) {
+                                                    player.getInventory().setItem(slot, ItemStack.EMPTY);
+                                                }
                                             }
-                                        }
+                                        });
                                         player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
                                     } else {
                                         player.sendSystemMessage(message("[ERROR]", "Deposit failed: " + response.body, ChatFormatting.RED));
@@ -316,6 +318,46 @@ public class MoneyCommands {
                             return 1;
                         })
         );
+        event.getDispatcher().register(
+                Commands.literal("daily")
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            if (isOnCooldown(player)) return 0;
+
+                            String uuid = player.getUUID().toString();
+
+                            EXECUTOR.submit(() -> {
+                                try {
+                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_DAILY_URL.get()) + "?uuid=" + uuid).toURL();
+                                    HttpResponse response = sendPost(url, player, "{}");
+
+                                    if (response.code == 200) {
+                                        try {
+                                            JsonObject json = GSON.fromJson(response.body, JsonObject.class);
+                                            String msg = json.has("message") ? json.get("message").getAsString() : "✅ Reward claimed!";
+                                            player.sendSystemMessage(message("✅", msg, ChatFormatting.GREEN));
+                                        } catch (Exception e) {
+                                            player.sendSystemMessage(message("✅", "Reward claimed, but failed to parse response.", ChatFormatting.YELLOW));
+                                        }
+                                    } else {
+                                        try {
+                                            JsonObject json = GSON.fromJson(response.body, JsonObject.class);
+                                            String err = json.has("error") ? json.get("error").getAsString() : response.body;
+                                            player.sendSystemMessage(message("[ERROR]", "Daily reward failed: " + err, ChatFormatting.RED));
+                                        } catch (Exception e) {
+                                            player.sendSystemMessage(message("[ERROR]", "Daily reward failed: " + response.body, ChatFormatting.RED));
+                                        }
+                                    }
+
+                                } catch (Exception e) {
+                                    player.sendSystemMessage(message("[ERROR]", "Daily reward request failed: " + e.getMessage(), ChatFormatting.RED));
+                                    LOGGER.error("Exception in /daily command for {} (UUID: {})", player.getName().getString(), uuid, e);
+                                }
+                            });
+
+                            return 1;
+                        })
+        );
     }
     private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
         String uuid = player.getUUID().toString();
@@ -353,7 +395,7 @@ public class MoneyCommands {
                     }
 
                     ItemStack stack = new ItemStack(billItem, count);
-                    player.getInventory().placeItemBackInInventory(stack);
+                    player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
 
                     final int amount = denomination * count;
                     String formatted = NumberFormat.getInstance().format(amount);
@@ -438,7 +480,7 @@ public class MoneyCommands {
                         Item billItem = getBillItem(denom);
                         if (billItem != null) {
                             ItemStack stack = new ItemStack(billItem, count);
-                            player.getInventory().placeItemBackInInventory(stack);
+                            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
                         }
                     } else {
                         allSucceeded = false;
@@ -513,7 +555,7 @@ public class MoneyCommands {
                         Item billItem = getBillItem(entry.getKey());
                         if (billItem != null) {
                             ItemStack stack = new ItemStack(billItem, entry.getValue());
-                            player.getInventory().placeItemBackInInventory(stack);
+                            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
                         }
                     } else {
                         allSucceeded = false;
@@ -564,7 +606,7 @@ public class MoneyCommands {
                     Item billItem = getBillItem(denomination);
                     if (billItem == null) return;
                     ItemStack stack = new ItemStack(billItem, count);
-                    player.getInventory().placeItemBackInInventory(stack);
+                    player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
                 } else {
                     player.sendSystemMessage(message("[ERROR]", "Withdraw failed: " + response.body, ChatFormatting.RED));
                 }

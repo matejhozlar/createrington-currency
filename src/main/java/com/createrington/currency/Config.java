@@ -41,6 +41,10 @@ public class Config {
             .comment("API URL for mob limit earnings, eg. '/currency/mob-limit")
             .define("apiMobLimitUrl", "api/currency/mob-limit");
 
+    public static final ModConfigSpec.ConfigValue<String> API_DAILY_URL = BUILDER
+            .comment("API URL for daily reward, eg. '/currency/daily")
+            .define("apiDailyUrl", "api/currency/daily");
+
     public static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP = BUILDER
             .comment("Drop chance of 1$ bills from zombies, spiders, creepers, eg. '50.0' = 50% chance")
             .define("zomSpiCreDrop", 2.0);
