@@ -45,6 +45,14 @@ public class Config {
             .comment("API URL for daily reward, eg. '/currency/daily")
             .define("apiDailyUrl", "api/currency/daily");
 
+    public static final ModConfigSpec.ConfigValue<String> API_START_LOTTERY_URL = BUILDER
+            .comment("API URL for starting a lottery, eg. '/currency/lottery/start'")
+            .define("apiStartLotteryUrl", "api/currency/lottery/start");
+
+    public static final ModConfigSpec.ConfigValue<String> API_JOIN_LOTTERY_URL = BUILDER
+            .comment("API URL for joining a lottery, eg. '/currency/lottery/join'")
+            .define("apiJoinLotteryUrl", "api/currency/lottery/join");
+
     public static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP = BUILDER
             .comment("Drop chance of 1$ bills from zombies, spiders, creepers, eg. '50.0' = 50% chance")
             .define("zomSpiCreDrop", 2.0);

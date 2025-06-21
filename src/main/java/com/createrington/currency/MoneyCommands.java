@@ -40,6 +40,9 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 
 public class MoneyCommands {
+    // lottery logic
+    private static long lastLotteryStartTime = 0L;
+    private static final long LOTTERY_COOLDOWN_MS = 30 * 60 * 1000;
     // Refetching JWT
     private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
     private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
@@ -357,6 +360,86 @@ public class MoneyCommands {
 
                             return 1;
                         })
+        );
+        event.getDispatcher().register(
+                Commands.literal("lottery")
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(10)) // Min 10
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    UUID uuid = player.getUUID();
+                                    int amount = IntegerArgumentType.getInteger(context, "amount");
+                                    long now = System.currentTimeMillis();
+
+                                    if (now - lastLotteryStartTime < LOTTERY_COOLDOWN_MS) {
+                                        long seconds = (LOTTERY_COOLDOWN_MS - (now - lastLotteryStartTime)) / 1000;
+                                        player.sendSystemMessage(Component.literal("⏳ A lottery is already running or was recently started. Try again in " + seconds + "s.").withStyle(ChatFormatting.RED));
+                                        return 1;
+                                    }
+
+                                    EXECUTOR.submit(() -> {
+                                        try {
+                                            Map<String, Object> payload = Map.of(
+                                                    "uuid", uuid.toString(),
+                                                    "name", player.getName().getString(),
+                                                    "amount", amount
+                                            );
+
+                                            String json = GSON.toJson(payload);
+                                            URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_START_LOTTERY_URL.get())).toURL();
+
+                                            HttpResponse response = sendPost(url, player, json);
+
+                                            if (response.code == 200) {
+                                                lastLotteryStartTime = System.currentTimeMillis();
+                                                player.sendSystemMessage(Component.literal("🎲 You successfully started a lottery with $" + amount + "!").withStyle(ChatFormatting.GREEN));
+                                            } else {
+                                                player.sendSystemMessage(Component.literal("❌ Could not start lottery: " + response.body).withStyle(ChatFormatting.RED));
+                                            }
+
+                                        } catch (Exception e) {
+                                            player.sendSystemMessage(Component.literal("⚠️ Request failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+                                        }
+                                    });
+
+                                    return 1;
+                                })
+                        )
+        );
+        event.getDispatcher().register(
+                Commands.literal("join")
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(10)) // Min 10
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    UUID uuid = player.getUUID();
+                                    int amount = IntegerArgumentType.getInteger(context, "amount");
+
+                                    EXECUTOR.submit(() -> {
+                                        try {
+                                            Map<String, Object> payload = Map.of(
+                                                    "uuid", uuid.toString(),
+                                                    "name", player.getName().getString(),
+                                                    "amount", amount
+                                            );
+
+                                            String json = GSON.toJson(payload);
+                                            URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_JOIN_LOTTERY_URL.get())).toURL();
+
+                                            HttpResponse response = sendPost(url, player, json);
+
+                                            if (response.code == 200) {
+                                                player.sendSystemMessage(Component.literal("✅ You joined the lottery with $" + amount + ". Good luck!").withStyle(ChatFormatting.GREEN));
+                                            } else {
+                                                player.sendSystemMessage(Component.literal("❌ Could not join: " + response.body).withStyle(ChatFormatting.RED));
+                                            }
+
+                                        } catch (Exception e) {
+                                            player.sendSystemMessage(Component.literal("⚠️ Request failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+                                        }
+                                    });
+
+                                    return 1;
+                                })
+                        )
         );
     }
     private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
