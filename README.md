@@ -1,5 +1,7 @@
 # Createrington Currency
 
+https://www.curseforge.com/minecraft/mc-mods/create-rington-currency
+
 **Createrington Currency** is a custom Minecraft mod designed to bring an economy system into your game.
 
 ## Description
