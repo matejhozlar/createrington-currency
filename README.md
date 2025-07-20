@@ -6,7 +6,7 @@
 
 ## Status: Production Ready
 
-All planned features have been implemented and the mod is stable for production use.
+All planned features have been implemented and the mod is stable for production use. Test for 2+ months in production with 1000+ players across multiple servers pre-CurseForge version.
 
 ---
 
