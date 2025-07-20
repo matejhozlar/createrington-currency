@@ -8,6 +8,18 @@
 
 All planned features have been implemented and the mod is stable for production use. Test for 2+ months in production with 1000+ players across multiple servers pre-CurseForge version.
 
+--- 
+
+## 🔗 Downloads & Related Projects
+
+**Get the Mod:**  
+Createrington Currency is available for one-click installation via CurseForge:  
+[Download on CurseForge](https://www.curseforge.com/minecraft/mc-mods/create-rington-currency)
+
+**Try the Full Experience:**  
+Want to see the mod in action with complementary gameplay? Check out the official modpack:  
+[Play the Create-rington Modpack](https://www.curseforge.com/minecraft/modpacks/create-rington)
+
 ---
 
 ## Features
