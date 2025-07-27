@@ -1,4 +1,10 @@
-# Createrington Currency
+# Createrington Currency – Minecraft Economy Mod
+
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-5E7C16?logo=minecraft&logoColor=white)
+![NeoForge](https://img.shields.io/badge/NeoForge-Required-orange)
+![Backend API](https://img.shields.io/badge/Backend-Required-critical)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+![Made by Matej Hozlár](https://img.shields.io/badge/Made%20by-matejhozlar-blue)
 
 **Createrington Currency** is a custom Minecraft mod that introduces a robust, server-backed economy system into your game. It enables physical money, banking features, enchantments, and more — all synchronized with an external backend API.
 
@@ -10,15 +16,12 @@ All planned features have been implemented and the mod is stable for production 
 
 --- 
 
-## 🔗 Downloads & Related Projects
+## Downloads & Related Projects
 
-**Get the Mod:**  
-Createrington Currency is available for one-click installation via CurseForge:  
-[Download on CurseForge](https://www.curseforge.com/minecraft/mc-mods/create-rington-currency)
-
-**Try the Full Experience:**  
-Want to see the mod in action with complementary gameplay? Check out the official modpack:  
-[Play the Create-rington Modpack](https://www.curseforge.com/minecraft/modpacks/create-rington)
+- [**Download on CurseForge**](https://www.curseforge.com/minecraft/mc-mods/create-rington-currency)
+- [**Play with the full modpack**](https://www.curseforge.com/minecraft/modpacks/create-rington)
+- [**Visit the live server**](https://create-rington.com)
+- [**Discord Integration**](https://github.com/matejhozlar/mc-page)
 
 ---
 
@@ -41,14 +44,16 @@ Want to see the mod in action with complementary gameplay? Check out the officia
 
 ### Economy Commands
 
-- `/money` – Check your current balance.
-- `/baltop` – View the richest players.
-- `/pay <player> <amount>` – Send money to another player.
-- `/deposit` – Convert physical bills into digital balance.
-- `/withdraw <amount>` – Withdraw bills from your account.
-- `/daily` – Claim a once-per-day reward.
-- `/lottery <amount>` – Start a new server-wide lottery.
-- `/join <amount>` – Join an existing lottery.
+| Command         | Description                          |
+|-----------------|--------------------------------------|
+| `/money`        | Check your current balance           |
+| `/baltop`       | See the richest players              |
+| `/pay`          | Send money to another player         |
+| `/deposit`      | Convert bills into balance           |
+| `/withdraw`     | Withdraw bills from balance          |
+| `/daily`        | Daily money reward                   |
+| `/lottery`      | Start a server-wide lottery          |
+| `/join`         | Join a lottery in progress           |
 
 ### Mob Drops
 
@@ -80,16 +85,18 @@ Want to see the mod in action with complementary gameplay? Check out the officia
 ### Backend API
 
 - Mod requires a remote server with specific API endpoints:
-  - `POST /currency/login`
-  - `GET /currency/balance`
-  - `POST /currency/pay`
-  - `POST /currency/deposit`
-  - `POST /currency/withdraw`
-  - `GET /currency/top`
-  - `GET /currency/mob-limit`
-  - `POST /currency/daily`
-  - `POST /currency/lottery/start`
-  - `POST /currency/lottery/join`
+```http
+POST   /currency/login
+GET    /currency/balance
+POST   /currency/pay
+POST   /currency/deposit
+POST   /currency/withdraw
+GET    /currency/top
+GET    /currency/mob-limit
+POST   /currency/daily
+POST   /currency/lottery/start
+POST   /currency/lottery/join
+```
 
 > ⚠️ Without the backend API, this mod **will not function**.
 
