@@ -22,6 +22,12 @@ All planned features have been implemented and the mod is stable for production 
 - [**Visit the live server**](https://create-rington.com)
 - [**Discord Integration**](https://github.com/matejhozlar/mc-page)
 
+## Backend Templates
+
+- [**Node.js**](https://github.com/matejhozlar/createrington-nodejs-backend)
+- [**TypeScript**](https://github.com/matejhozlar/createrington-typescript-backend) (*Unfinished*)
+- [**Python**](https://github.com/matejhozlar/createrington-python-backend) (*Unfinished*)
+
 ---
 
 ## Features
