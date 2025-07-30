@@ -440,6 +440,43 @@ public class MoneyCommands {
                                 })
                         )
         );
+        event.getDispatcher().register(
+                Commands.literal("vote")
+                        .then(Commands.argument("type", StringArgumentType.word())
+                                .suggests((ctx, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                        List.of("clear", "day", "night", "thunder", "rain"), builder))
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    if (isOnCooldown(player)) return 0;
+
+                                    String voteType = StringArgumentType.getString(context, "type").toLowerCase();
+                                    String uuid = player.getUUID().toString();
+                                    String name = player.getName().getString();
+
+                                    Map<String, Object> payload = Map.of("voteType", voteType);
+                                    String json = GSON.toJson(payload);
+
+                                    EXECUTOR.submit(() -> {
+                                        try {
+                                            URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_START_VOTE_URL.get())).toURL();
+                                            HttpResponse response = sendPost(url, player, json);
+
+                                            if (response.code == 200) {
+                                                player.sendSystemMessage(message("✅", "Vote started for " + voteType, ChatFormatting.GREEN));
+                                            } else {
+                                                sendError(player, "Vote", response.body);
+                                            }
+                                        } catch (Exception e) {
+                                            sendError(player, "Vote", e);
+                                            LOGGER.error("Exception in /vote command for {} (UUID: {})", name, uuid, e);
+                                        }
+                                    });
+
+                                    return 1;
+                                })
+                        )
+        );
+
     }
     private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
         String uuid = player.getUUID().toString();
