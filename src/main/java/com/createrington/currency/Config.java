@@ -46,12 +46,16 @@ public class Config {
             .define("apiDailyUrl", "api/currency/daily");
 
     public static final ModConfigSpec.ConfigValue<String> API_START_LOTTERY_URL = BUILDER
-            .comment("API URL for starting a lottery, eg. '/currency/lottery/start'")
+            .comment("API URL for starting a lottery, eg. '/currency/lottery/start', don't use this if you are not using integrated discord bots")
             .define("apiStartLotteryUrl", "api/currency/lottery/start");
 
     public static final ModConfigSpec.ConfigValue<String> API_JOIN_LOTTERY_URL = BUILDER
-            .comment("API URL for joining a lottery, eg. '/currency/lottery/join'")
+            .comment("API URL for joining a lottery, eg. '/currency/lottery/join', don't use this if you are not using integrated discord bots")
             .define("apiJoinLotteryUrl", "api/currency/lottery/join");
+
+    public static final ModConfigSpec.ConfigValue<String> API_START_VOTE_URL = BUILDER
+            .comment("API URL for starting a voting process eg. '/currency/vote/start', don't use this if you are not using integrated discord bots")
+            .define("apiStartVoteUrl", "api/currency/vote/start");
 
     public static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP = BUILDER
             .comment("Drop chance of 1$ bills from zombies, spiders, creepers, eg. '50.0' = 50% chance")
