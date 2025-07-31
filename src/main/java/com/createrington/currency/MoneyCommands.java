@@ -36,7 +36,9 @@ import org.slf4j.Logger;
 public class MoneyCommands {
     // lottery logic
     private static long lastLotteryStartTime = 0L;
-    private static final long LOTTERY_COOLDOWN_MS = 30 * 60 * 1000;
+    private static long getLotteryCooldownMs() {
+        return Config.LOTTERY_COOLDOWN_MINUTES.get() * 60L * 1000L;
+    }
     // Refetching JWT
     private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
     private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
@@ -362,9 +364,10 @@ public class MoneyCommands {
                                     UUID uuid = player.getUUID();
                                     int amount = IntegerArgumentType.getInteger(context, "amount");
                                     long now = System.currentTimeMillis();
+                                    long cooldownMs = getLotteryCooldownMs();
 
-                                    if (now - lastLotteryStartTime < LOTTERY_COOLDOWN_MS) {
-                                        long seconds = (LOTTERY_COOLDOWN_MS - (now - lastLotteryStartTime)) / 1000;
+                                    if (cooldownMs > 0 && now - lastLotteryStartTime < cooldownMs) {
+                                        long seconds = (cooldownMs - (now - lastLotteryStartTime)) / 1000;
                                         player.sendSystemMessage(Component.literal("⏳ A lottery is already running or was recently started. Try again in " + seconds + "s.").withStyle(ChatFormatting.RED));
                                         return 1;
                                     }
