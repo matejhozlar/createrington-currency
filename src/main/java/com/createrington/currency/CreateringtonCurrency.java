@@ -93,10 +93,10 @@ public class CreateringtonCurrency
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
+       if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
             NeoForge.EVENT_BUS.register(MobDrops.class);
             NeoForge.EVENT_BUS.register(MoneyCommands.class);
-        }
+       }
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
