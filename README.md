@@ -23,7 +23,7 @@ All planned features have been implemented and the mod is stable for production 
 
 ## Backend Templates
 
-- [**Node.js**](https://github.com/matejhozlar/createrington-nodejs-backend) (**Most Stable**)
+- [**JavaScript**](https://github.com/matejhozlar/createrington-javascript-backend) (**Most Stable**)
 - [**TypeScript**](https://github.com/matejhozlar/createrington-typescript-backend) (*Unfinished*)
 - [**Python**](https://github.com/matejhozlar/createrington-python-backend) (*Unfinished*)
 
