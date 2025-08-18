@@ -3,7 +3,6 @@
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-5E7C16?logo=minecraft&logoColor=white)
 ![NeoForge](https://img.shields.io/badge/NeoForge-Required-orange)
 ![Backend API](https://img.shields.io/badge/Backend-Required-critical)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
 **Createrington Currency** is a custom Minecraft mod that introduces a robust, server-backed economy system into your game. It enables physical money, banking features, enchantments, and more — all synchronized with an external backend API.
 
