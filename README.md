@@ -135,12 +135,5 @@ Inside, you can set:
 
 ---
 
-## License
-
-This project is licensed under the **MIT License**.  
-Use freely, contribute back, and credit [@matejhozlar](https://github.com/matejhozlar).
-
----
-
 Made with ☕ by [@matejhozlar](https://github.com/matejhozlar)  
 Let the money flow. 💸
