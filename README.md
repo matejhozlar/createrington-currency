@@ -23,7 +23,7 @@ All planned features have been implemented and the mod is stable for production 
 
 ## Backend Templates
 
-- [**Node.js**](https://github.com/matejhozlar/createrington-nodejs-backend) (**Most Stable**)
+- [**JavaScript**](https://github.com/matejhozlar/createrington-javascript-backend) (**Most Stable**)
 - [**TypeScript**](https://github.com/matejhozlar/createrington-typescript-backend) (*Unfinished*)
 - [**Python**](https://github.com/matejhozlar/createrington-python-backend) (*Unfinished*)
 
@@ -83,8 +83,8 @@ All planned features have been implemented and the mod is stable for production 
 
 ### Minecraft
 
-- Minecraft version **1.21.1**
-- Requires **NeoForge** mod loader
+- Minecraft version **1.20.1**
+- Requires **Forge** mod loader
 
 ### Backend API
 
@@ -122,7 +122,7 @@ Inside, you can set:
 
 ## Development
 
-- Built with **NeoForge** for Minecraft 1.21.1.
+- Built with **Forge** for Minecraft 1.20.1.
 - Developed using Java & Gradle.
 - Token-based authentication used to secure all player transactions.
 
@@ -132,13 +132,6 @@ Inside, you can set:
 2. Open in an IDE (e.g., IntelliJ).
 3. Use JDK 21+.
 4. Run `gradlew build` to compile.
-
----
-
-## License
-
-This project is licensed under the **MIT License**.  
-Use freely, contribute back, and credit [@matejhozlar](https://github.com/matejhozlar).
 
 ---
 
