@@ -5,6 +5,10 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class Config {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
+    public static final ModConfigSpec.BooleanValue DISABLE_CASH_COMMANDS = BUILDER
+            .comment("If true, the /deposit and /withdraw commands will NOT be registered")
+            .define("disableCashCommands", false);
+
     public static final ModConfigSpec.ConfigValue<String> API_BASE_URL = BUILDER
             .comment("Base URL for the currency API, eg. 'http://127.0.0.1:5000/")
             .define("apiBaseUrl", "http://127.0.0.1:5000/");
