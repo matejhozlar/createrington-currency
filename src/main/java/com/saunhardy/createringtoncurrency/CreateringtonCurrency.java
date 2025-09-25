@@ -1,7 +1,7 @@
-package com.createrington.currency;
+package com.saunhardy.createringtoncurrency;
 
-import com.createrington.currency.enchantment.ModEnchantmentEffects;
-import com.createrington.currency.mobdrops.MobDrops;
+import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
+import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.fml.loading.FMLEnvironment;
 import org.slf4j.Logger;
@@ -26,23 +26,15 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.api.distmarker.Dist;
 
-
-// The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(CreateringtonCurrency.MODID)
 public class CreateringtonCurrency
 {
-    // Define mod id in a common place for everything to reference
     public static final String MODID = "createringtoncurrency";
-    // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
-    // Create a Deferred Register to hold Blocks which will all be registered under the "createringtoncurrency" namespace
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
-    // Create a Deferred Register to hold Items which will all be registered under the "createringtoncurrency" namespace
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
-    // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "createringtoncurrency" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    // Bills
     public static final DeferredItem<Item> BILL_1 = ITEMS.register( "bill_1", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_5 = ITEMS.register( "bill_5", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_10 = ITEMS.register( "bill_10", () -> new Item(new Item.Properties().stacksTo(64)));
@@ -54,43 +46,28 @@ public class CreateringtonCurrency
 
     public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
 
-    // Creates a new food item with the id "createringtoncurrency:example_id", nutrition 1 and saturation 2
     public static final DeferredItem<Item> MOD_ICON = ITEMS.registerSimpleItem("mod_icon", new Item.Properties().food(new FoodProperties.Builder()
             .alwaysEdible().nutrition(1).saturationModifier(2f).build()));
 
-    // Creates a creative tab with the id "createringtoncurrency:example_tab" for the example item, that is placed after the combat tab
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("mod_tab", () -> CreativeModeTab.builder()
-            .title(Component.translatable("itemGroup.createringtoncurrency")) //The language key for the title of your CreativeModeTab
+            .title(Component.translatable("itemGroup.createringtoncurrency"))
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> MOD_ICON.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(MOD_ICON);
             }).build());
 
-    // The constructor for the mod class is the first code that is run when your mod is loaded.
-    // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.
     public CreateringtonCurrency(IEventBus modEventBus, ModContainer modContainer)
     {
-        // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
-
-        // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so items get registered
         ITEMS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
 
         MENUS.register(modEventBus);
 
-        // enchantments
         ModEnchantmentEffects.register(modEventBus);
 
-        // Register ourselves for server and other game events we are interested in.
-        // Note that this is necessary if and only if we want *this* class (CreateringtonCurrency) to respond directly to events.
-        // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
-
-        // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
        if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
@@ -101,7 +78,6 @@ public class CreateringtonCurrency
 
     private void commonSetup(final FMLCommonSetupEvent event)
     {
-        // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
     }
 }

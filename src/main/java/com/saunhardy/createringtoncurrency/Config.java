@@ -1,4 +1,4 @@
-package com.createrington.currency;
+package com.saunhardy.createringtoncurrency;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 

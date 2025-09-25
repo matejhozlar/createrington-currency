@@ -1,4 +1,4 @@
-package com.createrington.currency;
+package com.saunhardy.createringtoncurrency;
 
 import com.google.gson.*;
 import net.minecraft.commands.Commands;

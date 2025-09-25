@@ -1,7 +1,7 @@
-package com.createrington.currency.datagen;
+package com.saunhardy.createringtoncurrency.datagen;
 
-import com.createrington.currency.CreateringtonCurrency;
-import com.createrington.currency.enchantment.ModEnchantments;
+import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.enchantment.ModEnchantments;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.registries.Registries;

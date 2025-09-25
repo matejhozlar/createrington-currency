@@ -1,8 +1,8 @@
-package com.createrington.currency.enchantment;
+package com.saunhardy.createringtoncurrency.enchantment;
 
 import com.mojang.serialization.MapCodec;
-import com.createrington.currency.CreateringtonCurrency;
-import com.createrington.currency.enchantment.custom.CapitalistGreedEnchantmentEffect;
+import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.enchantment.custom.CapitalistGreedEnchantmentEffect;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.enchantment.effects.EnchantmentEntityEffect;
 import net.neoforged.bus.api.IEventBus;

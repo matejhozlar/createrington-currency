@@ -1,4 +1,4 @@
-package com.createrington.currency.enchantment.custom;
+package com.saunhardy.createringtoncurrency.enchantment.custom;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.server.level.ServerLevel;

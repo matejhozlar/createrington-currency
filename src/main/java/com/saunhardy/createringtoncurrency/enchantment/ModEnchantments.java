@@ -1,7 +1,7 @@
-package com.createrington.currency.enchantment;
+package com.saunhardy.createringtoncurrency.enchantment;
 
-import com.createrington.currency.CreateringtonCurrency;
-import com.createrington.currency.enchantment.custom.CapitalistGreedEnchantmentEffect;
+import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.enchantment.custom.CapitalistGreedEnchantmentEffect;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.resources.ResourceKey;

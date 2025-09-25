@@ -1,9 +1,9 @@
-package com.createrington.currency.mobdrops;
+package com.saunhardy.createringtoncurrency.mobdrops;
 
-import com.createrington.currency.CreateringtonCurrency;
-import com.createrington.currency.Config;
-import com.createrington.currency.MoneyCommands;
-import com.createrington.currency.enchantment.ModEnchantments;
+import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.Config;
+import com.saunhardy.createringtoncurrency.MoneyCommands;
+import com.saunhardy.createringtoncurrency.enchantment.ModEnchantments;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.core.registries.Registries;

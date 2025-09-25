@@ -1,6 +1,6 @@
-package com.createrington.currency.datagen;
+package com.saunhardy.createringtoncurrency.datagen;
 
-import com.createrington.currency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.PackOutput;
