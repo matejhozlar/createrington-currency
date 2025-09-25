@@ -1,10 +1,7 @@
 {
-  "itemGroup.createringtoncurrency": "Example Mod Tab",
-  "block.createringtoncurrency.example_block": "Example Block",
+  "itemGroup.createringtoncurrency": "Createrington Currency",
   "block.createringtoncurrency.atm": "ATM",
   "menu.createringtoncurrency.atm": "ATM",
-  "item.createringtoncurrency.example_item": "Example Item",
-  "item.createringtoncurrency.cash_bundle": "Cash Bundle ($1000)",
   "item.createringtoncurrency.bill_1": "$1 Bill",
   "item.createringtoncurrency.bill_5": "$5 Bill",
   "item.createringtoncurrency.bill_10": "$10 Bill",
@@ -13,8 +10,5 @@
   "item.createringtoncurrency.bill_100": "$100 Bill",
   "item.createringtoncurrency.bill_500": "$500 Bill",
   "item.createringtoncurrency.bill_1000": "$1000 Bill",
-  "item.createringtoncurrency.wallet": "Wallet",
-  "item.createringtoncurrency.mod_icon": "Mod Icon",
-
   "enchantment.createringtoncurrency.capitalist_greed": "Capitalist Greed"
 }

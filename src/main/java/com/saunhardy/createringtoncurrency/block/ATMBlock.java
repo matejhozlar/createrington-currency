@@ -45,7 +45,9 @@ public class ATMBlock extends Block {
 
     @Override
     public @NotNull BlockState mirror(BlockState state, Mirror mirror) {
-        return state.rotate(mirror.getRotation(state.getValue(FACING)));
+        Direction facing = state.getValue(FACING);
+        Rotation rot = mirror.getRotation(facing);
+        return state.setValue(FACING, rot.rotate(facing));
     }
 
     @Override

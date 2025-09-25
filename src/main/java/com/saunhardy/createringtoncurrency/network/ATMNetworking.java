@@ -1,6 +1,8 @@
 package com.saunhardy.createringtoncurrency.network;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.MoneyCommands;
@@ -58,7 +60,7 @@ public final class ATMNetworking {
 
                 int balance = -1;
                 try {
-                    var json = new com.google.gson.JsonParser().parse(sb.toString()).getAsJsonObject();
+                    JsonObject json = JsonParser.parseString(sb.toString()).getAsJsonObject();
                     if (json.has("balance")) balance = json.get("balance").getAsInt();
                 } catch (Exception ignored) {}
                 player.connection.send(new net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket(
