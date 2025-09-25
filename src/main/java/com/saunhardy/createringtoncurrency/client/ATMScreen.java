@@ -5,21 +5,30 @@ import com.saunhardy.createringtoncurrency.network.ATMDepositPayload;
 import com.saunhardy.createringtoncurrency.network.ATMWithdrawPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Inventory;
 import org.jetbrains.annotations.NotNull;
 
 public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
 
     private EditBox denomBox, countBox, totalBox;
-    private Button depositBtn, withdrawFixedBtn, withdrawTotalBtn;
+
+    private EditBox[] bundleBoxes = new EditBox[8];
+
+    private int wtSel = -1;
+    private Rect hitWTAct, hitWTBack;
+
+    private int wsSel = -1;
+    private Rect hitWSAct, hitWSBack;
+
+    private int wbSel = -1;
+    private Rect hitWBAct, hitWBBack;
 
     private int _label1Y = 34, _label2Y = 70;
 
@@ -33,25 +42,38 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private int pinProgress = 0;
     private int pinFlashTicks = 0;
 
-    private enum View { HOME, DEPOSIT, WITHDRAW }
+    private enum View {
+        HOME,
+        DEPOSIT,
+        WITHDRAW_MENU,
+        WITHDRAW_TOTAL,
+        WITHDRAW_SINGLE,
+        WITHDRAW_BUNDLE
+    }
     private View view = View.HOME;
 
     private int homeSel = 0;
     private Rect hitDeposit, hitWithdraw;
 
-    private static final int KEY_UP=265, KEY_DOWN=264, KEY_LEFT=263, KEY_RIGHT=262,
-            KEY_ENTER=257, KEY_SPACE=32, KEY_E=69, KEY_ESCAPE=256, KEY_W=87, KEY_S=83, KEY_A=65, KEY_D=68;
+    private int depositSel = 0;
+    private Rect hitDepAll, hitBack;
+
+    private int withdrawSel = 0;
+    private Rect hitWTotal, hitWSingle, hitWBundle, hitWBack;
 
     private int balance = -1;
     public void updateBalance(int v) { this.balance = v; }
 
-    private int depositSel = 0;
-    private Rect hitDepAll, hitBack;
+    private static final int KEY_UP=265, KEY_DOWN=264, KEY_LEFT=263, KEY_RIGHT=262,
+            KEY_ENTER=257, KEY_SPACE=32, KEY_E=69, KEY_ESCAPE=256,
+            KEY_W=87, KEY_S=83, KEY_A=65, KEY_D=68, KEY_BACKSPACE=259;
 
     private static final ResourceLocation ATM_BG =
             ResourceLocation.fromNamespaceAndPath("createringtoncurrency", "textures/gui/atm_bg.png");
     private static final int TEX_W = 320, TEX_H = 200;
     private static final int SCR_X = 16, SCR_Y = 22, SCR_W = 288, SCR_H = 162;
+
+    private static final int[] DENOMS = {1000, 500, 100, 50, 20, 10, 5, 1};
 
     private static class Rect { int x,y,w,h; Rect(int x,int y,int w,int h){this.x=x;this.y=y;this.w=w;this.h=h;} }
 
@@ -63,76 +85,17 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         return new Rect(x,y,w,h);
     }
 
-    private static final int CONTENT_PAD = 10;
+    private void attachPlaceholder(EditBox eb, String placeholder) {
+        eb.setSuggestion(placeholder);
+        eb.setResponder(s -> eb.setSuggestion(s.isEmpty() ? placeholder : ""));
+    }
 
+
+    private static final int CONTENT_PAD = 10;
     private Rect contentArea() {
         Rect s = screenArea();
         return new Rect(s.x + CONTENT_PAD, s.y + CONTENT_PAD, s.w - CONTENT_PAD*2, s.h - CONTENT_PAD*2);
     }
-
-    private void setView(View v) {
-        this.view = v;
-
-        boolean showDepositWidgets = false;
-        boolean showWithdraw = (v == View.WITHDRAW);
-
-        if (depositBtn != null)           { depositBtn.visible = showDepositWidgets;           depositBtn.active  = showDepositWidgets; }
-        if (denomBox != null)             { denomBox.visible = showWithdraw;                   denomBox.setEditable(showWithdraw); }
-        if (countBox != null)             { countBox.visible = showWithdraw;                   countBox.setEditable(showWithdraw); }
-        if (totalBox != null)             { totalBox.visible = showWithdraw;                   totalBox.setEditable(showWithdraw); }
-        if (withdrawFixedBtn != null)     { withdrawFixedBtn.visible = showWithdraw;           withdrawFixedBtn.active = showWithdraw; }
-        if (withdrawTotalBtn != null)     { withdrawTotalBtn.visible = showWithdraw;           withdrawTotalBtn.active = showWithdraw; }
-
-        if (v == View.HOME) {
-            updateBalance(-1);
-            requestBalance();
-        } else if (v == View.DEPOSIT) {
-            depositSel = 0;
-        }
-    }
-
-    private void goHome()      { setView(View.HOME); }
-    private void goDeposit()   { setView(View.DEPOSIT); }
-    private void goWithdraw()  { setView(View.WITHDRAW); }
-
-    private void performDepositAll() {
-        var c = Minecraft.getInstance().getConnection();
-        if (c != null) {
-            c.send(new ServerboundCustomPayloadPacket(new ATMDepositPayload()));
-            Minecraft.getInstance().getSoundManager()
-                    .play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-        }
-    }
-
-    private void renderDeposit(GuiGraphics g, Rect r) {
-        g.drawString(this.font, "Deposit", r.x, r.y, 0xFFFFFFFF, false);
-
-        int startY = r.y + 24;
-        int rowH = 20;
-        int itemW = Math.min(r.w, 220);
-        int x = r.x + 8;
-
-        String[] items = {"Deposit all", "Back"};
-        for (int i = 0; i < items.length; i++) {
-            int y = startY + i * (rowH + 8);
-            boolean sel = (depositSel == i);
-
-            g.fill(x, y, x + itemW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
-            g.fill(x, y, x + itemW, y + 1, 0x33FFFFFF);
-            g.fill(x, y + rowH - 1, x + itemW, y + rowH, 0x33000000);
-
-            String label = (sel ? "> " : "  ") + items[i];
-            int ty = y + (rowH - this.font.lineHeight) / 2;
-            g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
-
-            if (i == 0) hitDepAll = new Rect(x, y, itemW, rowH);
-            else        hitBack   = new Rect(x, y, itemW, rowH);
-        }
-
-        String hint = "Use ↑/↓ or W/S; Enter to select   •   ESC/← to go back";
-        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
-    }
-
 
     public ATMScreen(ATMMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -156,11 +119,6 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         final int LABEL_TO_FIELD = 12, FIELD_H = 18, GAP = 6, PAD = 4;
 
         int y0 = r.y;
-        depositBtn = Button.builder(Component.literal("Deposit all"), b -> {
-            var c = Minecraft.getInstance().getConnection();
-            if (c != null) c.send(new ServerboundCustomPayloadPacket(new ATMDepositPayload()));
-        }).bounds(r.x, y0, r.w, 20).build();
-        addRenderableWidget(depositBtn);
 
         int label1Y  = y0 + 20 + GAP;
         int fields1Y = label1Y + LABEL_TO_FIELD;
@@ -168,18 +126,11 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         int boxW = Math.max(48, (r.w - 72 - PAD*3) / 2);
         denomBox = new EditBox(this.font, r.x,              fields1Y, boxW, FIELD_H, Component.empty());
         countBox = new EditBox(this.font, r.x + boxW + PAD, fields1Y, boxW, FIELD_H, Component.empty());
+        for (EditBox eb : bundleBoxes) {
+            if (eb != null) eb.setSuggestion("0");
+        }
         addRenderableWidget(denomBox);
         addRenderableWidget(countBox);
-
-        withdrawFixedBtn = Button.builder(Component.literal("Withdraw"), b -> {
-            try {
-                int d = Integer.parseInt(denomBox.getValue().trim());
-                int c = Integer.parseInt(countBox.getValue().trim());
-                var conn = Minecraft.getInstance().getConnection();
-                if (conn != null) conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(0, d, c)));
-            } catch (Exception ignored) {}
-        }).bounds(r.x + r.w - 72, fields1Y, 72, 20).build();
-        addRenderableWidget(withdrawFixedBtn);
 
         int label2Y  = fields1Y + FIELD_H + GAP;
         int fields2Y = label2Y + LABEL_TO_FIELD;
@@ -188,33 +139,149 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         totalBox = new EditBox(this.font, r.x, fields2Y, totalW, FIELD_H, Component.empty());
         addRenderableWidget(totalBox);
 
-        withdrawTotalBtn = Button.builder(Component.literal("Total"), b -> {
-            try {
-                int t = Integer.parseInt(totalBox.getValue().trim());
-                var conn = Minecraft.getInstance().getConnection();
-                if (conn != null) conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(1, t, 0)));
-            } catch (Exception ignored) {}
-        }).bounds(r.x + r.w - 72, fields2Y, 72, 20).build();
-        addRenderableWidget(withdrawTotalBtn);
+        int rowH = 16;
+        int by = r.y + 28;
+        for (int i = 0; i < DENOMS.length; i++) {
+            EditBox eb = new EditBox(this.font, r.x + 100, by + i * (rowH + 4), 48, 14, Component.empty());
+            eb.setFilter(s -> s.matches("\\d{0,4}"));
+            eb.setValue("");
+            bundleBoxes[i] = eb;
+            addRenderableWidget(eb);
+        }
 
         denomBox.setFilter(s -> s.matches("\\d{0,5}"));
         countBox.setFilter(s -> s.matches("\\d{0,4}"));
         totalBox.setFilter(s -> s.matches("\\d{0,9}"));
 
+        attachPlaceholder(denomBox, "Denomination");
+        attachPlaceholder(countBox, "Count");
+        attachPlaceholder(totalBox, "Enter amount");
+        for (EditBox eb : bundleBoxes) {
+            if (eb != null) attachPlaceholder(eb, "0");
+        }
+
         this._label1Y = label1Y - this.topPos;
         this._label2Y = label2Y - this.topPos;
 
-        setUiVisible(false);
+        setView(View.HOME);
+        setUiForView();
     }
 
+    private void setUiForView() {
+        boolean vSingle  = (view == View.WITHDRAW_SINGLE);
+        boolean vTotal   = (view == View.WITHDRAW_TOTAL);
+        boolean vBundle  = (view == View.WITHDRAW_BUNDLE);
 
-    private void setUiVisible(boolean vis) {
-        if (depositBtn != null)        { depositBtn.visible = vis;        depositBtn.active = vis; }
-        if (withdrawFixedBtn != null)  { withdrawFixedBtn.visible = vis;  withdrawFixedBtn.active = vis; }
-        if (withdrawTotalBtn != null)  { withdrawTotalBtn.visible = vis;  withdrawTotalBtn.active = vis; }
-        if (denomBox != null)          { denomBox.visible = vis;          denomBox.setEditable(vis); }
-        if (countBox != null)          { countBox.visible = vis;          countBox.setEditable(vis); }
-        if (totalBox != null)          { totalBox.visible = vis;          totalBox.setEditable(vis); }
+        if (denomBox != null) { denomBox.visible = vSingle; denomBox.setEditable(vSingle); }
+        if (countBox != null) { countBox.visible = vSingle; countBox.setEditable(vSingle); }
+
+        if (totalBox != null) { totalBox.visible = vTotal;  totalBox.setEditable(vTotal); }
+
+        for (EditBox eb : bundleBoxes) {
+            if (eb != null) { eb.visible = vBundle; eb.setEditable(vBundle); }
+        }
+    }
+
+    private void move(EditBox eb, int x, int y, int w) {
+        eb.setX(x); eb.setY(y); eb.setWidth(w);
+    }
+
+    private void setView(View v) {
+        clearTextFocus();
+        this.view = v;
+
+        if (v == View.HOME) {
+            updateBalance(-1);
+            requestBalance();
+        } else if (v == View.DEPOSIT) {
+            depositSel = 0;
+        } else if (v == View.WITHDRAW_MENU) {
+            withdrawSel = 0;
+        }
+
+        setUiForView();
+
+        switch (v) {
+            case WITHDRAW_TOTAL  -> { wtSel = -1; focus(totalBox); }
+            case WITHDRAW_SINGLE -> { wsSel = -1; focus(denomBox); } // or focus(countBox) if you prefer
+            case WITHDRAW_BUNDLE -> { wbSel = -1; if (bundleBoxes[0] != null) focus(bundleBoxes[0]); }
+            default -> {}
+        }
+    }
+
+    private void goHome()            { setView(View.HOME); }
+    private void goDeposit()         { setView(View.DEPOSIT); }
+    private void goWithdrawMenu()    { setView(View.WITHDRAW_MENU); }
+    private void goWithdrawTotal()   { setView(View.WITHDRAW_TOTAL); }
+    private void goWithdrawSingle()  { setView(View.WITHDRAW_SINGLE); }
+    private void goWithdrawBundle()  { setView(View.WITHDRAW_BUNDLE); }
+
+    private void requestBalance() {
+        var conn = Minecraft.getInstance().getConnection();
+        if (conn != null) {
+            conn.send(new ServerboundCustomPayloadPacket(
+                    new com.saunhardy.createringtoncurrency.network.ATMQueryBalancePayload()));
+        }
+    }
+
+    private void performDepositAll() {
+        var c = Minecraft.getInstance().getConnection();
+        if (c != null) {
+            c.send(new ServerboundCustomPayloadPacket(new ATMDepositPayload()));
+            clickSound();
+        }
+    }
+
+    private void clearTextFocus() {
+        this.setFocused(null);
+        if (denomBox != null)  denomBox.setFocused(false);
+        if (countBox != null)  countBox.setFocused(false);
+        if (totalBox != null)  totalBox.setFocused(false);
+        for (EditBox eb : bundleBoxes) if (eb != null) eb.setFocused(false);
+    }
+
+    private void focus(EditBox eb) {
+        clearTextFocus();
+        if (eb != null) {
+            this.setFocused(eb);
+            eb.setFocused(true);
+            eb.setCursorPosition(eb.getValue().length());
+        }
+    }
+
+    private void performWithdrawSingle() {
+        try {
+            int d = Integer.parseInt(denomBox.getValue().trim());
+            int c = Integer.parseInt(countBox.getValue().trim());
+            var conn = Minecraft.getInstance().getConnection();
+            if (conn != null) conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(0, d, c)));
+        } catch (Exception ignored) {}
+    }
+
+    private void performWithdrawTotal() {
+        try {
+            int t = Integer.parseInt(totalBox.getValue().trim());
+            var conn = Minecraft.getInstance().getConnection();
+            if (conn != null) conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(1, t, 0)));
+        } catch (Exception ignored) {}
+    }
+
+    private void performWithdrawBundle() {
+        var conn = Minecraft.getInstance().getConnection();
+        if (conn == null) return;
+
+        for (int i = 0; i < DENOMS.length; i++) {
+            String v = bundleBoxes[i].getValue().trim();
+            if (!v.isEmpty()) {
+                try {
+                    int count = Integer.parseInt(v);
+                    if (count > 0) {
+                        conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(0, DENOMS[i], count)));
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        clickSound();
     }
 
     @Override
@@ -241,19 +308,51 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             case AUTH -> {
                 if (flowTicks > 20) {
                     flow = Flow.READY; flowTicks = 0;
-                    setUiVisible(true);
                     setView(View.HOME);
-                    requestBalance();
                 }
             }
             case READY -> { /* no-op */ }
         }
     }
 
-    private void requestBalance() {
-        var conn = Minecraft.getInstance().getConnection();
-        if (conn != null) {
-            conn.send(new ServerboundCustomPayloadPacket(new com.saunhardy.createringtoncurrency.network.ATMQueryBalancePayload()));
+    @Override
+    protected void renderBg(GuiGraphics g, float pt, int mouseX, int mouseY) {
+        g.blit(ATM_BG, leftPos, topPos, 0, 0, imageWidth, imageHeight, TEX_W, TEX_H);
+
+        Rect r = contentArea();
+        if (flow != Flow.READY) {
+            drawIntro(g, r.x, r.y, r.w, r.h);
+            return;
+        }
+
+        switch (view) {
+            case HOME -> renderHome(g, r);
+            case DEPOSIT -> renderDeposit(g, r);
+            case WITHDRAW_MENU -> renderWithdrawMenu(g, r);
+            case WITHDRAW_TOTAL -> renderWithdrawTotal(g, r);
+            case WITHDRAW_SINGLE -> renderWithdrawSingle(g, r);
+            case WITHDRAW_BUNDLE -> renderWithdrawBundle(g, r);
+        }
+    }
+
+    @Override
+    protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
+        g.drawString(this.font, "ATM", 6, 4, 0xFFFFFFFF, false);
+    }
+
+    @Override
+    public void render(@NotNull GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
+
+        boolean showing = statusTicks > 0 && statusText != null && !statusText.isEmpty();
+        if (!showing) this.renderTooltip(g, mouseX, mouseY);
+
+        if (showing) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, 1000);
+            renderStatusPopup(g);
+            g.pose().popPose();
         }
     }
 
@@ -291,51 +390,188 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
     }
 
-    @Override
-    protected void renderBg(GuiGraphics g, float pt, int mouseX, int mouseY) {
-        g.blit(ATM_BG, leftPos, topPos, 0, 0, imageWidth, imageHeight, TEX_W, TEX_H);
+    private void renderDeposit(GuiGraphics g, Rect r) {
+        g.drawString(this.font, "Deposit", r.x, r.y, 0xFFFFFFFF, false);
 
-        Rect r = contentArea();
-        if (flow != Flow.READY) {
-            drawIntro(g, r.x, r.y, r.w, r.h);
-            return;
+        int startY = r.y + 24;
+        int rowH = 20;
+        int itemW = Math.min(r.w, 220);
+        int x = r.x + 8;
+
+        String[] items = {"Deposit all", "Back"};
+        for (int i = 0; i < items.length; i++) {
+            int y = startY + i * (rowH + 8);
+            boolean sel = (depositSel == i);
+
+            g.fill(x, y, x + itemW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + itemW, y + 1, 0x33FFFFFF);
+            g.fill(x, y + rowH - 1, x + itemW, y + rowH, 0x33000000);
+
+            String label = (sel ? "> " : "  ") + items[i];
+            int ty = y + (rowH - this.font.lineHeight) / 2;
+            g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
+
+            if (i == 0) hitDepAll = new Rect(x, y, itemW, rowH);
+            else        hitBack   = new Rect(x, y, itemW, rowH);
         }
 
-        if (view == View.HOME) {
-            renderHome(g, r);
-        } else if (view == View.DEPOSIT) {
-            renderDeposit(g, r);
-        }
+        String hint = "Use ↑/↓ or W/S; Enter to select";
+        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
     }
 
-    @Override
-    protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
-        g.drawString(this.font, "ATM", 6, 4, 0xFFFFFFFF, false);
+    private void renderWithdrawMenu(GuiGraphics g, Rect r) {
+        g.drawString(this.font, "Withdraw", r.x, r.y, 0xFFFFFFFF, false);
 
-        if (flow == Flow.READY && view == View.WITHDRAW) {
-            Rect r = contentArea();
-            int lx = r.x - this.leftPos;
-            g.drawString(this.font, "Denom", lx,              _label1Y, 0xA0A0A0, false);
-            g.drawString(this.font, "Count", lx + 8 + 48,     _label1Y, 0xA0A0A0, false);
-            g.drawString(this.font, "Total", lx,              _label2Y, 0xA0A0A0, false);
+        int startY = r.y + 24;
+        int rowH = 20;
+        int itemW = Math.min(r.w, 240);
+        int x = r.x + 8;
+
+        String[] items = {
+                "Enter Amount",
+                "Choose Bills",
+                "Single Denomination",
+                "Back"
+        };
+
+        Rect[] hits = new Rect[4];
+        for (int i = 0; i < items.length; i++) {
+            int y = startY + i * (rowH + 8);
+            boolean sel = (withdrawSel == i);
+
+            g.fill(x, y, x + itemW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + itemW, y + 1, 0x33FFFFFF);
+            g.fill(x, y + rowH - 1, x + itemW, y + rowH, 0x33000000);
+
+            String label = (sel ? "> " : "  ") + items[i];
+            int ty = y + (rowH - this.font.lineHeight) / 2;
+            g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
+
+            hits[i] = new Rect(x, y, itemW, rowH);
         }
+        hitWTotal  = hits[0];
+        hitWBundle = hits[1];
+        hitWSingle = hits[2];
+        hitWBack   = hits[3];
+
+        String hint = "Use ↑/↓ or W/S; Enter to select";
+        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
+    }
+
+    private void renderWithdrawTotal(GuiGraphics g, Rect r) {
+        g.drawString(this.font, "Withdraw • Enter Amount", r.x, r.y, 0xFFFFFFFF, false);
+
+        int x = r.x + 8;
+        int inputW = Math.min(r.w - 16, 220);
+        int inputY = r.y + 22;
+
+        move(totalBox, x, inputY, inputW);
+
+        int rowH = 20;
+        int yStart = inputY + 24;
+
+        String[] items = { "Withdraw", "Back" };
+        Rect[] hits = new Rect[items.length];
+
+        for (int i = 0; i < items.length; i++) {
+            int y = yStart + i * (rowH + 8);
+            boolean sel = (wtSel == i);
+            g.fill(x, y, x + inputW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + inputW, y + 1, 0x33FFFFFF);
+            g.fill(x, y + rowH - 1, x + inputW, y + rowH, 0x33000000);
+
+            String label = (sel ? "> " : "  ") + items[i];
+            int ty = y + (rowH - this.font.lineHeight) / 2;
+            g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
+
+            hits[i] = new Rect(x, y, inputW, rowH);
+        }
+        hitWTAct  = hits[0];
+        hitWTBack = hits[1];
+
+        String hint = "Type amount, then Enter on Withdraw";
+        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
     }
 
 
-    @Override
-    public void render(@NotNull GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(g, mouseX, mouseY, partialTick);
-        super.render(g, mouseX, mouseY, partialTick);
+    private void renderWithdrawSingle(GuiGraphics g, Rect r) {
+        g.drawString(this.font, "Withdraw • Single Denomination", r.x, r.y, 0xFFFFFFFF, false);
 
-        boolean showing = statusTicks > 0 && statusText != null && !statusText.isEmpty();
-        if (!showing) this.renderTooltip(g, mouseX, mouseY);
+        int x = r.x + 8;
+        int rowH = 20;
+        int inputY = r.y + 22;
 
-        if (showing) {
-            g.pose().pushPose();
-            g.pose().translate(0, 0, 1000);
-            renderStatusPopup(g);
-            g.pose().popPose();
+        int boxW = 84;
+        int gap = 6;
+
+        move(denomBox, x, inputY, boxW);
+        move(countBox, x + boxW + gap, inputY, boxW);
+
+        int itemW = Math.min(r.w - 16, 220);
+        int yStart = inputY + 24;
+
+        String[] items = { "Withdraw", "Back" };
+        Rect[] hits = new Rect[items.length];
+
+        for (int i = 0; i < items.length; i++) {
+            int y = yStart + i * (rowH + 8);
+            boolean sel = (wsSel == i);
+            g.fill(x, y, x + itemW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + itemW, y + 1, 0x33FFFFFF);
+            g.fill(x, y + rowH - 1, x + itemW, y + rowH, 0x33000000);
+
+            String label = (sel ? "> " : "  ") + items[i];
+            int ty = y + (rowH - this.font.lineHeight) / 2;
+            g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
+
+            hits[i] = new Rect(x, y, itemW, rowH);
         }
+        hitWSAct  = hits[0];
+        hitWSBack = hits[1];
+
+        String hint = "Fill Denom & Count, then Withdraw";
+        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
+    }
+
+    private void renderWithdrawBundle(GuiGraphics g, Rect r) {
+        g.drawString(this.font, "Withdraw • Choose Bills", r.x, r.y, 0xFFFFFFFF, false);
+
+        int x = r.x + 8;
+        int labelW = 88;
+        int rowH = 16;
+        int y0 = r.y + 22;
+
+        for (int i = 0; i < DENOMS.length; i++) {
+            int y = y0 + i * (rowH + 4);
+            g.drawString(this.font, "$" + DENOMS[i] + "  x", x, y + 3, 0xC0C0C0, false);
+
+            move(bundleBoxes[i], x + labelW, y, 48);
+        }
+
+        int itemW = Math.min(r.w - 16, 240);
+        int yStart = r.y + r.h - (20 + 8 + 20) - 6;
+
+        String[] items = { "Withdraw bundle", "Back" };
+        Rect[] hits = new Rect[items.length];
+
+        for (int i = 0; i < items.length; i++) {
+            int y = yStart + i * (20 + 8);
+            boolean sel = (wbSel == i);
+            g.fill(x, y, x + itemW, y + 20, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + itemW, y + 1, 0x33FFFFFF);
+            g.fill(x, y + 19, x + itemW, y + 20, 0x33000000);
+
+            String label = (sel ? "> " : "  ") + items[i];
+            int ty = y + (20 - this.font.lineHeight) / 2;
+            g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
+
+            hits[i] = new Rect(x, y, itemW, 20);
+        }
+        hitWBAct  = hits[0];
+        hitWBBack = hits[1];
+
+        String hint = "Fill counts, then Withdraw bundle";
+        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
     }
 
     @Override
@@ -347,14 +583,12 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             if (hitDeposit != null &&
                     mx >= hitDeposit.x && mx <= hitDeposit.x + hitDeposit.w &&
                     my >= hitDeposit.y && my <= hitDeposit.y + hitDeposit.h) {
-                goDeposit();
-                return true;
+                goDeposit(); return true;
             }
             if (hitWithdraw != null &&
                     mx >= hitWithdraw.x && mx <= hitWithdraw.x + hitWithdraw.w &&
                     my >= hitWithdraw.y && my <= hitWithdraw.y + hitWithdraw.h) {
-                goWithdraw();
-                return true;
+                goWithdrawMenu(); return true;
             }
         }
 
@@ -368,7 +602,34 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
                 goHome(); return true;
             }
         }
+
+        if (view == View.WITHDRAW_MENU) {
+            if (hitWTotal  != null && within(mx,my,hitWTotal))  { goWithdrawTotal();  return true; }
+            if (hitWBundle != null && within(mx,my,hitWBundle)) { goWithdrawBundle(); return true; }
+            if (hitWSingle != null && within(mx,my,hitWSingle)) { goWithdrawSingle(); return true; }
+            if (hitWBack   != null && within(mx,my,hitWBack))   { goHome();           return true; }
+        }
+
+        if (view == View.WITHDRAW_TOTAL) {
+            if (hitWTAct  != null && within(mx,my,hitWTAct))  { performWithdrawTotal(); return true; }
+            if (hitWTBack != null && within(mx,my,hitWTBack)) { goWithdrawMenu();       return true; }
+        }
+
+        if (view == View.WITHDRAW_SINGLE) {
+            if (hitWSAct  != null && within(mx,my,hitWSAct))  { performWithdrawSingle(); return true; }
+            if (hitWSBack != null && within(mx,my,hitWSBack)) { goWithdrawMenu();        return true; }
+        }
+
+        if (view == View.WITHDRAW_BUNDLE) {
+            if (hitWBAct  != null && within(mx,my,hitWBAct))  { performWithdrawBundle(); return true; }
+            if (hitWBBack != null && within(mx,my,hitWBBack)) { goWithdrawMenu();        return true; }
+        }
+
         return super.mouseClicked(mx, my, button);
+    }
+
+    private static boolean within(double mx, double my, Rect r) {
+        return mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
     }
 
     private static void clickSound() {
@@ -376,64 +637,214 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
                 .play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
+    private boolean isAnyFieldFocused() {
+        if (denomBox != null && denomBox.isFocused()) return true;
+        if (countBox != null && countBox.isFocused()) return true;
+        if (totalBox != null && totalBox.isFocused()) return true;
+        for (EditBox eb : bundleBoxes) {
+            if (eb != null && eb.isFocused()) return true;
+        }
+        return false;
+    }
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (flow != Flow.READY) { flow = Flow.READY; setView(View.HOME); return true; }
+        if (keyCode == KEY_ESCAPE) {
+            this.onClose();
+            return true;
+        }
+
         if (statusTicks > 0) { statusTicks = 0; return true; }
 
-        if (view == View.HOME) {
-            if (keyCode == KEY_UP || keyCode == KEY_W) {
-                homeSel = (homeSel + 2 - 1) % 2;
-                clickSound();
-                return true;
+        if (flow != Flow.READY) { flow = Flow.READY; setView(View.HOME); return true; }
+        if (isAnyFieldFocused()) {
+            if (view == View.WITHDRAW_TOTAL && totalBox != null && totalBox.isFocused()) {
+                if (keyCode == KEY_DOWN || keyCode == KEY_S) {
+                    clearTextFocus();
+                    wtSel = 0;
+                    clickSound();
+                    return true;
+                }
             }
-            if (keyCode == KEY_DOWN || keyCode == KEY_S) {
-                homeSel = (homeSel + 1) % 2;
-                clickSound();
-                return true;
+            if (view == View.WITHDRAW_SINGLE) {
+                boolean inputFocused = (denomBox != null && denomBox.isFocused())
+                        || (countBox != null && countBox.isFocused());
+                if (inputFocused && (keyCode == KEY_DOWN || keyCode == KEY_S)) {
+                    clearTextFocus();
+                    wsSel = 0;
+                    clickSound();
+                    return true;
+                }
             }
-            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
-                if (homeSel == 0) goDeposit(); else goWithdraw();
-                return true;
+            if (view == View.WITHDRAW_BUNDLE) {
+                boolean anyFocused = false;
+                for (EditBox eb : bundleBoxes) if (eb != null && eb.isFocused()) { anyFocused = true; break; }
+                if (anyFocused && (keyCode == KEY_DOWN || keyCode == KEY_S)) {
+                    clearTextFocus();
+                    wbSel = 0;
+                    clickSound();
+                    return true;
+                }
             }
-            if (keyCode == KEY_ESCAPE || keyCode == KEY_LEFT || keyCode == KEY_A) {
-                this.onClose();
-                return true;
+
+            if (keyCode == KEY_BACKSPACE) {
+                return super.keyPressed(keyCode, scanCode, modifiers);
+            }
+
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E
+                    || keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                if (view == View.WITHDRAW_TOTAL)   { performWithdrawTotal();  return true; }
+                if (view == View.WITHDRAW_SINGLE)  { performWithdrawSingle(); return true; }
+                if (view == View.WITHDRAW_BUNDLE)  { performWithdrawBundle(); return true; }
+            }
+
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+
+        if (view == View.WITHDRAW_TOTAL) {
+            if (totalBox != null && totalBox.isFocused()) {
+                if (keyCode == KEY_DOWN || keyCode == KEY_S) {
+                    totalBox.setFocused(false);
+                    this.setFocused(null);
+                    wtSel = 0;
+                    clickSound();
+                    return true;
+                }
+            } else {
+                if ((keyCode == KEY_UP || keyCode == KEY_W) && wtSel == 0) {
+                    focus(totalBox);
+                    wtSel = -1;
+                    clickSound();
+                    return true;
+                }
             }
         }
 
+        if (view == View.WITHDRAW_SINGLE) {
+            boolean inputFocused = (denomBox != null && denomBox.isFocused())
+                    || (countBox != null && countBox.isFocused());
+
+            if (inputFocused) {
+                if (keyCode == KEY_DOWN || keyCode == KEY_S) {
+                    clearTextFocus();
+                    wsSel = 0;
+                    clickSound();
+                    return true;
+                }
+            } else {
+                if ((keyCode == KEY_UP || keyCode == KEY_W) && wsSel == 0) {
+                    if (countBox != null) focus(countBox); else focus(denomBox);
+                    wsSel = -1;
+                    clickSound();
+                    return true;
+                }
+            }
+        }
+
+        if (view == View.WITHDRAW_BUNDLE) {
+            boolean anyFocused = false;
+            for (EditBox eb : bundleBoxes) if (eb != null && eb.isFocused()) { anyFocused = true; break; }
+
+            if (anyFocused) {
+                if (keyCode == KEY_DOWN || keyCode == KEY_S) {
+                    clearTextFocus();
+                    wbSel = 0;
+                    clickSound();
+                    return true;
+                }
+            } else {
+                if ((keyCode == KEY_UP || keyCode == KEY_W) && wbSel == 0) {
+                    if (bundleBoxes[0] != null) focus(bundleBoxes[0]);
+                    wbSel = -1;
+                    clickSound();
+                    return true;
+                }
+            }
+        }
+
+        if (view == View.HOME) {
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { homeSel = (homeSel + 2 - 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { homeSel = (homeSel + 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                if (homeSel == 0) goDeposit(); else goWithdrawMenu();
+                return true;
+            }
+            if (keyCode == KEY_BACKSPACE) { this.onClose(); return true; }
+
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
         if (view == View.DEPOSIT) {
-            if (keyCode == KEY_UP || keyCode == KEY_W) {
-                depositSel = (depositSel + 2 - 1) % 2;
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-                return true;
-            }
-            if (keyCode == KEY_DOWN || keyCode == KEY_S) {
-                depositSel = (depositSel + 1) % 2;
-                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-                return true;
-            }
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { depositSel = (depositSel + 2 - 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { depositSel = (depositSel + 1) % 2; clickSound(); return true; }
             if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
                 if (depositSel == 0) performDepositAll(); else goHome();
                 return true;
             }
-            if (keyCode == KEY_ESCAPE || keyCode == KEY_LEFT || keyCode == KEY_A) {
-                goHome();
+            if (keyCode == KEY_BACKSPACE) { goHome(); return true; }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (view == View.WITHDRAW_MENU) {
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { withdrawSel = (withdrawSel + 4 - 1) % 4; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { withdrawSel = (withdrawSel + 1) % 4; clickSound(); return true; }
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                switch (withdrawSel) {
+                    case 0 -> goWithdrawTotal();
+                    case 1 -> goWithdrawBundle();
+                    case 2 -> goWithdrawSingle();
+                    case 3 -> goHome();
+                }
                 return true;
             }
+            if (keyCode == KEY_BACKSPACE) { clearTextFocus(); goHome(); return true; }
+            return super.keyPressed(keyCode, scanCode, modifiers);
         }
+
+        if (view == View.WITHDRAW_TOTAL) {
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { wtSel = (wtSel + 2 - 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { wtSel = (wtSel + 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                if (wtSel == 0) performWithdrawTotal(); else goWithdrawMenu();
+                return true;
+            }
+            if (keyCode == KEY_BACKSPACE) { clearTextFocus(); goWithdrawMenu(); return true; }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (view == View.WITHDRAW_SINGLE) {
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { wsSel = (wsSel + 2 - 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { wsSel = (wsSel + 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                if (wsSel == 0) performWithdrawSingle(); else goWithdrawMenu();
+                return true;
+            }
+            if (keyCode == KEY_BACKSPACE) { clearTextFocus(); goWithdrawMenu(); return true; }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (view == View.WITHDRAW_BUNDLE) {
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { wbSel = (wbSel + 2 - 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { wbSel = (wbSel + 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                if (wbSel == 0) performWithdrawBundle(); else goWithdrawMenu();
+                return true;
+            }
+            if (keyCode == KEY_BACKSPACE) { clearTextFocus(); goWithdrawMenu(); return true; }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    private void drawIntro(GuiGraphics g, int x, int y, int w, int h) {
 
+    private void drawIntro(GuiGraphics g, int x, int y, int w, int h) {
         final int TOP_PAD = 6;
         final int cx = x + w / 2;
         final int top = y + TOP_PAD;
 
-        if (flow == Flow.INTRO) {
-            return;
-        }
+        if (flow == Flow.INTRO) return;
 
         if (flow == Flow.PIN) {
             String title = "Enter PIN";
