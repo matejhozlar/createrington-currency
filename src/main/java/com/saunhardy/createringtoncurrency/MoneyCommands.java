@@ -168,77 +168,7 @@ public class MoneyCommands {
                             .executes(context -> {
                                 ServerPlayer player = context.getSource().getPlayerOrException();
                                 if (isOnCooldown(player)) return 0;
-                                final String uuid = player.getUUID().toString();
-
-                                // Define the bill items and their values
-                                Map<Item, Integer> billValues = Map.of(
-                                        CreateringtonCurrency.BILL_1.get(), 1,
-                                        CreateringtonCurrency.BILL_5.get(), 5,
-                                        CreateringtonCurrency.BILL_10.get(), 10,
-                                        CreateringtonCurrency.BILL_20.get(), 20,
-                                        CreateringtonCurrency.BILL_50.get(), 50,
-                                        CreateringtonCurrency.BILL_100.get(), 100,
-                                        CreateringtonCurrency.BILL_500.get(), 500,
-                                        CreateringtonCurrency.BILL_1000.get(), 1000
-                                );
-
-                                // Step 1: Scan inventory for bills
-                                final Map<Integer, List<Integer>> slotsByDenomination = new HashMap<>();
-                                int computedTotal = 0;
-
-                                for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-                                    ItemStack stack = player.getInventory().getItem(i);
-                                    if (!stack.isEmpty() && billValues.containsKey(stack.getItem())) {
-                                        int value = billValues.get(stack.getItem());
-                                        int count = stack.getCount();
-                                        computedTotal += value * count;
-
-                                        slotsByDenomination.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
-                                    }
-                                }
-
-                                if (computedTotal == 0) {
-                                    player.sendSystemMessage(message("[ERROR]" , "No bills to deposit.", ChatFormatting.RED));
-                                    return 1;
-                                }
-
-                                final int totalAmount = computedTotal;
-
-                                // Step 2: Make API request
-                                Map<String, Object> payload = new HashMap<>();
-                                payload.put("uuid", uuid);
-                                payload.put("amount", totalAmount);
-
-                                final String json = GSON.toJson(payload);
-                                String formatted = NumberFormat.getInstance().format(totalAmount);
-
-                                player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
-
-                                EXECUTOR.submit(() -> {
-                                    try {
-                                        URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get())).toURL();
-                                        HttpResponse response = sendPost(url, player, json);
-
-                                        if (response.code == 200) {
-                                            // Step 3: Remove items AFTER successful deposit
-                                            player.server.execute(() -> {
-                                                for (Map.Entry<Integer, List<Integer>> entry : slotsByDenomination.entrySet()) {
-                                                    for (int slot : entry.getValue()) {
-                                                        player.getInventory().setItem(slot, ItemStack.EMPTY);
-                                                    }
-                                                }
-                                            });
-                                            player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
-                                        } else {
-                                            sendError(player, "Deposit", response.body);
-                                        }
-
-                                    } catch (Exception e) {
-                                        player.sendSystemMessage(message("[ERROR]", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
-                                        LOGGER.error("Exception in /deposit command for {} (UUID: {})",player.getName().getString(), uuid, e);
-                                    }
-                                });
-
+                                handleDepositAll(player);
                                 return 1;
                             })
             );
@@ -733,6 +663,70 @@ public class MoneyCommands {
             } catch (Exception e) {
                 sendError(player, "Request", e);
                 LOGGER.error("Exception in /withdrawFixedSilent", e);
+            }
+        });
+    }
+
+    public static void handleDepositAll(ServerPlayer player) {
+        final String uuid = player.getUUID().toString();
+
+        Map<Item, Integer> billValues = Map.of(
+                CreateringtonCurrency.BILL_1.get(), 1,
+                CreateringtonCurrency.BILL_5.get(), 5,
+                CreateringtonCurrency.BILL_10.get(), 10,
+                CreateringtonCurrency.BILL_20.get(), 20,
+                CreateringtonCurrency.BILL_50.get(), 50,
+                CreateringtonCurrency.BILL_100.get(), 100,
+                CreateringtonCurrency.BILL_500.get(), 500,
+                CreateringtonCurrency.BILL_1000.get(), 1000
+        );
+
+        final Map<Integer, List<Integer>> slotsByDenomination = new HashMap<>();
+        int computedTotal = 0;
+
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (!stack.isEmpty() && billValues.containsKey(stack.getItem())) {
+                int value = billValues.get(stack.getItem());
+                int count = stack.getCount();
+                computedTotal += value * count;
+                slotsByDenomination.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
+            }
+        }
+
+        if (computedTotal == 0) {
+            player.sendSystemMessage(message("[ERROR]" , "No bills to deposit.", ChatFormatting.RED));
+            return;
+        }
+
+        final int totalAmount = computedTotal;
+        String formatted = NumberFormat.getInstance().format(totalAmount);
+        player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
+
+        EXECUTOR.submit(() -> {
+            try {
+                URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get())).toURL();
+
+                String json = GSON.toJson(Map.of("uuid", uuid, "amount", totalAmount));
+                HttpResponse response = sendPost(url, player, json);
+
+                if (response.code == 200) {
+                    player.server.execute(() -> {
+                        for (Map.Entry<Integer, List<Integer>> e : slotsByDenomination.entrySet()) {
+                            for (int slot : e.getValue()) {
+                                player.getInventory().setItem(slot, ItemStack.EMPTY);
+                            }
+                        }
+                        player.inventoryMenu.broadcastChanges();
+                    });
+
+                    player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
+                } else {
+                    sendError(player, "Deposit", response.body);
+                }
+            } catch (Exception e) {
+                player.sendSystemMessage(message("[ERROR]", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
+                LOGGER.error("Exception in handleDepositAll for {} (UUID: {})", player.getName().getString(), uuid, e);
             }
         });
     }

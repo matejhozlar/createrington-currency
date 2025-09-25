@@ -104,7 +104,7 @@ public final class ATMNetworking {
         var p = ctx.player();
         if (!(p instanceof ServerPlayer player)) return;
 
-        Map<Object,Integer> values = Map.of(
+        Map<Object, Integer> values = Map.of(
                 CreateringtonCurrency.BILL_1.get(), 1,
                 CreateringtonCurrency.BILL_5.get(), 5,
                 CreateringtonCurrency.BILL_10.get(), 10,
@@ -125,46 +125,60 @@ public final class ATMNetworking {
                 slotsByDenom.computeIfAbsent(val, k -> new ArrayList<>()).add(i);
             }
         }
-        if (total <= 0) return;
+
+        if (total <= 0) {
+            sendResult(player, 2, "No bills to deposit.");
+            return;
+        }
 
         final int totalAmount = total;
 
         MoneyCommands.EXECUTOR.submit(() -> {
             try {
                 String token = MoneyCommands.getOrFetchToken(player);
-                URL url = URI.create(MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get())).toURL();
+                URL url = URI.create(MoneyCommands.safeJoin(
+                        Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get()
+                )).toURL();
 
                 var conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
-                var json = GSON.toJson(Map.of("uuid", player.getUUID().toString(), "amount", totalAmount));
+
+                var json = GSON.toJson(Map.of(
+                        "uuid", player.getUUID().toString(),
+                        "amount", totalAmount
+                ));
                 conn.getOutputStream().write(json.getBytes());
+
                 int code = conn.getResponseCode();
 
                 if (code == 200) {
                     player.server.execute(() -> {
-                        for (var entry : slotsByDenom.entrySet())
-                            for (int slot : entry.getValue())
+                        for (var entry : slotsByDenom.entrySet()) {
+                            for (int slot : entry.getValue()) {
                                 player.getInventory().setItem(slot, net.minecraft.world.item.ItemStack.EMPTY);
+                            }
+                        }
+                        player.inventoryMenu.broadcastChanges();
+                        player.closeContainer();
                     });
                     sendResult(player, 1, "Deposited $" + totalAmount);
                 } else {
                     sendResult(player, 2, "Deposit failed (" + code + ")");
                 }
             } catch (Exception e) {
-                sendResult(player, 2,"Deposit failed: " + e.getMessage());
+                sendResult(player, 2, "Deposit failed: " + e.getMessage());
             }
         });
     }
 
-    // Replace your handleWithdraw with this version:
+
     private static void handleWithdraw(final ATMWithdrawPayload pkt, final IPayloadContext ctx) {
         var p = ctx.player();
         if (!(p instanceof ServerPlayer player)) return;
 
-        // give bills helper
         java.util.function.BiConsumer<Integer,Integer> give = (denom, count) -> {
             var item = switch (denom) {
                 case 1 -> CreateringtonCurrency.BILL_1.get();
@@ -190,7 +204,6 @@ public final class ATMNetworking {
                 )).toURL();
 
                 if (pkt.mode() == 0) {
-                    // denomination + count
                     var payload = Map.of(
                             "uuid", player.getUUID().toString(),
                             "denomination", pkt.a(),
@@ -204,7 +217,6 @@ public final class ATMNetworking {
                         sendResult(player, 2, "Withdraw failed (" + code + ")");
                     }
                 } else {
-                    // total → greedy breakdown
                     int total = pkt.a();
                     int[] denoms = {1000, 500, 100, 50, 20, 10, 5, 1};
                     Map<Integer,Integer> bundle = new LinkedHashMap<>();
