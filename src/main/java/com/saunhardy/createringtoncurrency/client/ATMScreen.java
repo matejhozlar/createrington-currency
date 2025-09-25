@@ -75,6 +75,26 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
 
     private static final int[] DENOMS = {1000, 500, 100, 50, 20, 10, 5, 1};
 
+    private double bundleScroll = 0;
+    private static final int BUNDLE_ROW_H = 16;
+    private static final int BUNDLE_ROW_GAP = 4;
+
+    private static final int ACTION_ROW_H = 20;
+    private static final int ACTION_ROW_GAP = 8;
+    private static final int HINT_H = 12;
+    private static final int GAP_LIST_TO_ACTIONS = 6;
+
+    private static ResourceLocation tx(String name) {
+        return ResourceLocation.fromNamespaceAndPath(
+                "createringtoncurrency", "textures/item/" + name + ".png"
+        );
+    }
+
+    private static final ResourceLocation[] BILL_TEX = {
+            tx("bill_1000"), tx("bill_500"), tx("bill_100"), tx("bill_50"),
+            tx("bill_20"),   tx("bill_10"),  tx("bill_5"),   tx("bill_1")
+    };
+
     private static class Rect { int x,y,w,h; Rect(int x,int y,int w,int h){this.x=x;this.y=y;this.w=w;this.h=h;} }
 
     private Rect screenArea() {
@@ -204,7 +224,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         switch (v) {
             case WITHDRAW_TOTAL  -> { wtSel = -1; focus(totalBox); }
             case WITHDRAW_SINGLE -> { wsSel = -1; focus(denomBox); } // or focus(countBox) if you prefer
-            case WITHDRAW_BUNDLE -> { wbSel = -1; if (bundleBoxes[0] != null) focus(bundleBoxes[0]); }
+            case WITHDRAW_BUNDLE -> { bundleScroll = 0; wbSel = -1; if (bundleBoxes[DENOMS.length - 1] != null) focus(bundleBoxes[DENOMS.length - 1]);}
             default -> {}
         }
     }
@@ -223,6 +243,32 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
                     new com.saunhardy.createringtoncurrency.network.ATMQueryBalancePayload()));
         }
     }
+
+    private int focusedBundleIndex() {
+        for (int i = 0; i < bundleBoxes.length; i++) {
+            if (bundleBoxes[i] != null && bundleBoxes[i].isFocused()) return i;
+        }
+        return -1;
+    }
+
+    private int displayIndexForData(int dataIdx) {
+        return DENOMS.length - 1 - dataIdx;
+    }
+
+    private void ensureBundleVisible(int dataIdx, int viewportH) {
+        int totalH = DENOMS.length * (BUNDLE_ROW_H + BUNDLE_ROW_GAP) - BUNDLE_ROW_GAP;
+        int maxScroll = Math.max(0, totalH - viewportH);
+
+        int rowTop = displayIndexForData(dataIdx) * (BUNDLE_ROW_H + BUNDLE_ROW_GAP);
+        int rowBottom = rowTop + BUNDLE_ROW_H;
+
+        if (bundleScroll > rowTop) bundleScroll = rowTop;
+        if (bundleScroll < rowBottom - viewportH) bundleScroll = rowBottom - viewportH;
+
+        if (bundleScroll < 0) bundleScroll = 0;
+        if (bundleScroll > maxScroll) bundleScroll = maxScroll;
+    }
+
 
     private void performDepositAll() {
         var c = Minecraft.getInstance().getConnection();
@@ -538,40 +584,90 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
 
         int x = r.x + 8;
         int labelW = 88;
-        int rowH = 16;
-        int y0 = r.y + 22;
+
+        int listTop = r.y + 22;
+
+        int actionsTop = r.y + r.h
+                - (2 * ACTION_ROW_H + ACTION_ROW_GAP)
+                - HINT_H
+                - 6;
+
+        int listBottom = actionsTop - GAP_LIST_TO_ACTIONS;
+        int viewportH = Math.max(0, listBottom - listTop);
+
+        int totalH = DENOMS.length * (BUNDLE_ROW_H + BUNDLE_ROW_GAP) - BUNDLE_ROW_GAP;
+        int maxScroll = Math.max(0, totalH - viewportH);
+        bundleScroll = Math.max(0, Math.min(bundleScroll, maxScroll));
+
+        int yBase = listTop - (int) bundleScroll;
 
         for (int i = 0; i < DENOMS.length; i++) {
-            int y = y0 + i * (rowH + 4);
-            g.drawString(this.font, "$" + DENOMS[i] + "  x", x, y + 3, 0xC0C0C0, false);
+            int dataIdx = DENOMS.length - 1 - i;
+            int y = yBase + i * (BUNDLE_ROW_H + BUNDLE_ROW_GAP);
 
-            move(bundleBoxes[i], x + labelW, y, 48);
+            boolean inView = (y >= listTop) && (y + BUNDLE_ROW_H <= listBottom);
+
+            if (inView) {
+                if (dataIdx < BILL_TEX.length && BILL_TEX[dataIdx] != null) {
+                    g.blit(BILL_TEX[dataIdx], x, y, 0, 0, 16, 16, 16, 16);
+                }
+                int labelX = x + 20;
+                g.drawString(this.font, "$" + DENOMS[dataIdx] + "  x", labelX, y + 3, 0xC0C0C0, false);
+            }
+
+            EditBox eb = bundleBoxes[dataIdx];
+            if (eb != null) {
+                int boxX = x + labelW;
+                move(eb, boxX, y, 48);
+                eb.visible = inView;
+                eb.setEditable(inView);
+                if (!inView && eb.isFocused()) { eb.setFocused(false); this.setFocused(null); }
+            }
         }
 
         int itemW = Math.min(r.w - 16, 240);
-        int yStart = r.y + r.h - (20 + 8 + 20) - 6;
+        int yStart = actionsTop;
 
         String[] items = { "Withdraw bundle", "Back" };
         Rect[] hits = new Rect[items.length];
 
         for (int i = 0; i < items.length; i++) {
-            int y = yStart + i * (20 + 8);
+            int y = yStart + i * (ACTION_ROW_H + ACTION_ROW_GAP);
             boolean sel = (wbSel == i);
-            g.fill(x, y, x + itemW, y + 20, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + itemW, y + ACTION_ROW_H, sel ? 0xFF2B3138 : 0xFF1D2227);
             g.fill(x, y, x + itemW, y + 1, 0x33FFFFFF);
-            g.fill(x, y + 19, x + itemW, y + 20, 0x33000000);
+            g.fill(x, y + ACTION_ROW_H - 1, x + itemW, y + ACTION_ROW_H, 0x33000000);
 
             String label = (sel ? "> " : "  ") + items[i];
-            int ty = y + (20 - this.font.lineHeight) / 2;
+            int ty = y + (ACTION_ROW_H - this.font.lineHeight) / 2;
             g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
 
-            hits[i] = new Rect(x, y, itemW, 20);
+            hits[i] = new Rect(x, y, itemW, ACTION_ROW_H);
         }
         hitWBAct  = hits[0];
         hitWBBack = hits[1];
+    }
 
-        String hint = "Fill counts, then Withdraw bundle";
-        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
+    @Override
+    public boolean mouseScrolled(double mx, double my, double dx, double dy) {
+        if (view == View.WITHDRAW_BUNDLE) {
+            Rect r = contentArea();
+
+            int listTop = r.y + 22;
+            int actionsTop = r.y + r.h - (2 * ACTION_ROW_H + ACTION_ROW_GAP) - HINT_H - 6;
+            int listBottom = actionsTop - GAP_LIST_TO_ACTIONS;
+            int viewportH = Math.max(0, listBottom - listTop);
+
+            int totalH = DENOMS.length * (BUNDLE_ROW_H + BUNDLE_ROW_GAP) - BUNDLE_ROW_GAP;
+            int maxScroll = Math.max(0, totalH - viewportH);
+
+            double wheel = Math.abs(dy) > 1e-6 ? dy : dx;
+            if (my >= listTop && my <= listBottom) {
+                bundleScroll = Math.max(0, Math.min(bundleScroll - wheel * 12.0, (double) maxScroll));
+                return true;
+            }
+        }
+        return super.mouseScrolled(mx, my, dx, dy);
     }
 
     @Override
@@ -677,13 +773,32 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
                 }
             }
             if (view == View.WITHDRAW_BUNDLE) {
-                boolean anyFocused = false;
-                for (EditBox eb : bundleBoxes) if (eb != null && eb.isFocused()) { anyFocused = true; break; }
-                if (anyFocused && (keyCode == KEY_DOWN || keyCode == KEY_S)) {
-                    clearTextFocus();
-                    wbSel = 0;
-                    clickSound();
-                    return true;
+                int dataIdx = focusedBundleIndex();
+                if (dataIdx != -1) {
+                    Rect r = contentArea();
+                    int listTop = r.y + 22;
+                    int actionsTop = r.y + r.h - (2 * ACTION_ROW_H + ACTION_ROW_GAP) - HINT_H - 6;
+                    int listBottom = actionsTop - GAP_LIST_TO_ACTIONS;
+                    int viewportH = Math.max(0, listBottom - listTop);
+
+                    if (keyCode == KEY_DOWN || keyCode == KEY_S) {
+                        if (dataIdx > 0) {
+                            ensureBundleVisible(dataIdx - 1, viewportH);
+                            focus(bundleBoxes[dataIdx - 1]);
+                            clickSound();
+                        } else {
+                            clearTextFocus(); wbSel = 0; clickSound();
+                        }
+                        return true;
+                    }
+                    if (keyCode == KEY_UP || keyCode == KEY_W) {
+                        if (dataIdx < DENOMS.length - 1) {
+                            ensureBundleVisible(dataIdx + 1, viewportH);
+                            focus(bundleBoxes[dataIdx + 1]);
+                            clickSound();
+                            return true;
+                        }
+                    }
                 }
             }
 
@@ -743,23 +858,18 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         }
 
         if (view == View.WITHDRAW_BUNDLE) {
-            boolean anyFocused = false;
-            for (EditBox eb : bundleBoxes) if (eb != null && eb.isFocused()) { anyFocused = true; break; }
+            if ((keyCode == KEY_UP || keyCode == KEY_W) && wbSel == 0) {
+                Rect r = contentArea();
+                int listTop = r.y + 22;
+                int actionsTop = r.y + r.h - (2 * ACTION_ROW_H + ACTION_ROW_GAP) - HINT_H - 6;
+                int listBottom = actionsTop - GAP_LIST_TO_ACTIONS;
+                int viewportH = Math.max(0, listBottom - listTop);
 
-            if (anyFocused) {
-                if (keyCode == KEY_DOWN || keyCode == KEY_S) {
-                    clearTextFocus();
-                    wbSel = 0;
-                    clickSound();
-                    return true;
-                }
-            } else {
-                if ((keyCode == KEY_UP || keyCode == KEY_W) && wbSel == 0) {
-                    if (bundleBoxes[0] != null) focus(bundleBoxes[0]);
-                    wbSel = -1;
-                    clickSound();
-                    return true;
-                }
+                ensureBundleVisible(0, viewportH);
+                focus(bundleBoxes[0]);
+                wbSel = -1;
+                clickSound();
+                return true;
             }
         }
 
