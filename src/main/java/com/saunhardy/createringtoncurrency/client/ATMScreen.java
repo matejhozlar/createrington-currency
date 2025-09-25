@@ -84,6 +84,16 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private static final int HINT_H = 12;
     private static final int GAP_LIST_TO_ACTIONS = 6;
 
+    // Custom button sizing
+    private static final int BTN_MIN_W = 160;
+    private static final int BTN_MAX_W = 240;
+    private static final int BTN_H = 20;
+    private static final int BTN_X_PAD = 8;
+
+    private static int clamp(int v, int lo, int hi) { return Math.max(lo, Math.min(hi, v)); }
+    private int uniformButtonW(Rect r) { return clamp(r.w - 2 * BTN_X_PAD, BTN_MIN_W, BTN_MAX_W); }
+    private int buttonX(Rect r) { return r.x + BTN_X_PAD; }
+
     private static ResourceLocation tx(String name) {
         return ResourceLocation.fromNamespaceAndPath(
                 "createringtoncurrency", "textures/item/" + name + ".png"
@@ -411,9 +421,9 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         g.drawString(this.font, bal, r.x, r.y + 12, 0xC0C0C0, false);
 
         int startY = r.y + 36;
-        int rowH = 20;
-        int itemW = Math.min(r.w, 200);
-        int x = r.x + 8;
+        int rowH = BTN_H;
+        int itemW = uniformButtonW(r);
+        int x = buttonX(r);
 
         String[] items = {"Deposit", "Withdraw"};
         for (int i = 0; i < items.length; i++) {
@@ -440,9 +450,9 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         g.drawString(this.font, "Deposit", r.x, r.y, 0xFFFFFFFF, false);
 
         int startY = r.y + 24;
-        int rowH = 20;
-        int itemW = Math.min(r.w, 220);
-        int x = r.x + 8;
+        int rowH = BTN_H;
+        int itemW = uniformButtonW(r);
+        int x = buttonX(r);
 
         String[] items = {"Deposit all", "Back"};
         for (int i = 0; i < items.length; i++) {
@@ -469,9 +479,9 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         g.drawString(this.font, "Withdraw", r.x, r.y, 0xFFFFFFFF, false);
 
         int startY = r.y + 24;
-        int rowH = 20;
-        int itemW = Math.min(r.w, 240);
-        int x = r.x + 8;
+        int rowH = BTN_H;
+        int itemW = uniformButtonW(r);
+        int x = buttonX(r);
 
         String[] items = {
                 "Enter Amount",
@@ -507,13 +517,14 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private void renderWithdrawTotal(GuiGraphics g, Rect r) {
         g.drawString(this.font, "Withdraw • Enter Amount", r.x, r.y, 0xFFFFFFFF, false);
 
-        int x = r.x + 8;
+        int x = buttonX(r);
+
         int inputW = Math.min(r.w - 16, 220);
         int inputY = r.y + 22;
-
         move(totalBox, x, inputY, inputW);
 
-        int rowH = 20;
+        int rowH = BTN_H;
+        int btnW = uniformButtonW(r);
         int yStart = inputY + 24;
 
         String[] items = { "Withdraw", "Back" };
@@ -522,15 +533,15 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         for (int i = 0; i < items.length; i++) {
             int y = yStart + i * (rowH + 8);
             boolean sel = (wtSel == i);
-            g.fill(x, y, x + inputW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
-            g.fill(x, y, x + inputW, y + 1, 0x33FFFFFF);
-            g.fill(x, y + rowH - 1, x + inputW, y + rowH, 0x33000000);
+            g.fill(x, y, x + btnW, y + rowH, sel ? 0xFF2B3138 : 0xFF1D2227);
+            g.fill(x, y, x + btnW, y + 1, 0x33FFFFFF);
+            g.fill(x, y + rowH - 1, x + btnW, y + rowH, 0x33000000);
 
             String label = (sel ? "> " : "  ") + items[i];
             int ty = y + (rowH - this.font.lineHeight) / 2;
             g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
 
-            hits[i] = new Rect(x, y, inputW, rowH);
+            hits[i] = new Rect(x, y, btnW, rowH);
         }
         hitWTAct  = hits[0];
         hitWTBack = hits[1];
@@ -543,8 +554,8 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private void renderWithdrawSingle(GuiGraphics g, Rect r) {
         g.drawString(this.font, "Withdraw • Single Denomination", r.x, r.y, 0xFFFFFFFF, false);
 
-        int x = r.x + 8;
-        int rowH = 20;
+        int x = buttonX(r);
+        int rowH = BTN_H;
         int inputY = r.y + 22;
 
         int boxW = 84;
@@ -553,7 +564,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         move(denomBox, x, inputY, boxW);
         move(countBox, x + boxW + gap, inputY, boxW);
 
-        int itemW = Math.min(r.w - 16, 220);
+        int itemW = uniformButtonW(r);
         int yStart = inputY + 24;
 
         String[] items = { "Withdraw", "Back" };
@@ -582,7 +593,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private void renderWithdrawBundle(GuiGraphics g, Rect r) {
         g.drawString(this.font, "Withdraw • Choose Bills", r.x, r.y, 0xFFFFFFFF, false);
 
-        int x = r.x + 8;
+        int x = buttonX(r);
         int labelW = 88;
 
         int listTop = r.y + 22;
@@ -625,7 +636,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             }
         }
 
-        int itemW = Math.min(r.w - 16, 240);
+        int itemW = uniformButtonW(r);
         int yStart = actionsTop;
 
         String[] items = { "Withdraw bundle", "Back" };
