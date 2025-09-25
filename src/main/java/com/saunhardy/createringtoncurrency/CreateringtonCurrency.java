@@ -5,6 +5,7 @@ import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
+import com.saunhardy.createringtoncurrency.network.ATMNetworking;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
@@ -90,6 +91,8 @@ public class CreateringtonCurrency
         MENUS.register(modEventBus);
 
         ModEnchantmentEffects.register(modEventBus);
+
+        modEventBus.addListener(ATMNetworking::register);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
