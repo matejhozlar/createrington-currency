@@ -4,7 +4,7 @@
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.172-orange)
 ![Backend API](https://img.shields.io/badge/Backend-Required-critical)
 
-**Createrington Currency** is a custom Minecraft mod that introduces a robust, server-backed economy system into your game. It enables physical money, banking features, enchantments, and more — all synchronized with an external backend API.
+**Createrington Currency** is a fully‑fledged economy mod for Minecraft built on the NeoForge mod loader. It introduces physical currency items, player bank accounts, an ATM block and a suite of commands that all tie into a remote backend API. Unlike simple economy add‑ons, balances and transactions live on your own server so you can connect multiple game servers to the same economy.
 
 ---
 
@@ -33,18 +33,19 @@ All planned features have been implemented and the mod is stable for production 
 
 ### Backend Integration
 
-- Persistent account balances, deposits, withdrawals, and transactions are managed through a remote server API.
-- Requires a backend service with defined endpoints (see below).
+- **Persistent accounts & transactions:** All player balances, deposits, withdrawals and transfers are performed via HTTP requests to a remote server. Commands call endpoints such as `/currency/balance`, `/currency/pay`, `/currency/deposit`, `/currency/withdraw` and `/currency/top`. The mod caches JWT tokens and refreshes them periodically to authenticate requests 
+- **Requires a backend API:** Without an API server the mod will not function. See the configuration section for setting API URLs.
 
 ### Currency Items
 
-- Physical money items in denominations: `$1`, `$5`, `$10`, `$20`, `$50`, `$100`, `$500`, `$1000`.
-- Stackable, tradable, and usable in-world or via commands.
+- **Eight denominations:** `$1`, `$5`, `$10`, `$20`, `$50`, `$100`, `$500`, `$1000`.
+- **Stackable and tradable:** Bills behave like regular items. You can deposit them to your account or withdraw them using commands or the ATM.
+- **Drop behaviour:** Certain hostile mobs can drop small bills when killed. Drop chances are configurable and scale with the `Capitalist Greed` enchantment (see below).
 
 ### Player Accounts
 
-- Secure, server-synced virtual accounts.
-- Data persists across servers that use the same backend.
+- **Server‑synced balances:** Each player has a unique account identified by their UUID. Balances are fetched from the backend using `/currency/balance`. Accounts persist across servers that point to the same API.
+- **Secure transactions:** The mod obtains a JWT token from the backend via the `/currency/login` endpoint and includes it in all authenticated requests.
 
 ### Economy Commands
 
@@ -58,6 +59,14 @@ All planned features have been implemented and the mod is stable for production 
 | `/daily`        | Daily money reward                   |
 | `/lottery`      | Start a server-wide lottery          |
 | `/join`         | Join a lottery in progress           |
+
+All commands enforce a global cooldown, configurable via `commandCooldownMs`. If a player executes a command too quickly, they will see a cooldown message.
+
+### ATM Block & GUI
+- **Interactive ATM:** A new block called the ATM can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
+- **PIN & authentication:** The GUI guides players through a simple login flow; once authenticated it displays their balance, deposit buttons and withdraw options. The screen class organises the UI into views for deposit, withdraw total, withdraw single bills and withdraw bundles.
+- **Bundled withdrawals:** Players can specify denominations and counts for withdrawal, or enter a lump sum to automatically get the best combination of bills.
+- **Feedback:** After each deposit or withdrawal the server sends a success or error payload so the screen can display a coloured status message.
 
 ### Mob Drops
 
