@@ -1,9 +1,16 @@
 package com.saunhardy.createringtoncurrency;
 
+import com.saunhardy.createringtoncurrency.block.ATMBlock;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
+import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
+import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -46,6 +53,21 @@ public class CreateringtonCurrency
 
     public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
 
+    public static final DeferredBlock<ATMBlock> ATM_BLOCK =
+            BLOCKS.register("atm", () -> new ATMBlock(
+                    BlockBehaviour.Properties.of()
+                            .strength(3.5F)
+                            .requiresCorrectToolForDrops()
+            ));
+
+    public static final DeferredItem<BlockItem> ATM_ITEM =
+            ITEMS.register("atm", () -> new BlockItem(ATM_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<ATMMenu>> ATM_MENU =
+            MENUS.register("atm", () ->
+                    new MenuType<>(ATMMenu::new, FeatureFlags.VANILLA_SET)
+            );
+
     public static final DeferredItem<Item> MOD_ICON = ITEMS.registerSimpleItem("mod_icon", new Item.Properties().food(new FoodProperties.Builder()
             .alwaysEdible().nutrition(1).saturationModifier(2f).build()));
 
@@ -55,6 +77,7 @@ public class CreateringtonCurrency
             .icon(() -> MOD_ICON.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
                 output.accept(MOD_ICON);
+                output.accept(ATM_ITEM);
             }).build());
 
     public CreateringtonCurrency(IEventBus modEventBus, ModContainer modContainer)
@@ -69,6 +92,10 @@ public class CreateringtonCurrency
         ModEnchantmentEffects.register(modEventBus);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            modEventBus.addListener(ClientOnlyHooks::registerScreens);
+        }
 
        if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
             NeoForge.EVENT_BUS.register(MobDrops.class);

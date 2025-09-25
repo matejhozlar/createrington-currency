@@ -201,7 +201,7 @@ public class MoneyCommands {
                                 return 1;
                             }
 
-                            final int totalAmount = computedTotal; // must be final for use in thread
+                            final int totalAmount = computedTotal;
 
                             // Step 2: Make API request
                             Map<String, Object> payload = new HashMap<>();
