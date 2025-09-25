@@ -1,4 +1,3 @@
-// src/main/java/com/saunhardy/createringtoncurrency/menu/ATMMenu.java
 package com.saunhardy.createringtoncurrency.menu;
 
 import net.minecraft.world.entity.player.Inventory;

@@ -1,8 +1,8 @@
 {
   "variants": {
-    "facing=north": { "model": "createringtoncurrency:block/atm" },
-    "facing=south": { "model": "createringtoncurrency:block/atm", "y": 180 },
-    "facing=west":  { "model": "createringtoncurrency:block/atm", "y": 270 },
-    "facing=east":  { "model": "createringtoncurrency:block/atm", "y": 90 }
+    "facing=north": { "model": "createringtoncurrency:block/atm", "y": 180 },
+    "facing=south": { "model": "createringtoncurrency:block/atm", "y": 0   },
+    "facing=west":  { "model": "createringtoncurrency:block/atm", "y": 90  },
+    "facing=east":  { "model": "createringtoncurrency:block/atm", "y": 270 }
   }
 }
