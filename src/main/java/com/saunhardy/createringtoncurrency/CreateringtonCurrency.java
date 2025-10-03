@@ -49,6 +49,8 @@ public class CreateringtonCurrency {
     public static final DeferredItem<Item> BILL_100  = ITEMS.register("bill_100",  () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_500  = ITEMS.register("bill_500",  () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_1000 = ITEMS.register("bill_1000", () -> new Item(new Item.Properties().stacksTo(64)));
+    public static final DeferredItem<Item> CIRCUIT_BOARD = ITEMS.register("circuit_board", () -> new Item(new Item.Properties().stacksTo(64)));
+    public static final DeferredItem<Item> KEYPAD = ITEMS.register("keypad", () -> new Item(new Item.Properties().stacksTo(64)));
 
     public static final DeferredBlock<ATMBlock> ATM_BLOCK = BLOCKS.register("atm", () ->
             new ATMBlock(BlockBehaviour.Properties.of()
@@ -78,6 +80,8 @@ public class CreateringtonCurrency {
                         out.accept(BILL_100.get());
                         out.accept(BILL_500.get());
                         out.accept(BILL_1000.get());
+                        out.accept(CIRCUIT_BOARD.get());
+                        out.accept(KEYPAD.get());
                     })
                     .build()
             );

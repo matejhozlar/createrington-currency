@@ -1,0 +1,7 @@
+// 1.21.1	2025-10-03T15:32:36.5606093	Recipes
+eb50693ef32feef22bc6a590efea2ce956624c2e data/createringtoncurrency/advancement/recipes/building_blocks/atm.json
+76216ed4c0aa9abedc14139e27bd926f7c3d6fbc data/createringtoncurrency/advancement/recipes/misc/circuit_board.json
+d960155102a46575a283a87d8e7e0ab799de0613 data/createringtoncurrency/advancement/recipes/misc/keypad.json
+e9033ae780b3b05a8074d3900a513d3710c0ef6b data/createringtoncurrency/recipe/atm.json
+bc54f08d30b9e4f262e64a21a23059b9e5efb385 data/createringtoncurrency/recipe/circuit_board.json
+e1799304bddac0f6ffe8c15b8b166e7d4c0b8b8c data/createringtoncurrency/recipe/keypad.json

@@ -10,5 +10,8 @@
   "item.createringtoncurrency.bill_100": "$100 Bill",
   "item.createringtoncurrency.bill_500": "$500 Bill",
   "item.createringtoncurrency.bill_1000": "$1000 Bill",
-  "enchantment.createringtoncurrency.capitalist_greed": "Capitalist Greed"
+  "enchantment.createringtoncurrency.capitalist_greed": "Capitalist Greed",
+  "item.createringtoncurrency.circuit_board": "Circuit Board",
+  "item.createringtoncurrency.card_reader": "Card Reader",
+  "item.createringtoncurrency.keypad": "Keypad"
 }
