@@ -146,12 +146,21 @@ public class MoneyCommands {
                                             EXECUTOR.submit(() -> {
                                                 try {
                                                     URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_PAY_URL.get())).toURL();
-                                                    sendPost(url, sender,  json);
-                                                    String formatted = NumberFormat.getInstance().format(amount);
+                                                    HttpResponse response = sendPost(url, sender, json);
 
-                                                    sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
-                                                    targetPlayer.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
+                                                    if (response.code == 200) {
+                                                        int displayedAmount = amount;
+                                                        try {
+                                                            JsonObject obj = GSON.fromJson(response.body, JsonObject.class);
+                                                            if (obj.has("amount")) displayedAmount = obj.get("amount").getAsInt();
+                                                        } catch (Exception ignored) {}
 
+                                                        String formatted = NumberFormat.getInstance().format(displayedAmount);
+                                                        sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
+                                                        targetPlayer.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
+                                                    } else {
+                                                        sendError(sender, "Pay", response.body);
+                                                    }
                                                 } catch (Exception e) {
                                                     sendError(sender, "Request", e);
                                                     LOGGER.error("Exception in /pay command for {} (UUID: {})", sender.getName().getString(), fromUuid, e);
