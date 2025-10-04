@@ -41,7 +41,9 @@ public class MobDrops {
             EntityType.ZOMBIE,
             EntityType.CREEPER,
             EntityType.SPIDER,
-            EntityType.SKELETON
+            EntityType.SKELETON,
+            EntityType.WITHER_SKELETON,
+            EntityType.BLAZE
     );
 
     @SubscribeEvent
@@ -84,7 +86,6 @@ public class MobDrops {
         if (!ALLOWED_MOB_TYPES.contains(type)) return;
         UUID uuid = player.getUUID();
 
-        // First, local check: is limit reached?
         if (backendLimitReached.contains(uuid)) {
             if (!warnedToday.contains(uuid)) {
                 player.sendSystemMessage(message());
@@ -106,10 +107,12 @@ public class MobDrops {
 
         if (type == EntityType.ZOMBIE || type == EntityType.CREEPER || type == EntityType.SPIDER) {
             baseChance = Config.ZOM_SPI_CRE_DROP.get();
-        }
-
-        if (type == EntityType.SKELETON) {
+        } else if (type == EntityType.SKELETON) {
             baseChance = Config.SKELETON_DROP.get();
+        } else if (type == EntityType.WITHER_SKELETON) {
+            baseChance = Config.WITHER_SKELETON_DROP.get();
+        } else if (type == EntityType.BLAZE) {
+            baseChance = Config.BLAZE_DROP.get();
         }
 
         switch (enchantmentLevel) {
@@ -123,7 +126,12 @@ public class MobDrops {
             billToDrop = CreateringtonCurrency.BILL_1.get();
         }
 
-        if (type == EntityType.SKELETON && ThreadLocalRandom.current().nextDouble() < 0.01){
+        final boolean isFiveDollarMob =
+                type == EntityType.SKELETON ||
+                        type == EntityType.WITHER_SKELETON ||
+                        type == EntityType.BLAZE;
+
+        if (isFiveDollarMob && ThreadLocalRandom.current().nextDouble() < 0.02) {
             earned = 5;
             billToDrop = CreateringtonCurrency.BILL_5.get();
         }
@@ -148,7 +156,6 @@ public class MobDrops {
             progress.earnedToday += earned;
             dropBill(dead, billToDrop);
 
-            // After reaching limit exactly:
             if (progress.earnedToday >= DAILY_LIMIT) {
                 sendLimitReached(player);
                 backendLimitReached.add(uuid);

@@ -69,6 +69,14 @@ public class Config {
             .comment("Drop chance of 1$ bills from skeletons, eg. '50.0' = 50% chance")
             .define("skeletonDrop", 3.0);
 
+    public static final ModConfigSpec.ConfigValue<Double> WITHER_SKELETON_DROP = BUILDER
+            .comment("Drop chance of 1$ bills from wither skeletons, eg. '50.0' = 50% chance")
+            .define("witherSkeletonDrop", 3.5);
+
+    public static final ModConfigSpec.ConfigValue<Double> BLAZE_DROP = BUILDER
+            .comment("Drop chance of 1$ bills from wither blazes, eg. '50.0' = 50% chance")
+            .define("blazeDrop", 3.5);
+
     public static final ModConfigSpec.IntValue LOTTERY_COOLDOWN_MINUTES = BUILDER
             .comment("Cooldown duration for /lottery in minutes, don't use this if you are not using integrated discord bots")
             .defineInRange("lotteryCooldownMinutes", 15, 0, 1440);
