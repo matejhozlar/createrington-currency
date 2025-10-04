@@ -17,9 +17,14 @@ public class DataGenerators {
         DataGenerator generator = event.getGenerator();
         PackOutput packOutput = generator.getPackOutput();
         CompletableFuture<HolderLookup.Provider> lookupProvider = event.getLookupProvider();
+        var efh = event.getExistingFileHelper();
 
         generator.addProvider(event.includeServer(), new ModDatapackProvider(packOutput, lookupProvider));
 
         generator.addProvider(event.includeServer(), new ModRecipeProvider(packOutput, lookupProvider));
+
+        generator.addProvider(event.includeServer(), new ModBlockTags(packOutput, lookupProvider, efh));
+
+        generator.addProvider(event.includeServer(), new ModLootProvider(packOutput, lookupProvider));
     }
 }

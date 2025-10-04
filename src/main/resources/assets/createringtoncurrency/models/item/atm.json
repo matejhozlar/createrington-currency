@@ -1,1 +1,9 @@
-{ "parent": "createringtoncurrency:block/atm" }
+{
+  "parent": "createringtoncurrency:block/atm",
+  "display": {
+    "ground": {
+      "scale": [0.5, 0.5, 0.5],
+      "translation": [0, 3, 0]
+    }
+  }
+}

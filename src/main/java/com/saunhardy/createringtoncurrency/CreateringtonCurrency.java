@@ -14,6 +14,7 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -54,8 +55,10 @@ public class CreateringtonCurrency {
 
     public static final DeferredBlock<ATMBlock> ATM_BLOCK = BLOCKS.register("atm", () ->
             new ATMBlock(BlockBehaviour.Properties.of()
-                    .strength(3.5F)
-                    .requiresCorrectToolForDrops())
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .requiresCorrectToolForDrops()
+            )
     );
     public static final DeferredItem<BlockItem> ATM_ITEM =
             ITEMS.register("atm", () -> new BlockItem(ATM_BLOCK.get(), new Item.Properties()));
