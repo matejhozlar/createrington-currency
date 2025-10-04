@@ -115,7 +115,8 @@ public class MobDrops {
             baseChance = Config.BLAZE_DROP.get();
         }
 
-        switch (enchantmentLevel) {
+        int effectiveLevel = Math.min(enchantmentLevel, 3);
+        switch (effectiveLevel) {
             case 1 -> baseChance += 5.0;
             case 2 -> baseChance += 8.0;
             case 3 -> baseChance += 10.0;
