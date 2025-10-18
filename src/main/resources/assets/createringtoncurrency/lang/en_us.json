@@ -10,8 +10,12 @@
   "item.createringtoncurrency.bill_100": "$100 Bill",
   "item.createringtoncurrency.bill_500": "$500 Bill",
   "item.createringtoncurrency.bill_1000": "$1000 Bill",
+  "item.createringtoncurrency.bank_card": "Bank Card",
   "enchantment.createringtoncurrency.capitalist_greed": "Capitalist Greed",
   "item.createringtoncurrency.circuit_board": "Circuit Board",
   "item.createringtoncurrency.card_reader": "Card Reader",
-  "item.createringtoncurrency.keypad": "Keypad"
+  "item.createringtoncurrency.keypad": "Keypad",
+  "createringtoncurrency.message.withdrawal_failed": "Failed to withdraw bills from your account",
+  "createringtoncurrency.message.withdrawal_error": "Error occurred during bill withdrawal",
+  "createringtoncurrency.message.insufficient_inventory_space": "Not enough inventory space! Need %d slots, have %d free"
 }

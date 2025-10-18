@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": {
+      "item": "minecraft:paper"
+    },
+    "I": {
+      "item": "minecraft:inc_sack"
+    }
+  },
+  "pattern": [
+    " I ",
+    "PPP"
+  ],
+  "result": {
+    "count": 1,
+    "id": "createringtoncurrency:bank_card"
+  }
+}
