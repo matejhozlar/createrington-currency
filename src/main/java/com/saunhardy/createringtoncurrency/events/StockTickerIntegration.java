@@ -8,7 +8,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClick
 import net.neoforged.bus.api.SubscribeEvent;
 import net.minecraft.core.BlockPos;
 
-import static com.saunhardy.createringtoncurrency.CreateringtonCurrency.BANK_CARD;
 import static com.saunhardy.createringtoncurrency.CreateringtonCurrency.*;
 
 import java.util.Map;
@@ -22,27 +21,19 @@ import com.simibubi.create.content.logistics.stockTicker.StockTickerInteractionH
 import com.simibubi.create.content.logistics.tableCloth.ShoppingListItem;
 import com.simibubi.create.content.processing.burner.BlazeBurnerBlock;
 
-// Import MoneyCommands for using its withdrawal logic
-import com.saunhardy.createringtoncurrency.MoneyCommands;
-import com.saunhardy.createringtoncurrency.Config;
-import com.google.gson.Gson;
+// Import our withdrawal helper
+import com.saunhardy.createringtoncurrency.util.WithdrawalHelper;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URI;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.InputStream;
 import java.lang.reflect.Method;
 
 
 public class StockTickerIntegration {
     
-    private static void getBills(Player player, ItemStack shoppingListItem) {
+    private static boolean getBills(Player player, ItemStack shoppingListItem) {
         // Get the shopping list from the item
         var shoppingList = ShoppingListItem.getList(shoppingListItem);
         if (shoppingList == null) {
-            return;
+            return false;
         }
         
         // Use reflection to call bakeEntries and get payment requirements
@@ -53,7 +44,7 @@ public class StockTickerIntegration {
             Object bakedEntries = bakeEntriesMethod.invoke(shoppingList, player.level(), null);
             
             if (bakedEntries == null) {
-                return;
+                return false;
             }
             
             // Get the second element (payment requirements) using reflection
@@ -99,83 +90,47 @@ public class StockTickerIntegration {
             }
             
             if (totalSlotsNeeded > 0 && player instanceof ServerPlayer serverPlayer) {
-                // Count free inventory slots
-                int freeSlots = 0;
-                for (int i = 0; i < serverPlayer.getInventory().getContainerSize(); i++) {
-                    ItemStack slot = serverPlayer.getInventory().getItem(i);
-                    if (slot.isEmpty()) {
-                        freeSlots++;
+                // Check if player has enough inventory space using helper
+                if (!WithdrawalHelper.hasInventorySpace(serverPlayer, totalSlotsNeeded)) {
+                    int freeSlots = 0;
+                    for (int i = 0; i < serverPlayer.getInventory().getContainerSize(); i++) {
+                        if (serverPlayer.getInventory().getItem(i).isEmpty()) {
+                            freeSlots++;
+                        }
                     }
+                    player.sendSystemMessage(Component.translatable("createringtoncurrency.message.insufficient_inventory_space", totalSlotsNeeded, freeSlots));
+                    return false;
                 }
                 
-                if (freeSlots >= totalSlotsNeeded) {
-                    // Player has enough space - proceed with bill dispensing logic
-                    for (Map.Entry<Item, Integer> entry : billsToDispense.entrySet()) {
-                        Item billItem = entry.getKey();
-                        int count = entry.getValue();
-                        int denomination = billValues.get(billItem);
-                        
-                        // Use MoneyCommands' withdrawal logic - submit to the executor
-                        MoneyCommands.EXECUTOR.submit(() -> {
-                            try {
-                                String uuid = serverPlayer.getUUID().toString();
-                                
-                                // Create the payload for withdrawal API
-                                Map<String, Object> payload = new HashMap<>();
-                                payload.put("uuid", uuid);
-                                payload.put("count", count);
-                                payload.put("denomination", denomination);
-                                
-                                String json = new Gson().toJson(payload);
-                                
-                                // Make HTTP request to withdraw endpoint
-                                URL url = URI.create(MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL();
-                                String token = MoneyCommands.getOrFetchToken(serverPlayer);
-                                
-                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                                conn.setRequestMethod("POST");
-                                conn.setRequestProperty("Content-Type", "application/json");
-                                conn.setRequestProperty("Authorization", "Bearer " + token);
-                                conn.setDoOutput(true);
-                                conn.setConnectTimeout(5000);
-                                conn.setReadTimeout(5000);
-                                conn.getOutputStream().write(json.getBytes());
-                                
-                                int responseCode = conn.getResponseCode();
-                                
-                                if (responseCode == 200) {
-                                    // Success - give the player the bills
-                                    ItemStack billStack = new ItemStack(billItem, count);
-                                    serverPlayer.getInventory().add(billStack);
-                                } else {
-                                    // Failed withdrawal
-                                    InputStream errorStream = conn.getErrorStream();
-                                    if (errorStream != null) {
-                                        BufferedReader reader = new BufferedReader(new InputStreamReader(errorStream));
-                                        StringBuilder errorResponse = new StringBuilder();
-                                        String line;
-                                        while ((line = reader.readLine()) != null) {
-                                            errorResponse.append(line);
-                                        }
-                                        reader.close();
-                                        serverPlayer.displayClientMessage(Component.translatable("createringtoncurrency.message.withdrawal_failed"), true);
-                                    }
-                                }
-                                
-                            } catch (Exception e) {
-                                serverPlayer.displayClientMessage(Component.translatable("createringtoncurrency.message.withdrawal_error"), true);
-                                e.printStackTrace();
-                            }
-                        });
+                // Player has enough space - proceed with bill dispensing using helper
+                boolean allWithdrawalsSucceeded = true;
+                
+                for (Map.Entry<Item, Integer> entry : billsToDispense.entrySet()) {
+                    Item billItem = entry.getKey();
+                    int count = entry.getValue();
+                    int denomination = billValues.get(billItem);
+                    
+                    // Use the withdrawal helper
+                    WithdrawalHelper.WithdrawalResponse response = WithdrawalHelper.withdrawBills(
+                        serverPlayer, billItem, count, denomination);
+                    
+                    if (!response.success) {
+                        allWithdrawalsSucceeded = false;
+                        player.sendSystemMessage(Component.translatable("createringtoncurrency.message.withdrawal_failed"));
+                        break; // Stop processing further withdrawals if one fails
                     }
-                } else {
-                    player.displayClientMessage(Component.translatable("createringtoncurrency.message.insufficient_inventory_space", totalSlotsNeeded, freeSlots), true);
+                    player.sendSystemMessage(Component.translatable("createringtoncurrency.message.withdrawal_success", count, "$" + denomination));
                 }
+                
+                // Return true if all withdrawals succeeded, indicating bills are now in inventory
+                return allWithdrawalsSucceeded;
             }
             
         } catch (Exception e) {
-
+            return false;
         }
+
+        return false; // No bills to dispense
     }
 
 
@@ -198,7 +153,9 @@ public class StockTickerIntegration {
         if (stockTickerPos != null) {
             if ((heldItem.getItem() instanceof ShoppingListItem) && (player.getOffhandItem().is(BANK_CARD.get()))) {
                 // Player is holding a shopping list and has a bank card in offhand
+                // Run our bill dispensing logic first, but don't cancel the event
                 getBills(player, heldItem);
+                // Allow other handlers to continue processing after we're done
             }
         }
     }
@@ -222,7 +179,9 @@ public class StockTickerIntegration {
         if (event.getLevel().getBlockState(pos).getBlock() instanceof BlazeBurnerBlock) {
             if ((heldItem.getItem() instanceof ShoppingListItem) && (player.getOffhandItem().is(BANK_CARD.get()))) {
                 // Player is holding a shopping list and has a bank card in offhand
+                // Run our bill dispensing logic first, but don't cancel the event
                 getBills(player, heldItem);
+                // Allow other handlers to continue processing after we're done
             }
         }
     }

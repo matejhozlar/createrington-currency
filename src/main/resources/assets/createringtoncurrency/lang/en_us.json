@@ -15,7 +15,7 @@
   "item.createringtoncurrency.circuit_board": "Circuit Board",
   "item.createringtoncurrency.card_reader": "Card Reader",
   "item.createringtoncurrency.keypad": "Keypad",
-  "createringtoncurrency.message.withdrawal_failed": "Failed to withdraw bills from your account",
-  "createringtoncurrency.message.withdrawal_error": "Error occurred during bill withdrawal",
-  "createringtoncurrency.message.insufficient_inventory_space": "Not enough inventory space! Need %d slots, have %d free"
+  "message.createringtoncurrency.withdrawal_success": "Withdrawn %d x %s bills from your account",
+  "message.createringtoncurrency.withdrawal_failed": "Failed to withdraw bills from your account",
+  "message.createringtoncurrency.insufficient_inventory_space": "Not enough inventory space! Need %d slots, have %d free"
 }
