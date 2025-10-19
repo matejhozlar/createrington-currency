@@ -1,4 +1,5 @@
 package com.saunhardy.createringtoncurrency.events;
+import net.minecraft.ChatFormatting;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -20,7 +21,7 @@ import net.minecraft.network.chat.Component;
 import com.simibubi.create.content.logistics.stockTicker.StockTickerInteractionHandler;
 import com.simibubi.create.content.logistics.tableCloth.ShoppingListItem;
 import com.simibubi.create.content.processing.burner.BlazeBurnerBlock;
-
+import com.saunhardy.createringtoncurrency.MoneyCommands;
 // Import our withdrawal helper
 import com.saunhardy.createringtoncurrency.util.WithdrawalHelper;
 
@@ -90,18 +91,11 @@ public class StockTickerIntegration {
             }
             
             if (totalSlotsNeeded > 0 && player instanceof ServerPlayer serverPlayer) {
-                // Check if player has enough inventory space using helper
+                // Check if player has enough inventory space
                 if (!WithdrawalHelper.hasInventorySpace(serverPlayer, totalSlotsNeeded)) {
-                    int freeSlots = 0;
-                    for (int i = 0; i < serverPlayer.getInventory().getContainerSize(); i++) {
-                        if (serverPlayer.getInventory().getItem(i).isEmpty()) {
-                            freeSlots++;
-                        }
-                    }
-                    player.sendSystemMessage(Component.translatable("createringtoncurrency.message.insufficient_inventory_space", totalSlotsNeeded, freeSlots));
+                    player.sendSystemMessage(Component.translatable("message.createringtoncurrency.insufficient_inventory_space").withStyle(ChatFormatting.RED));
                     return false;
                 }
-                
                 // Player has enough space - proceed with bill dispensing using helper
                 boolean allWithdrawalsSucceeded = true;
                 
@@ -116,10 +110,10 @@ public class StockTickerIntegration {
                     
                     if (!response.success) {
                         allWithdrawalsSucceeded = false;
-                        player.sendSystemMessage(Component.translatable("createringtoncurrency.message.withdrawal_failed"));
+                        player.sendSystemMessage(Component.translatable("message.createringtoncurrency.withdrawal_failed").withStyle(ChatFormatting.RED));
                         break; // Stop processing further withdrawals if one fails
                     }
-                    player.sendSystemMessage(Component.translatable("createringtoncurrency.message.withdrawal_success", count, "$" + denomination));
+                    player.sendSystemMessage(Component.translatable("message.createringtoncurrency.withdrawal_success", count, "$" + denomination).withStyle(ChatFormatting.GREEN));
                 }
                 
                 // Return true if all withdrawals succeeded, indicating bills are now in inventory
@@ -145,7 +139,7 @@ public class StockTickerIntegration {
         InteractionHand hand = event.getHand();
         ItemStack heldItem = player.getItemInHand(hand);
 
-        if (player == null || target == null || player.isSpectator() || hand != InteractionHand.MAIN_HAND) {
+        if (player.isSpectator() || hand != InteractionHand.MAIN_HAND) {
             return;
         }
 
@@ -171,7 +165,7 @@ public class StockTickerIntegration {
         BlockPos pos = event.getPos();
         ItemStack heldItem = player.getItemInHand(hand);
 
-        if (player == null || player.isSpectator() || hand != InteractionHand.MAIN_HAND) {
+        if (player.isSpectator() || hand != InteractionHand.MAIN_HAND) {
             return;
         }
 

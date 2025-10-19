@@ -3,6 +3,7 @@ package com.saunhardy.createringtoncurrency.util;
 import com.google.gson.Gson;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.MoneyCommands;
+
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -62,7 +63,6 @@ public class WithdrawalHelper {
      * @param billItem The type of bill to withdraw
      * @param count The number of bills to withdraw
      * @param denomination The denomination value of the bills
-     * @param showMessages Whether to show success/failure messages to the player
      * @return WithdrawalResponse indicating the result
      */
     public static WithdrawalResponse withdrawBills(ServerPlayer player, Item billItem, int count, int denomination) {
@@ -70,7 +70,7 @@ public class WithdrawalHelper {
         if (player.getName().getString().equals("Dev")) {
             ItemStack billStack = new ItemStack(billItem, count);
             player.getInventory().add(billStack);
-        
+
             return WithdrawalResponse.devMode();
         }
         
@@ -128,24 +128,7 @@ public class WithdrawalHelper {
         }
     }
     
-    /**
-     * Checks if the player has enough inventory space for the given number of bills
-     * 
-     * @param player The player to check
-     * @param totalSlots Number of inventory slots needed
-     * @return true if player has enough space, false otherwise
-     */
-    public static boolean hasInventorySpace(ServerPlayer player, int totalSlots) {
-        int freeSlots = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack slot = player.getInventory().getItem(i);
-            if (slot.isEmpty()) {
-                freeSlots++;
-            }
-        }
-        return freeSlots >= totalSlots;
-    }
-    
+   
     /**
      * Calculates the number of inventory slots needed for a given number of items
      * 
@@ -156,6 +139,28 @@ public class WithdrawalHelper {
     public static int calculateSlotsNeeded(int count, int maxStackSize) {
         return (int) Math.ceil((double) count / maxStackSize);
     }
+
+
+    /**
+     * Checks if the player has enough inventory space for the given number of bills
+     * Only counts main inventory (slots 9-35) and hotbar (slots 0-8)
+     * 
+     * @param player The player to check
+     * @param slotsNeeded Number of inventory slots needed
+     * @return true if player has enough space, false otherwise
+     */
+    public static boolean hasInventorySpace(ServerPlayer player, int slotsNeeded) {
+        int freeSlots = 0;
+        // Count hotbar slots (0-8) and main inventory slots (9-35)
+        for (int i = 0; i < 36; i++) {
+            ItemStack slot = player.getInventory().getItem(i);
+            if (slot.isEmpty()) {
+                freeSlots++;
+            }
+        }
+        return freeSlots >= slotsNeeded;
+    }
+
     
     /**
      * Convenience method to withdraw bills with inventory space checking
