@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.block.ATMBlock;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
+import com.saunhardy.createringtoncurrency.item.BankCardItem;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -50,6 +52,7 @@ public class CreateringtonCurrency {
     public static final DeferredItem<Item> BILL_100  = ITEMS.register("bill_100",  () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_500  = ITEMS.register("bill_500",  () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_1000 = ITEMS.register("bill_1000", () -> new Item(new Item.Properties().stacksTo(64)));
+    public static final DeferredItem<BankCardItem> BANK_CARD = ITEMS.register("bank_card", () -> new BankCardItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<Item> CIRCUIT_BOARD = ITEMS.register("circuit_board", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> KEYPAD = ITEMS.register("keypad", () -> new Item(new Item.Properties().stacksTo(64)));
 
@@ -83,6 +86,7 @@ public class CreateringtonCurrency {
                         out.accept(BILL_100.get());
                         out.accept(BILL_500.get());
                         out.accept(BILL_1000.get());
+                        out.accept(BANK_CARD.get());
                         out.accept(CIRCUIT_BOARD.get());
                         out.accept(KEYPAD.get());
                     })
@@ -110,6 +114,12 @@ public class CreateringtonCurrency {
         if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
             NeoForge.EVENT_BUS.register(MobDrops.class);
             NeoForge.EVENT_BUS.register(MoneyCommands.class);
+        }
+        
+        // Register Create integration if Create is loaded
+        if (ModList.get().isLoaded("create")) {
+            NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.events.StockTickerIntegration.class);
+            LOGGER.info("Create mod detected - Stock Ticker integration enabled");
         }
     }
 
