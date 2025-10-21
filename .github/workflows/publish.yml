@@ -36,7 +36,7 @@ jobs:
           version: ${{ inputs.version }}
           version-type: release
           name: "[${{ inputs.version }}] Createrington Currency"
-          changelog-file: changelog.md
+          changelog-file: CHANGELOG.md
           loaders: neoforge
           game-versions: 1.21.1
           files: build/libs/!(*-@(dev|sources|javadoc)).jar
