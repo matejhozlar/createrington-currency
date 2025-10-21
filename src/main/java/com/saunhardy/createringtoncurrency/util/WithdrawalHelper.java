@@ -67,12 +67,12 @@ public class WithdrawalHelper {
      */
     public static WithdrawalResponse withdrawBills(ServerPlayer player, Item billItem, int count, int denomination) {
         // Dev mode bypass - check if player name is "Dev"
-        if (player.getName().getString().equals("Dev")) {
-            ItemStack billStack = new ItemStack(billItem, count);
-            player.getInventory().add(billStack);
-
-            return WithdrawalResponse.devMode();
-        }
+//        if (player.getName().getString().equals("Dev")) {
+//            ItemStack billStack = new ItemStack(billItem, count);
+//            player.getInventory().add(billStack);
+//
+//            return WithdrawalResponse.devMode();
+//        }
         
         try {
             String uuid = player.getUUID().toString();
