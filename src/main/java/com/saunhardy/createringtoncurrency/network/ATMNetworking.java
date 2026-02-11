@@ -12,6 +12,8 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -54,9 +56,11 @@ public final class ATMNetworking {
 
                 int code = conn.getResponseCode();
                 java.io.InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
-                var br = new java.io.BufferedReader(new java.io.InputStreamReader(is));
                 var sb = new StringBuilder();
-                String line; while ((line = br.readLine()) != null) sb.append(line); br.close();
+                if (is != null) {
+                    var br = new java.io.BufferedReader(new java.io.InputStreamReader(is));
+                    String line; while ((line = br.readLine()) != null) sb.append(line); br.close();
+                }
 
                 int balance = -1;
                 try {
@@ -140,21 +144,13 @@ public final class ATMNetworking {
                         Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get()
                 )).toURL();
 
-                var conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-
-                var json = GSON.toJson(Map.of(
+                var payload = Map.of(
                         "uuid", player.getUUID().toString(),
                         "amount", totalAmount
-                ));
-                conn.getOutputStream().write(json.getBytes());
+                );
+                PostResult result = post(url, token, payload);
 
-                int code = conn.getResponseCode();
-
-                if (code == 200) {
+                if (result.code == 200) {
                     player.server.execute(() -> {
                         for (var entry : slotsByDenom.entrySet()) {
                             for (int slot : entry.getValue()) {
@@ -166,10 +162,10 @@ public final class ATMNetworking {
                     });
                     sendResult(player, 1, "Deposited $" + totalAmount);
                 } else {
-                    sendResult(player, 2, "Deposit failed (" + code + ")");
+                    sendResult(player, 2, extractApiMessage(result.body, "Deposit failed. Please try again."));
                 }
             } catch (Exception e) {
-                sendResult(player, 2, "Deposit failed: " + e.getMessage());
+                sendResult(player, 2, "Something went wrong. Please try again.");
             }
         });
     }
@@ -209,12 +205,12 @@ public final class ATMNetworking {
                             "denomination", pkt.a(),
                             "count", pkt.b()
                     );
-                    int code = post(url, token, payload);
-                    if (code == 200) {
+                    PostResult result = post(url, token, payload);
+                    if (result.code == 200) {
                         give.accept(pkt.a(), pkt.b());
                         sendResult(player, 1, "Withdrew $" + (pkt.a() * pkt.b()));
                     } else {
-                        sendResult(player, 2, "Withdraw failed (" + code + ")");
+                        sendResult(player, 2, extractApiMessage(result.body, "Withdraw failed. Please try again."));
                     }
                 } else {
                     int total = pkt.a();
@@ -236,12 +232,12 @@ public final class ATMNetworking {
                                 "denomination", e.getKey(),
                                 "count", e.getValue()
                         );
-                        int code = post(url, token, payload);
-                        if (code == 200) {
+                        PostResult result = post(url, token, payload);
+                        if (result.code == 200) {
                             give.accept(e.getKey(), e.getValue());
                         } else {
                             ok = false;
-                            sendResult(player, 2, "Part failed for $" + (e.getKey() * e.getValue()) + " (" + code + ")");
+                            sendResult(player, 2, extractApiMessage(result.body, "Withdraw failed. Please try again."));
                         }
                     }
                     if (ok) {
@@ -249,19 +245,38 @@ public final class ATMNetworking {
                     }
                 }
             } catch (Exception e) {
-                sendResult(player, 2, "Withdraw failed: " + e.getMessage());
+                sendResult(player, 2, "Something went wrong. Please try again.");
             }
         });
     }
 
 
-    private static int post(URL url, String bearer, Object payload) throws Exception {
+    private record PostResult(int code, String body) {}
+
+    private static PostResult post(URL url, String bearer, Object payload) throws Exception {
         var conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Authorization", "Bearer " + bearer);
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
         conn.getOutputStream().write(new Gson().toJson(payload).getBytes());
-        return conn.getResponseCode();
+        int code = conn.getResponseCode();
+        var is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+        if (is == null) {
+            return new PostResult(code, "");
+        }
+        var br = new BufferedReader(new InputStreamReader(is));
+        var sb = new StringBuilder();
+        String line; while ((line = br.readLine()) != null) sb.append(line); br.close();
+        return new PostResult(code, sb.toString());
+    }
+
+    private static String extractApiMessage(String body, String fallback) {
+        try {
+            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+            if (json.has("message")) return json.get("message").getAsString();
+            if (json.has("error")) return json.get("error").getAsString();
+        } catch (Exception ignored) {}
+        return fallback;
     }
 }

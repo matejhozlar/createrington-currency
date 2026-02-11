@@ -25,10 +25,14 @@ import com.saunhardy.createringtoncurrency.MoneyCommands;
 // Import our withdrawal helper
 import com.saunhardy.createringtoncurrency.util.WithdrawalHelper;
 
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.lang.reflect.Method;
 
 
 public class StockTickerIntegration {
+    private static final Logger LOGGER = LogUtils.getLogger();
     
     private static boolean getBills(Player player, ItemStack shoppingListItem) {
         // Get the shopping list from the item
@@ -121,6 +125,7 @@ public class StockTickerIntegration {
             }
             
         } catch (Exception e) {
+            LOGGER.error("StockTicker bill dispensing failed: {}", e.getMessage());
             return false;
         }
 

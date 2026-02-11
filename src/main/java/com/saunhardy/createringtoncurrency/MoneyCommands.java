@@ -59,7 +59,7 @@ public class MoneyCommands {
                 LOGGER.warn("Executor force-shutdown due to timeout");
             }
         } catch (InterruptedException e) {
-            LOGGER.error("Interrupted during shutdown", e);
+            LOGGER.warn("Interrupted during shutdown: {}", e.getMessage());
             Thread.currentThread().interrupt();
         }
     }
@@ -111,11 +111,11 @@ public class MoneyCommands {
                                         String formatted = NumberFormat.getInstance().format(balance);
                                         player.sendSystemMessage(message("💰", "Balance: $" + formatted, ChatFormatting.GREEN));
                                     } else {
-                                        sendError(player, "Missing 'balance' in /money response", body);
+                                        sendError(player, "Balance", body);
                                     }
                                 } catch (Exception e) {
-                                    sendError(player, "Request", e);
-                                    LOGGER.error("Exception in /money command for {} (UUID: {})", player.getName().getString(), uuid, e);
+                                    sendError(player, "Balance", e);
+                                    LOGGER.error("Exception in /money for {} (UUID: {}): {}", player.getName().getString(), uuid, e.getMessage());
                                 }
                             });
 
@@ -162,8 +162,8 @@ public class MoneyCommands {
                                                         sendError(sender, "Pay", response.body);
                                                     }
                                                 } catch (Exception e) {
-                                                    sendError(sender, "Request", e);
-                                                    LOGGER.error("Exception in /pay command for {} (UUID: {})", sender.getName().getString(), fromUuid, e);
+                                                    sendError(sender, "Pay", e);
+                                                    LOGGER.error("Exception in /pay for {} (UUID: {}): {}", sender.getName().getString(), fromUuid, e.getMessage());
                                                 }
                                             });
 
@@ -251,8 +251,8 @@ public class MoneyCommands {
                                     }
 
                                 } catch (Exception e) {
-                                    sendError(player, "Request", e);
-                                    LOGGER.error("Exception in /baltop command for {} (UUID: {})", player.getName().getString(), player.getUUID(), e);
+                                    sendError(player, "Baltop", e);
+                                    LOGGER.error("Exception in /baltop for {} (UUID: {}): {}", player.getName().getString(), player.getUUID(), e.getMessage());
                                 }
                             });
 
@@ -281,17 +281,12 @@ public class MoneyCommands {
                                             player.sendSystemMessage(message("✅", "Reward claimed, but failed to parse response.", ChatFormatting.YELLOW));
                                         }
                                     } else {
-                                        try {
-                                            @SuppressWarnings("unused") JsonObject json = GSON.fromJson(response.body, JsonObject.class);
-                                            sendError(player, "Daily reward", response.body);
-                                        } catch (Exception e) {
-                                            sendError(player, "Daily reward", response.body);
-                                        }
+                                        sendError(player, "Daily reward", response.body);
                                     }
 
                                 } catch (Exception e) {
-                                    sendError(player, "Request", e);
-                                    LOGGER.error("Exception in /daily command for {} (UUID: {})", player.getName().getString(), uuid, e);
+                                    sendError(player, "Daily reward", e);
+                                    LOGGER.error("Exception in /daily for {} (UUID: {}): {}", player.getName().getString(), uuid, e.getMessage());
                                 }
                             });
 
@@ -329,13 +324,14 @@ public class MoneyCommands {
 
                                             if (response.code == 200) {
                                                 lastLotteryStartTime = System.currentTimeMillis();
-                                                player.sendSystemMessage(Component.literal("🎲 You successfully started a lottery with $" + amount + "!").withStyle(ChatFormatting.GREEN));
+                                                player.sendSystemMessage(message("🎲", "You successfully started a lottery with $" + amount + "!", ChatFormatting.GREEN));
                                             } else {
-                                                player.sendSystemMessage(Component.literal("❌ Could not start lottery: " + response.body).withStyle(ChatFormatting.RED));
+                                                sendError(player, "Lottery start", response.body);
                                             }
 
                                         } catch (Exception e) {
-                                            player.sendSystemMessage(Component.literal("⚠️ Request failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+                                            sendError(player, "Lottery start", e);
+                                            LOGGER.error("Exception in /lottery for {}: {}", player.getName().getString(), e.getMessage());
                                         }
                                     });
 
@@ -365,13 +361,14 @@ public class MoneyCommands {
                                             HttpResponse response = sendPost(url, player, json);
 
                                             if (response.code == 200) {
-                                                player.sendSystemMessage(Component.literal("✅ You joined the lottery with $" + amount + ". Good luck!").withStyle(ChatFormatting.GREEN));
+                                                player.sendSystemMessage(message("✅", "You joined the lottery with $" + amount + ". Good luck!", ChatFormatting.GREEN));
                                             } else {
-                                                player.sendSystemMessage(Component.literal("❌ Could not join: " + response.body).withStyle(ChatFormatting.RED));
+                                                sendError(player, "Join lottery", response.body);
                                             }
 
                                         } catch (Exception e) {
-                                            player.sendSystemMessage(Component.literal("⚠️ Request failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+                                            sendError(player, "Join lottery", e);
+                                            LOGGER.error("Exception in /join for {}: {}", player.getName().getString(), e.getMessage());
                                         }
                                     });
 
@@ -407,7 +404,7 @@ public class MoneyCommands {
                                             }
                                         } catch (Exception e) {
                                             sendError(player, "Vote", e);
-                                            LOGGER.error("Exception in /vote command for {} (UUID: {})", name, uuid, e);
+                                            LOGGER.error("Exception in /vote for {} (UUID: {}): {}", name, uuid, e.getMessage());
                                         }
                                     });
 
@@ -459,12 +456,12 @@ public class MoneyCommands {
                     String formatted = NumberFormat.getInstance().format(amount);
                     player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
                 } else {
-                    player.sendSystemMessage(message("❌", "Withdraw failed: " + response.body, ChatFormatting.RED));
+                    sendError(player, "Withdraw", response.body);
                 }
 
             } catch (Exception e) {
-                sendError(player, "Request", e);
-                LOGGER.error("Exception in /withdrawFixed", e);
+                sendError(player, "Withdraw", e);
+                LOGGER.error("Exception in /withdrawFixed: {}", e.getMessage());
             }
         });
 
@@ -542,13 +539,13 @@ public class MoneyCommands {
                         }
                     } else {
                         allSucceeded = false;
-                        player.sendSystemMessage(message("[ERROR]", "Withdraw failed for $" + (denom * count) + ": " + response.body, ChatFormatting.RED));
+                        sendError(player, "Withdraw", response.body);
                     }
 
                 } catch (Exception e) {
                     allSucceeded = false;
-                    sendError(player, "Request", e);
-                    LOGGER.error("Error during /withdrawCustomBundle", e);
+                    sendError(player, "Withdraw", e);
+                    LOGGER.error("Exception in /withdrawCustomBundle: {}", e.getMessage());
                 }
             }
 
@@ -617,13 +614,13 @@ public class MoneyCommands {
                         }
                     } else {
                         allSucceeded = false;
-                        player.sendSystemMessage(message("[ERROR]", "Withdraw failed for $" + (entry.getKey() * entry.getValue()) + ": " + response.body, ChatFormatting.RED));
+                        sendError(player, "Withdraw", response.body);
                     }
 
                 } catch (Exception e) {
                     allSucceeded = false;
-                    sendError(player, "Request", e);
-                    LOGGER.error("Exception in /withdrawOptimized", e);
+                    sendError(player, "Withdraw", e);
+                    LOGGER.error("Exception in /withdrawOptimized: {}", e.getMessage());
                 }
             }
 
@@ -670,8 +667,8 @@ public class MoneyCommands {
                 }
 
             } catch (Exception e) {
-                sendError(player, "Request", e);
-                LOGGER.error("Exception in /withdrawFixedSilent", e);
+                sendError(player, "Withdraw", e);
+                LOGGER.error("Exception in /withdrawFixedSilent: {}", e.getMessage());
             }
         });
     }
@@ -734,8 +731,8 @@ public class MoneyCommands {
                     sendError(player, "Deposit", response.body);
                 }
             } catch (Exception e) {
-                player.sendSystemMessage(message("[ERROR]", "Deposit failed or server unavailable. No money was lost.", ChatFormatting.RED));
-                LOGGER.error("Exception in handleDepositAll for {} (UUID: {})", player.getName().getString(), uuid, e);
+                sendError(player, "Deposit", e);
+                LOGGER.error("Exception in /deposit for {} (UUID: {}): {}", player.getName().getString(), uuid, e.getMessage());
             }
         });
     }
@@ -768,9 +765,11 @@ public class MoneyCommands {
             TOKEN_CACHE.remove(player.getUUID());
             TOKEN_EXPIRATION.remove(player.getUUID());
         }
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(
-                responseCode == 200 ? conn.getInputStream() : conn.getErrorStream()
-        ))) {
+        InputStream stream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+        if (stream == null) {
+            return new HttpResponse(responseCode, "");
+        }
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(stream))) {
             StringBuilder response = new StringBuilder();
             String line;
             while ((line = in.readLine()) != null) {
@@ -810,6 +809,10 @@ public class MoneyCommands {
         InputStream inputStream = (responseCode == 200)
                 ? conn.getInputStream()
                 : conn.getErrorStream();
+
+        if (inputStream == null) {
+            return new HttpResponse(responseCode, "");
+        }
 
         BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
         StringBuilder response = new StringBuilder();
@@ -893,7 +896,10 @@ public class MoneyCommands {
         String line;
         while ((line = reader.readLine()) != null) sb.append(line);
 
-        if(responseCode != 200) throw new Exception("Failed to fetch JWT: " + sb);
+        if(responseCode != 200) {
+            LOGGER.error("Failed to fetch JWT (HTTP {}): {}", responseCode, sb);
+            throw new Exception("Authentication failed (HTTP " + responseCode + ")");
+        }
 
         JsonObject obj = JsonParser.parseString(sb.toString()).getAsJsonObject();
         return obj.get("token").getAsString();
@@ -906,41 +912,25 @@ public class MoneyCommands {
         return base + path;
     }
 
-    // clean error messages
+    // clean error messages - only show the API message to the player
     private static void sendError(ServerPlayer player, String context, Object errorSource) {
-        String prefix = "[ERROR]";
-        ChatFormatting color = ChatFormatting.RED;
-
-        if (errorSource instanceof Exception e) {
-            String msg = e.getMessage();
-            if (msg == null || msg.isBlank()) {
-                msg = "An unknown error occurred.";
-            } else {
-                msg = msg.length() > 100 ? msg.substring(0, 100) + "..." : msg;
-            }
-            player.sendSystemMessage(message(prefix, context + " failed: " + msg, color));
-            return;
-        }
-
         if (errorSource instanceof String body) {
             try {
                 JsonObject json = JsonParser.parseString(body).getAsJsonObject();
-                if (json.has("error")) {
-                    player.sendSystemMessage(message(prefix, context + ": " + json.get("error").getAsString(), color));
-                } else if (json.has("message")) {
-                    player.sendSystemMessage(message(prefix, context + ": " + json.get("message").getAsString(), color));
-                } else {
-                    player.sendSystemMessage(message(prefix, context + " failed (no details).", color));
+                if (json.has("message")) {
+                    player.sendSystemMessage(message("❌", json.get("message").getAsString(), ChatFormatting.RED));
+                    return;
+                } else if (json.has("error")) {
+                    player.sendSystemMessage(message("❌", json.get("error").getAsString(), ChatFormatting.RED));
+                    return;
                 }
-            } catch (Exception e) {
-                // Fallback to truncated body if it's plain text or invalid JSON
-                String msg = body.length() > 100 ? body.substring(0, 100) + "..." : body;
-                player.sendSystemMessage(message(prefix, context + " failed: " + msg, color));
-            }
-            return;
+            } catch (Exception ignored) {}
         }
 
-        // Unknown error type
-        player.sendSystemMessage(message(prefix, context + " failed due to an unexpected error.", color));
+        if (errorSource instanceof Exception e) {
+            LOGGER.error("{} error: {}", context, e.getMessage());
+        }
+
+        player.sendSystemMessage(message("❌", "Something went wrong. Please try again.", ChatFormatting.RED));
     }
 }

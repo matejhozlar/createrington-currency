@@ -24,14 +24,16 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.time.LocalDate;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static com.mojang.text2speech.Narrator.LOGGER;
-
 public class MobDrops {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Set<UUID> warnedToday = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> backendLimitReached = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, DailyEarnings> dailyEarnings = new ConcurrentHashMap<>();

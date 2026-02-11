@@ -8,6 +8,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -18,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class WithdrawalHelper {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
     
     /**
@@ -107,23 +111,12 @@ public class WithdrawalHelper {
                 
                 return WithdrawalResponse.success();
             } else {
-                // Failed withdrawal - read error response
-                InputStream errorStream = conn.getErrorStream();
-                if (errorStream != null) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(errorStream));
-                    StringBuilder errorResponse = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        errorResponse.append(line);
-                    }
-                    reader.close();
-                }
-                
+                LOGGER.error("Withdrawal API failed (HTTP {}): uuid={}, denomination={}, count={}", responseCode, uuid, denomination, count);
                 return WithdrawalResponse.failed(WithdrawalResult.FAILED_API);
             }
-            
+
         } catch (Exception e) {
-            
+            LOGGER.error("Withdrawal connection error for uuid={}: {}", player.getUUID(), e.getMessage());
             return WithdrawalResponse.failed(WithdrawalResult.FAILED_CONNECTION);
         }
     }
