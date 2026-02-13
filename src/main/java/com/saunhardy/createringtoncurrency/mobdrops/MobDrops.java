@@ -2,10 +2,10 @@ package com.saunhardy.createringtoncurrency.mobdrops;
 
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.Config;
-import com.saunhardy.createringtoncurrency.MoneyCommands;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantments;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -13,32 +13,36 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.minecraft.world.entity.EntityType;
 
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MobDrops {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Set<UUID> warnedToday = ConcurrentHashMap.newKeySet();
-    private static final Set<UUID> backendLimitReached = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, DailyEarnings> dailyEarnings = new ConcurrentHashMap<>();
-    private static final int DAILY_LIMIT = 1000;
-    private static final ExecutorService EXECUTOR = MoneyCommands.EXECUTOR;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Type EARNINGS_MAP_TYPE = new TypeToken<Map<String, DailyEarningsData>>() {}.getType();
+    private static Path dataFile;
     private static final Set<EntityType<?>> ALLOWED_MOB_TYPES = Set.of(
             EntityType.ZOMBIE,
             EntityType.CREEPER,
@@ -49,22 +53,28 @@ public class MobDrops {
     );
 
     @SubscribeEvent
-    public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+    public static void onServerStarting(ServerStartingEvent event) {
+        Path worldDir = event.getServer().getWorldPath(LevelResource.ROOT);
+        dataFile = worldDir.resolve("createringtoncurrency_mob_earnings.json");
+        loadDailyEarnings();
+    }
 
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        saveDailyEarnings();
+    }
+
+    @SubscribeEvent
+    public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();
         UUID uuid = player.getUUID();
-
         warnedToday.remove(uuid);
-        backendLimitReached.remove(uuid);
-
-        checkBackendLimitOnce(uuid, player);
     }
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();
         UUID uuid = player.getUUID();
-
         warnedToday.remove(uuid);
     }
 
@@ -73,6 +83,9 @@ public class MobDrops {
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (player instanceof FakePlayer) return;
         if (player.isSpectator()) return;
+
+        int dailyLimit = Config.MOB_DAILY_LIMIT.get();
+        if (dailyLimit <= 0) return; // limit disabled
 
         ItemStack stack = player.getMainHandItem();
         int enchantmentLevel = 0;
@@ -88,18 +101,19 @@ public class MobDrops {
         if (!ALLOWED_MOB_TYPES.contains(type)) return;
         UUID uuid = player.getUUID();
 
-        if (backendLimitReached.contains(uuid)) {
-            if (!warnedToday.contains(uuid)) {
-                player.sendSystemMessage(message());
-                warnedToday.add(uuid);
-            }
-            return;
-        }
-
         DailyEarnings progress = dailyEarnings.computeIfAbsent(uuid, u -> new DailyEarnings(LocalDate.now(), 0));
         if (!progress.date.equals(LocalDate.now())) {
             progress.date = LocalDate.now();
             progress.earnedToday = 0;
+            warnedToday.remove(uuid);
+        }
+
+        if (progress.earnedToday >= dailyLimit) {
+            if (!warnedToday.contains(uuid)) {
+                player.sendSystemMessage(message(dailyLimit));
+                warnedToday.add(uuid);
+            }
+            return;
         }
 
         int earned = 0;
@@ -140,18 +154,17 @@ public class MobDrops {
         }
 
         if (earned > 0) {
-            if (progress.earnedToday + earned > DAILY_LIMIT) {
-                int allowed = DAILY_LIMIT - progress.earnedToday;
+            if (progress.earnedToday + earned > dailyLimit) {
+                int allowed = dailyLimit - progress.earnedToday;
                 if (allowed > 0) {
                     progress.earnedToday += allowed;
                     dropBill(dead, billToDrop);
+                    saveDailyEarnings();
                 } else {
                     if (!warnedToday.contains(uuid)) {
-                        player.sendSystemMessage(message());
+                        player.sendSystemMessage(message(dailyLimit));
                         warnedToday.add(uuid);
                     }
-                    sendLimitReached(player);
-                    backendLimitReached.add(uuid);
                 }
                 return;
             }
@@ -159,68 +172,58 @@ public class MobDrops {
             progress.earnedToday += earned;
             dropBill(dead, billToDrop);
 
-            if (progress.earnedToday >= DAILY_LIMIT) {
-                sendLimitReached(player);
-                backendLimitReached.add(uuid);
+            if (progress.earnedToday >= dailyLimit) {
+                player.sendSystemMessage(message(dailyLimit));
+                warnedToday.add(uuid);
+                saveDailyEarnings();
             }
         }
     }
 
-    private static void checkBackendLimitOnce(UUID uuid, ServerPlayer player) {
-        if (backendLimitReached.contains(uuid)) return;
+    private static void loadDailyEarnings() {
+        dailyEarnings.clear();
+        if (dataFile == null || !Files.exists(dataFile)) return;
 
-        EXECUTOR.submit(() -> {
-            try {
-                String token = MoneyCommands.getOrFetchToken(player);
-                String apiUrl = MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_MOB_LIMIT_URL.get() + "?uuid=" + uuid);
-                URL url = URI.create(apiUrl).toURL();
+        try (Reader reader = Files.newBufferedReader(dataFile)) {
+            Map<String, DailyEarningsData> raw = GSON.fromJson(reader, EARNINGS_MAP_TYPE);
+            if (raw == null) return;
 
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200) {
-                    InputStreamReader reader = new InputStreamReader(conn.getInputStream());
-                    JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
-                    boolean limitReached = obj.get("limitReached").getAsBoolean();
-                    if (limitReached) {
-                        backendLimitReached.add(uuid);
+            LocalDate today = LocalDate.now();
+            for (Map.Entry<String, DailyEarningsData> entry : raw.entrySet()) {
+                try {
+                    UUID uuid = UUID.fromString(entry.getKey());
+                    DailyEarningsData data = entry.getValue();
+                    LocalDate date = LocalDate.parse(data.date);
+                    if (date.equals(today)) {
+                        dailyEarnings.put(uuid, new DailyEarnings(date, data.earnedToday));
                     }
+                } catch (Exception e) {
+                    LOGGER.warn("Skipping invalid mob earnings entry '{}': {}", entry.getKey(), e.getMessage());
                 }
-            } catch (Exception e) {
-                LOGGER.warn("Backend limit check failed for {}: {}", uuid, e.getMessage());
             }
-        });
+            LOGGER.info("Loaded mob daily earnings for {} players", dailyEarnings.size());
+        } catch (IOException e) {
+            LOGGER.warn("Failed to load mob daily earnings: {}", e.getMessage());
+        }
     }
 
-    private static void sendLimitReached(ServerPlayer player) {
-        UUID uuid = player.getUUID();
-        EXECUTOR.submit(() -> {
-            try {
-                String token = MoneyCommands.getOrFetchToken(player);
-                String apiUrl = MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_MOB_LIMIT_URL.get());
-                URL url = URI.create(apiUrl).toURL();
+    private static void saveDailyEarnings() {
+        if (dataFile == null) return;
 
-                String json = "{}";
-
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.getOutputStream().write(json.getBytes());
-                conn.getInputStream().close();
-
-                LOGGER.info("Sent mob limit reached update for {}", uuid);
-            } catch (Exception e) {
-                LOGGER.warn("Failed to send limit reached for {}: {}", uuid, e.getMessage());
+        Map<String, DailyEarningsData> raw = new HashMap<>();
+        LocalDate today = LocalDate.now();
+        for (Map.Entry<UUID, DailyEarnings> entry : dailyEarnings.entrySet()) {
+            DailyEarnings de = entry.getValue();
+            if (de.date.equals(today)) {
+                raw.put(entry.getKey().toString(), new DailyEarningsData(de.date.toString(), de.earnedToday));
             }
-        });
+        }
+
+        try (Writer writer = Files.newBufferedWriter(dataFile)) {
+            GSON.toJson(raw, EARNINGS_MAP_TYPE, writer);
+        } catch (IOException e) {
+            LOGGER.warn("Failed to save mob daily earnings: {}", e.getMessage());
+        }
     }
 
     private static void dropBill(LivingEntity dead, Item bill) {
@@ -240,7 +243,17 @@ public class MobDrops {
         }
     }
 
-    private static Component message() {
-        return Component.literal("⚠ You've reached today's mob farming limit ($1000).").withStyle(ChatFormatting.RED);
+    private static class DailyEarningsData {
+        String date;
+        int earnedToday;
+
+        public DailyEarningsData(String date, int earnedToday) {
+            this.date = date;
+            this.earnedToday = earnedToday;
+        }
+    }
+
+    private static Component message(int limit) {
+        return Component.literal("\u26A0 You've reached today's mob farming limit ($" + limit + ").").withStyle(ChatFormatting.RED);
     }
 }

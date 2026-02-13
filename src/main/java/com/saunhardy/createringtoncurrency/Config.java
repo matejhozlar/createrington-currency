@@ -41,9 +41,9 @@ public class Config {
             .comment("API URL for a safe login to your back-end (should prevent Unauthorized access. Works on JWT verification every 10 mins, eg. '/currency/login")
             .define("apiLoginUrl", "api/currency/login");
 
-    public static final ModConfigSpec.ConfigValue<String> API_MOB_LIMIT_URL = BUILDER
-            .comment("API URL for mob limit earnings, eg. '/currency/mob-limit")
-            .define("apiMobLimitUrl", "api/currency/mob-limit");
+    public static final ModConfigSpec.IntValue MOB_DAILY_LIMIT = BUILDER
+            .comment("Maximum amount of currency a player can earn from mob kills per day (set to 0 to disable limit)")
+            .defineInRange("mobDailyLimit", 1000, 0, Integer.MAX_VALUE);
 
     public static final ModConfigSpec.ConfigValue<String> API_DAILY_URL = BUILDER
             .comment("API URL for daily reward, eg. '/currency/daily")
