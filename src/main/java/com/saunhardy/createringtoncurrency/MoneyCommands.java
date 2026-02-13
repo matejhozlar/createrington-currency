@@ -160,6 +160,7 @@ public class MoneyCommands {
                                                         String formatted = NumberFormat.getInstance().format(displayedAmount);
                                                         sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
                                                         targetPlayer.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
+                                                        LOGGER.info("[PAY] {} ({}) -> {} ({}): ${}", sender.getName().getString(), fromUuid, toName, toUuid, formatted);
                                                     } else {
                                                         sendError(sender, "Pay", response.body);
                                                     }
@@ -470,6 +471,7 @@ public class MoneyCommands {
                     final long amount = (long) denomination * count;
                     String formatted = NumberFormat.getInstance().format(amount);
                     player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+                    LOGGER.info("[WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), uuid, formatted, count, denomination);
                 } else {
                     sendError(player, "Withdraw", response.body);
                 }
@@ -567,6 +569,7 @@ public class MoneyCommands {
             if (allSucceeded) {
                 String formatted = NumberFormat.getInstance().format(finalTotal);
                 player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+                LOGGER.info("[WITHDRAW] {} ({}): ${} (bundle)", player.getName().getString(), player.getUUID(), formatted);
             }
         });
 
@@ -642,6 +645,7 @@ public class MoneyCommands {
             if (allSucceeded) {
                 String formatted = NumberFormat.getInstance().format(originalTotal);
                 player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+                LOGGER.info("[WITHDRAW] {} ({}): ${} (optimized)", player.getName().getString(), player.getUUID(), formatted);
             }
 
         });
@@ -742,6 +746,7 @@ public class MoneyCommands {
                     });
 
                     player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
+                    LOGGER.info("[DEPOSIT] {} ({}): ${}", player.getName().getString(), uuid, formatted);
                 } else {
                     sendError(player, "Deposit", response.body);
                 }

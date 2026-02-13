@@ -12,6 +12,9 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -20,6 +23,7 @@ import java.net.URL;
 import java.util.*;
 
 public final class ATMNetworking {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
 
     public static void register(RegisterPayloadHandlersEvent event) {
@@ -166,6 +170,7 @@ public final class ATMNetworking {
                         player.closeContainer();
                     });
                     sendResult(player, 1, "Deposited $" + totalAmount);
+                    LOGGER.info("[ATM DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), totalAmount);
                 } else {
                     sendResult(player, 2, extractApiMessage(result.body, "Deposit failed. Please try again."));
                 }
@@ -218,7 +223,9 @@ public final class ATMNetworking {
                     PostResult result = post(url, token, payload);
                     if (result.code == 200) {
                         give.accept(pkt.a(), pkt.b());
-                        sendResult(player, 1, "Withdrew $" + ((long) pkt.a() * pkt.b()));
+                        long amount = (long) pkt.a() * pkt.b();
+                        sendResult(player, 1, "Withdrew $" + amount);
+                        LOGGER.info("[ATM WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), player.getUUID(), amount, pkt.b(), pkt.a());
                     } else {
                         sendResult(player, 2, extractApiMessage(result.body, "Withdraw failed. Please try again."));
                     }
@@ -252,6 +259,7 @@ public final class ATMNetworking {
                     }
                     if (ok) {
                         sendResult(player, 1, "Withdrawal complete");
+                        LOGGER.info("[ATM WITHDRAW] {} ({}): ${} (optimized)", player.getName().getString(), player.getUUID(), pkt.a());
                     }
                 }
             } catch (Exception e) {
