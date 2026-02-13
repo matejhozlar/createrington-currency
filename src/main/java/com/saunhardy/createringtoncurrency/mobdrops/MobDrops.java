@@ -19,6 +19,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.minecraft.world.entity.EntityType;
 
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MobDrops {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -42,6 +44,9 @@ public class MobDrops {
     private static final Map<UUID, DailyEarnings> dailyEarnings = new ConcurrentHashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Type EARNINGS_MAP_TYPE = new TypeToken<Map<String, DailyEarningsData>>() {}.getType();
+    private static final AtomicBoolean dirty = new AtomicBoolean(false);
+    private static final int SAVE_INTERVAL_TICKS = 6000; // 5 minutes
+    private static int tickCounter = 0;
     private static Path dataFile;
     private static final Set<EntityType<?>> ALLOWED_MOB_TYPES = Set.of(
             EntityType.ZOMBIE,
@@ -61,7 +66,19 @@ public class MobDrops {
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
-        saveDailyEarnings();
+        if (dirty.compareAndSet(true, false)) {
+            saveDailyEarnings();
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (++tickCounter >= SAVE_INTERVAL_TICKS) {
+            tickCounter = 0;
+            if (dirty.compareAndSet(true, false)) {
+                saveDailyEarnings();
+            }
+        }
     }
 
     @SubscribeEvent
@@ -159,7 +176,7 @@ public class MobDrops {
                 if (allowed > 0) {
                     progress.earnedToday += allowed;
                     dropBill(dead, billToDrop);
-                    saveDailyEarnings();
+                    dirty.set(true);
                 } else {
                     if (!warnedToday.contains(uuid)) {
                         player.sendSystemMessage(message(dailyLimit));
@@ -175,8 +192,9 @@ public class MobDrops {
             if (progress.earnedToday >= dailyLimit) {
                 player.sendSystemMessage(message(dailyLimit));
                 warnedToday.add(uuid);
-                saveDailyEarnings();
             }
+
+            dirty.set(true);
         }
     }
 
