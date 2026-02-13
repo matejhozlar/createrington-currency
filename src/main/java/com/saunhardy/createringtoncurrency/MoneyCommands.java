@@ -42,6 +42,8 @@ public class MoneyCommands {
     // Refetching JWT
     private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
     private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
+    private static final long CLEANUP_INTERVAL_MS = 60 * 1000;
+    private static volatile long lastCleanupTime = 0;
     // JWT Authentication
     private static final Map<UUID, String> TOKEN_CACHE = new ConcurrentHashMap<>();
     private static final Map<UUID, Object> TOKEN_LOCKS = new ConcurrentHashMap<>();
@@ -69,6 +71,9 @@ public class MoneyCommands {
         LOGGER.info("Server is stopping, shutting down MoneyCommands executor.");
         shutdownExecutor();
         COOLDOWNS.clear();
+        TOKEN_CACHE.clear();
+        TOKEN_EXPIRATION.clear();
+        TOKEN_LOCKS.clear();
     }
 
     @SubscribeEvent
@@ -857,6 +862,7 @@ public class MoneyCommands {
 
     public static String getOrFetchToken(ServerPlayer player) throws Exception {
         UUID uuid = player.getUUID();
+        evictExpiredTokens();
         Object lock = TOKEN_LOCKS.computeIfAbsent(uuid, k -> new Object());
 
         synchronized (lock) {
@@ -868,6 +874,20 @@ public class MoneyCommands {
             }
             return TOKEN_CACHE.get(uuid);
         }
+    }
+
+    private static void evictExpiredTokens() {
+        long now = System.currentTimeMillis();
+        if (now - lastCleanupTime < CLEANUP_INTERVAL_MS) return;
+        lastCleanupTime = now;
+
+        TOKEN_EXPIRATION.forEach((uid, expiry) -> {
+            if (expiry < now) {
+                TOKEN_CACHE.remove(uid);
+                TOKEN_EXPIRATION.remove(uid);
+                TOKEN_LOCKS.remove(uid);
+            }
+        });
     }
 
     // Inventory space checker (to overcome overflow)
