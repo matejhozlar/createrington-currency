@@ -49,27 +49,32 @@ public final class ATMNetworking {
                 String token = com.saunhardy.createringtoncurrency.MoneyCommands.getOrFetchToken(player);
 
                 var conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                int code = conn.getResponseCode();
-                java.io.InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
-                var sb = new StringBuilder();
-                if (is != null) {
-                    var br = new java.io.BufferedReader(new java.io.InputStreamReader(is));
-                    String line; while ((line = br.readLine()) != null) sb.append(line); br.close();
-                }
-
-                int balance = -1;
                 try {
-                    JsonObject json = JsonParser.parseString(sb.toString()).getAsJsonObject();
-                    if (json.has("balance")) balance = json.get("balance").getAsInt();
-                } catch (Exception ignored) {}
-                player.connection.send(new net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket(
-                        new ATMBalancePayload(Math.max(0, balance))
-                ));
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("Authorization", "Bearer " + token);
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+
+                    int code = conn.getResponseCode();
+                    java.io.InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+                    var sb = new StringBuilder();
+                    if (is != null) {
+                        try (var br = new java.io.BufferedReader(new java.io.InputStreamReader(is))) {
+                            String line; while ((line = br.readLine()) != null) sb.append(line);
+                        }
+                    }
+
+                    int balance = -1;
+                    try {
+                        JsonObject json = JsonParser.parseString(sb.toString()).getAsJsonObject();
+                        if (json.has("balance")) balance = json.get("balance").getAsInt();
+                    } catch (Exception ignored) {}
+                    player.connection.send(new net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket(
+                            new ATMBalancePayload(Math.max(0, balance))
+                    ));
+                } finally {
+                    conn.disconnect();
+                }
             } catch (Exception e) {
                 player.connection.send(new net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket(
                         new ATMBalancePayload(0)
@@ -255,20 +260,31 @@ public final class ATMNetworking {
 
     private static PostResult post(URL url, String bearer, Object payload) throws Exception {
         var conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Authorization", "Bearer " + bearer);
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true);
-        conn.getOutputStream().write(new Gson().toJson(payload).getBytes());
-        int code = conn.getResponseCode();
-        var is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
-        if (is == null) {
-            return new PostResult(code, "");
+        try {
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + bearer);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+
+            try (var os = conn.getOutputStream()) {
+                os.write(new Gson().toJson(payload).getBytes());
+            }
+
+            int code = conn.getResponseCode();
+            var is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+            if (is == null) {
+                return new PostResult(code, "");
+            }
+            try (var br = new BufferedReader(new InputStreamReader(is))) {
+                var sb = new StringBuilder();
+                String line; while ((line = br.readLine()) != null) sb.append(line);
+                return new PostResult(code, sb.toString());
+            }
+        } finally {
+            conn.disconnect();
         }
-        var br = new BufferedReader(new InputStreamReader(is));
-        var sb = new StringBuilder();
-        String line; while ((line = br.readLine()) != null) sb.append(line); br.close();
-        return new PostResult(code, sb.toString());
     }
 
     private static String extractApiMessage(String body, String fallback) {

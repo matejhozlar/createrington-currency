@@ -80,39 +80,46 @@ public class WithdrawalHelper {
         
         try {
             String uuid = player.getUUID().toString();
-            
+
             // Create the payload for withdrawal API
             Map<String, Object> payload = new HashMap<>();
             payload.put("uuid", uuid);
             payload.put("count", count);
             payload.put("denomination", denomination);
-            
+
             String json = GSON.toJson(payload);
-            
+
             // Make HTTP request to withdraw endpoint synchronously
             URL url = URI.create(MoneyCommands.safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL();
             String token = MoneyCommands.getOrFetchToken(player);
-            
+
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            conn.getOutputStream().write(json.getBytes());
-            
-            int responseCode = conn.getResponseCode();
-            
-            if (responseCode == 200) {
-                // Success - give the player the bills
-                ItemStack billStack = new ItemStack(billItem, count);
-                player.getInventory().add(billStack);
-                
-                return WithdrawalResponse.success();
-            } else {
-                LOGGER.error("Withdrawal API failed (HTTP {}): uuid={}, denomination={}, count={}", responseCode, uuid, denomination, count);
-                return WithdrawalResponse.failed(WithdrawalResult.FAILED_API);
+            try {
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                try (var os = conn.getOutputStream()) {
+                    os.write(json.getBytes());
+                }
+
+                int responseCode = conn.getResponseCode();
+
+                if (responseCode == 200) {
+                    // Success - give the player the bills
+                    ItemStack billStack = new ItemStack(billItem, count);
+                    player.getInventory().add(billStack);
+
+                    return WithdrawalResponse.success();
+                } else {
+                    LOGGER.error("Withdrawal API failed (HTTP {}): uuid={}, denomination={}, count={}", responseCode, uuid, denomination, count);
+                    return WithdrawalResponse.failed(WithdrawalResult.FAILED_API);
+                }
+            } finally {
+                conn.disconnect();
             }
 
         } catch (Exception e) {

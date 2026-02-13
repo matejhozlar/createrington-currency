@@ -755,27 +755,31 @@ public class MoneyCommands {
         String token = getOrFetchToken(player);
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestProperty("Authorization", "Bearer " + token);
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(5000);
-        conn.setReadTimeout(5000);
+        try {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
 
-        int responseCode = conn.getResponseCode();
-        if (responseCode == 401) {
-            TOKEN_CACHE.remove(player.getUUID());
-            TOKEN_EXPIRATION.remove(player.getUUID());
-        }
-        InputStream stream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
-        if (stream == null) {
-            return new HttpResponse(responseCode, "");
-        }
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(stream))) {
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = in.readLine()) != null) {
-                response.append(line);
+            int responseCode = conn.getResponseCode();
+            if (responseCode == 401) {
+                TOKEN_CACHE.remove(player.getUUID());
+                TOKEN_EXPIRATION.remove(player.getUUID());
             }
-            return new HttpResponse(responseCode, response.toString());
+            InputStream stream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+            if (stream == null) {
+                return new HttpResponse(responseCode, "");
+            }
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(stream))) {
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
+                }
+                return new HttpResponse(responseCode, response.toString());
+            }
+        } finally {
+            conn.disconnect();
         }
     }
 
@@ -789,40 +793,46 @@ public class MoneyCommands {
         }
     }
 
-    private static HttpResponse sendPost(URL url,ServerPlayer player, String json) throws Exception {
+    private static HttpResponse sendPost(URL url, ServerPlayer player, String json) throws Exception {
         String token = getOrFetchToken(player);
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + token);
-        conn.setDoOutput(true);
-        conn.setConnectTimeout(5000);
-        conn.setReadTimeout(5000);
-        conn.getOutputStream().write(json.getBytes());
+        try {
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
 
-        int responseCode = conn.getResponseCode();
-        if (responseCode == 401) {
-            TOKEN_CACHE.remove(player.getUUID());
-            TOKEN_EXPIRATION.remove(player.getUUID());
+            try (var os = conn.getOutputStream()) {
+                os.write(json.getBytes());
+            }
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode == 401) {
+                TOKEN_CACHE.remove(player.getUUID());
+                TOKEN_EXPIRATION.remove(player.getUUID());
+            }
+            InputStream inputStream = (responseCode == 200)
+                    ? conn.getInputStream()
+                    : conn.getErrorStream();
+
+            if (inputStream == null) {
+                return new HttpResponse(responseCode, "");
+            }
+
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
+                }
+                return new HttpResponse(responseCode, response.toString());
+            }
+        } finally {
+            conn.disconnect();
         }
-        InputStream inputStream = (responseCode == 200)
-                ? conn.getInputStream()
-                : conn.getErrorStream();
-
-        if (inputStream == null) {
-            return new HttpResponse(responseCode, "");
-        }
-
-        BufferedReader in = new BufferedReader(new InputStreamReader(inputStream));
-        StringBuilder response = new StringBuilder();
-        String line;
-        while ((line = in.readLine()) != null) {
-            response.append(line);
-        }
-        in.close();
-
-        return new HttpResponse(responseCode, response.toString());
     }
 
     public static String getOrFetchToken(ServerPlayer player) throws Exception {
@@ -881,28 +891,37 @@ public class MoneyCommands {
 
         URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_LOGIN_URL.get())).toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true);
+        try {
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
 
-        String json = GSON.toJson(Map.of("uuid", uuid, "name", name));
-        conn.getOutputStream().write(json.getBytes());
+            String json = GSON.toJson(Map.of("uuid", uuid, "name", name));
+            try (var os = conn.getOutputStream()) {
+                os.write(json.getBytes());
+            }
 
-        int responseCode = conn.getResponseCode();
-        InputStream input = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+            int responseCode = conn.getResponseCode();
+            InputStream input = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) sb.append(line);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
 
-        if(responseCode != 200) {
-            LOGGER.error("Failed to fetch JWT (HTTP {}): {}", responseCode, sb);
-            throw new Exception("Authentication failed (HTTP " + responseCode + ")");
+                if (responseCode != 200) {
+                    LOGGER.error("Failed to fetch JWT (HTTP {}): {}", responseCode, sb);
+                    throw new Exception("Authentication failed (HTTP " + responseCode + ")");
+                }
+
+                JsonObject obj = JsonParser.parseString(sb.toString()).getAsJsonObject();
+                return obj.get("token").getAsString();
+            }
+        } finally {
+            conn.disconnect();
         }
-
-        JsonObject obj = JsonParser.parseString(sb.toString()).getAsJsonObject();
-        return obj.get("token").getAsString();
     }
 
     // Safe join for urls
