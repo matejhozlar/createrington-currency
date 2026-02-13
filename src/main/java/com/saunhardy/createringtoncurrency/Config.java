@@ -37,6 +37,10 @@ public class Config {
             .comment("Global cooldown for all currency commands in milliseconds")
             .define("commandCooldownMs", 5000L);
 
+    public static final ModConfigSpec.IntValue API_TIMEOUT_MS = BUILDER
+            .comment("HTTP connect and read timeout for all API calls in milliseconds")
+            .defineInRange("apiTimeoutMs", 5000, 1000, 30000);
+
     public static final ModConfigSpec.ConfigValue<String> API_LOGIN_URL = BUILDER
             .comment("API URL for a safe login to your back-end (should prevent Unauthorized access. Works on JWT verification every 10 mins, eg. '/currency/login")
             .define("apiLoginUrl", "api/currency/login");

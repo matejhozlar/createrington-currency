@@ -760,8 +760,8 @@ public class MoneyCommands {
         try {
             conn.setRequestProperty("Authorization", "Bearer " + token);
             conn.setRequestMethod("GET");
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
 
             int responseCode = conn.getResponseCode();
             if (responseCode == 401) {
@@ -804,8 +804,8 @@ public class MoneyCommands {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Authorization", "Bearer " + token);
             conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
 
             try (var os = conn.getOutputStream()) {
                 os.write(json.getBytes());
@@ -900,8 +900,8 @@ public class MoneyCommands {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
 
             String json = GSON.toJson(Map.of("uuid", uuid, "name", name));
             try (var os = conn.getOutputStream()) {

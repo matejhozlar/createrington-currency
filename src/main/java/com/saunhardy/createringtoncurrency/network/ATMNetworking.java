@@ -52,8 +52,8 @@ public final class ATMNetworking {
                 try {
                     conn.setRequestMethod("GET");
                     conn.setRequestProperty("Authorization", "Bearer " + token);
-                    conn.setConnectTimeout(5000);
-                    conn.setReadTimeout(5000);
+                    conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+                    conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
 
                     int code = conn.getResponseCode();
                     java.io.InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
@@ -265,8 +265,8 @@ public final class ATMNetworking {
             conn.setRequestProperty("Authorization", "Bearer " + bearer);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
 
             try (var os = conn.getOutputStream()) {
                 os.write(new Gson().toJson(payload).getBytes());

@@ -99,8 +99,8 @@ public class WithdrawalHelper {
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
+                conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+                conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
 
                 try (var os = conn.getOutputStream()) {
                     os.write(json.getBytes());
