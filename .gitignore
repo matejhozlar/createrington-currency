@@ -14,6 +14,7 @@ out
 .idea
 .claude
 todo.txt
+CLAUDE.md
 
 # gradle
 build

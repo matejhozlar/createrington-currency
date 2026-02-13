@@ -10,5 +10,3 @@
 - Expired token eviction to prevent memory leak from crashed players
 - All token caches cleared on server stop
 
-## New version 1.1.6
-- Improved error handling across the project
