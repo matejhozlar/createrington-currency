@@ -44,6 +44,7 @@ public class MoneyCommands {
     private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
     // JWT Authentication
     private static final Map<UUID, String> TOKEN_CACHE = new ConcurrentHashMap<>();
+    private static final Map<UUID, Object> TOKEN_LOCKS = new ConcurrentHashMap<>();
     private static Component message(String emoji, String text, ChatFormatting color) {
         return Component.literal(emoji + " " + text).withStyle(color);
     }
@@ -75,6 +76,7 @@ public class MoneyCommands {
         COOLDOWNS.remove(event.getEntity().getUUID());
         TOKEN_CACHE.remove(event.getEntity().getUUID());
         TOKEN_EXPIRATION.remove(event.getEntity().getUUID());
+        TOKEN_LOCKS.remove(event.getEntity().getUUID());
     }
     // JSON parser
     private static final Gson GSON = new GsonBuilder().create();
@@ -837,14 +839,17 @@ public class MoneyCommands {
 
     public static String getOrFetchToken(ServerPlayer player) throws Exception {
         UUID uuid = player.getUUID();
-        long now = System.currentTimeMillis();
+        Object lock = TOKEN_LOCKS.computeIfAbsent(uuid, k -> new Object());
 
-        if (!TOKEN_CACHE.containsKey(uuid) || TOKEN_EXPIRATION.getOrDefault(uuid, 0L) < now) {
-            String token = fetchJwtToken(player);
-            TOKEN_CACHE.put(uuid, token);
-            TOKEN_EXPIRATION.put(uuid, now + TOKEN_TTL_MS);
+        synchronized (lock) {
+            long now = System.currentTimeMillis();
+            if (!TOKEN_CACHE.containsKey(uuid) || TOKEN_EXPIRATION.getOrDefault(uuid, 0L) < now) {
+                String token = fetchJwtToken(player);
+                TOKEN_CACHE.put(uuid, token);
+                TOKEN_EXPIRATION.put(uuid, now + TOKEN_TTL_MS);
+            }
+            return TOKEN_CACHE.get(uuid);
         }
-        return TOKEN_CACHE.get(uuid);
     }
 
     // Inventory space checker (to overcome overflow)
