@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 @Mod(CreateringtonCurrency.MODID)
 public class CreateringtonCurrency {
     public static final String MODID = "createringtoncurrency";
+    public static final int[] DENOMINATIONS = {1000, 500, 100, 50, 20, 10, 5, 1};
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);

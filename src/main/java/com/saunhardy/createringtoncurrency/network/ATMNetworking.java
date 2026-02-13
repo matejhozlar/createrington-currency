@@ -219,7 +219,7 @@ public final class ATMNetworking {
                     }
                 } else {
                     int total = pkt.a();
-                    int[] denoms = {1000, 500, 100, 50, 20, 10, 5, 1};
+                    int[] denoms = CreateringtonCurrency.DENOMINATIONS;
                     Map<Integer,Integer> bundle = new LinkedHashMap<>();
                     for (int d : denoms) {
                         int cnt = total / d;

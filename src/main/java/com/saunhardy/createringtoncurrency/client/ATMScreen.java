@@ -73,7 +73,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private static final int TEX_W = 320, TEX_H = 200;
     private static final int SCR_X = 16, SCR_Y = 22, SCR_W = 288, SCR_H = 162;
 
-    private static final int[] DENOMS = {1000, 500, 100, 50, 20, 10, 5, 1};
+    private static final int[] DENOMS = com.saunhardy.createringtoncurrency.CreateringtonCurrency.DENOMINATIONS;
 
     private double bundleScroll = 0;
     private static final int BUNDLE_ROW_H = 16;

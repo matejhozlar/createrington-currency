@@ -561,7 +561,7 @@ public class MoneyCommands {
     }
 
     private static int withdrawOptimized(ServerPlayer player, int totalAmount) {
-        int[] denominations = {1000, 500, 100, 50, 20, 10, 5, 1};
+        int[] denominations = CreateringtonCurrency.DENOMINATIONS;
         Map<Integer, Integer> result = new LinkedHashMap<>();
         int originalTotal = totalAmount;
 
