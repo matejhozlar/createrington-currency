@@ -197,6 +197,11 @@ public final class ATMNetworking {
             player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
         };
 
+        if (pkt.a() <= 0 || (pkt.mode() == 0 && pkt.b() <= 0)) {
+            sendResult(player, 2, "Invalid amount.");
+            return;
+        }
+
         MoneyCommands.EXECUTOR.submit(() -> {
             try {
                 String token = MoneyCommands.getOrFetchToken(player);
@@ -213,7 +218,7 @@ public final class ATMNetworking {
                     PostResult result = post(url, token, payload);
                     if (result.code == 200) {
                         give.accept(pkt.a(), pkt.b());
-                        sendResult(player, 1, "Withdrew $" + (pkt.a() * pkt.b()));
+                        sendResult(player, 1, "Withdrew $" + ((long) pkt.a() * pkt.b()));
                     } else {
                         sendResult(player, 2, extractApiMessage(result.body, "Withdraw failed. Please try again."));
                     }

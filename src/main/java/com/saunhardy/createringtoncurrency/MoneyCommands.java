@@ -192,23 +192,36 @@ public class MoneyCommands {
                                         if (isOnCooldown(player)) return 0;
                                         String input = StringArgumentType.getString(context, "input").trim();
 
-                                        // Match: "50 2"
-                                        if (input.matches("^\\d+ \\d+$")) {
-                                            String[] parts = input.split(" ");
-                                            int denom = Integer.parseInt(parts[0]);
-                                            int count = Integer.parseInt(parts[1]);
-                                            return withdrawFixed(player, denom, count);
-                                        }
+                                        try {
+                                            // Match: "50 2"
+                                            if (input.matches("^\\d+ \\d+$")) {
+                                                String[] parts = input.split(" ");
+                                                int denom = Integer.parseInt(parts[0]);
+                                                int count = Integer.parseInt(parts[1]);
+                                                if (denom <= 0 || count <= 0) {
+                                                    player.sendSystemMessage(message("[ERROR]", "Amount must be positive.", ChatFormatting.RED));
+                                                    return 0;
+                                                }
+                                                return withdrawFixed(player, denom, count);
+                                            }
 
-                                        // Match: "50:2 20:1 5:3"
-                                        if (input.contains(":")) {
-                                            return withdrawCustomBundle(player, input);
-                                        }
+                                            // Match: "50:2 20:1 5:3"
+                                            if (input.contains(":")) {
+                                                return withdrawCustomBundle(player, input);
+                                            }
 
-                                        // Match: "185"
-                                        if (input.matches("^\\d+$")) {
-                                            int total = Integer.parseInt(input);
-                                            return withdrawOptimized(player, total);
+                                            // Match: "185"
+                                            if (input.matches("^\\d+$")) {
+                                                int total = Integer.parseInt(input);
+                                                if (total <= 0) {
+                                                    player.sendSystemMessage(message("[ERROR]", "Amount must be positive.", ChatFormatting.RED));
+                                                    return 0;
+                                                }
+                                                return withdrawOptimized(player, total);
+                                            }
+                                        } catch (NumberFormatException e) {
+                                            player.sendSystemMessage(message("[ERROR]", "Number too large.", ChatFormatting.RED));
+                                            return 0;
                                         }
 
                                         player.sendSystemMessage(message("[ERROR]" , "Invalid command format.", ChatFormatting.RED));
@@ -454,7 +467,7 @@ public class MoneyCommands {
                     ItemStack stack = new ItemStack(billItem, count);
                     player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
 
-                    final int amount = denomination * count;
+                    final long amount = (long) denomination * count;
                     String formatted = NumberFormat.getInstance().format(amount);
                     player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
                 } else {
@@ -472,7 +485,7 @@ public class MoneyCommands {
 
     private static int withdrawCustomBundle(ServerPlayer player, String input) {
         Map<Integer, Integer> bundle = new LinkedHashMap<>();
-        int totalAmount = 0;
+        long totalAmount = 0;
 
         // Phase 1: Parse and validate
         for (String part : input.split(" ")) {
@@ -508,11 +521,11 @@ public class MoneyCommands {
             }
 
             bundle.put(denom, count);
-            totalAmount += denom * count;
+            totalAmount += (long) denom * count;
         }
 
         // Phase 2: Submit all withdrawals in 1 task
-        final int finalTotal = totalAmount;
+        final long finalTotal = totalAmount;
         EXECUTOR.submit(() -> {
             boolean allSucceeded = true;
 
