@@ -1,3 +1,6 @@
+## New version 1.1.9
+- Added driver, passenger, owner, and backwards driver data to train crash reports
+
 ## New version 1.1.8
 - Added train crash reporting to backend API via mixin into Create's Train.crash() (train name, speed, position, dimension, carriage count)
 - Conditional mixin plugin: only applies when Create mod is loaded
