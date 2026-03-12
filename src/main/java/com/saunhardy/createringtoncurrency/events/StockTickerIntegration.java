@@ -21,7 +21,6 @@ import net.minecraft.network.chat.Component;
 import com.simibubi.create.content.logistics.stockTicker.StockTickerInteractionHandler;
 import com.simibubi.create.content.logistics.tableCloth.ShoppingListItem;
 import com.simibubi.create.content.processing.burner.BlazeBurnerBlock;
-import com.saunhardy.createringtoncurrency.MoneyCommands;
 // Import our withdrawal helper
 import com.saunhardy.createringtoncurrency.util.WithdrawalHelper;
 

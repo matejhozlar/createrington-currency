@@ -85,5 +85,13 @@ public class Config {
             .comment("Cooldown duration for /lottery in minutes, don't use this if you are not using integrated discord bots")
             .defineInRange("lotteryCooldownMinutes", 15, 0, 1440);
 
+    public static final ModConfigSpec.BooleanValue TRAIN_CRASH_REPORTING_ENABLED = BUILDER
+            .comment("Enable reporting Create train crashes to the API (requires Create mod)")
+            .define("trainCrashReportingEnabled", true);
+
+    public static final ModConfigSpec.ConfigValue<String> API_TRAIN_CRASH_URL = BUILDER
+            .comment("API URL for reporting train crashes, eg. 'api/trains/crash'")
+            .define("apiTrainCrashUrl", "api/trains/crash");
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 }

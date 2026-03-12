@@ -1,0 +1,10 @@
+{
+    "required": false,
+    "package": "com.saunhardy.createringtoncurrency.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "plugin": "com.saunhardy.createringtoncurrency.mixin.CreateMixinPlugin",
+    "mixins": [
+        "TrainCrashMixin"
+    ],
+    "minVersion": "0.8"
+}

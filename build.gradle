@@ -111,7 +111,14 @@ dependencies {
     
     // Create mod - optional dependency
     compileOnly "com.simibubi.create:create-${minecraft_version}:${create_version}:slim"
-    localRuntime "com.simibubi.create:create-${minecraft_version}:${create_version}:slim"
+    localRuntime("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") {
+        exclude group: 'maven.modrinth', module: 'journeymap'
+        exclude group: 'info.journeymap'
+        exclude group: 'cc.tweaked'
+    }
+
+    // Flywheel - required by Create at runtime
+    localRuntime "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:1.0.6"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
