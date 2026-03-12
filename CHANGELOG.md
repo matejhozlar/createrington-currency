@@ -1,12 +1,7 @@
-## New version 1.1.7
-- Local mob daily earnings limit (configurable `mobDailyLimit`, persistent across restarts, no backend ping needed)
-- Fixed HTTP resource leaks across all API call sites (proper connection disconnect and stream closing)
-- Fixed token cache race condition with per-player synchronization
-- Periodic save for mob daily earnings using dirty flag (every 5 minutes instead of per-kill)
-- Extracted shared `DENOMINATIONS` constant to eliminate duplication
-- Replaced hardcoded HTTP timeouts with configurable `apiTimeoutMs`
-- Added integer overflow and negative value validation on withdraw commands and ATM packets
-- Added audit logging for all successful transactions (pay, deposit, withdraw, ATM)
-- Expired token eviction to prevent memory leak from crashed players
-- All token caches cleared on server stop
-
+## New version 1.1.8
+- Added train crash reporting to backend API via mixin into Create's Train.crash() (train name, speed, position, dimension, carriage count)
+- Conditional mixin plugin: only applies when Create mod is loaded
+- Added `trainCrashReportingEnabled` and `apiTrainCrashUrl` config options
+- Updated NeoForge 21.1.172 -> 21.1.217
+- Updated Create 6.0.7 -> 6.0.9
+- Added explicit Flywheel 1.0.6 dependency (required by Create 6.0.9)
