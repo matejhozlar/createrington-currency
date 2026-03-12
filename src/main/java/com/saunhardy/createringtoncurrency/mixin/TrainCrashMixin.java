@@ -4,6 +4,8 @@ import com.simibubi.create.content.trains.entity.Carriage;
 import com.simibubi.create.content.trains.entity.Train;
 import com.saunhardy.createringtoncurrency.events.TrainCrashHandler;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -11,8 +13,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.List;
-import java.util.UUID;
+import javax.annotation.Nullable;
+import java.util.*;
 
 @Mixin(value = Train.class, remap = false)
 public abstract class TrainCrashMixin {
@@ -22,6 +24,8 @@ public abstract class TrainCrashMixin {
     @Shadow public double speed;
     @Shadow public boolean derailed;
     @Shadow public List<Carriage> carriages;
+    @Shadow public @Nullable UUID owner;
+    @Shadow public @Nullable Player backwardsDriver;
 
     @Inject(method = "crash", at = @At("HEAD"), remap = false)
     private void createringtoncurrency$onTrainCrash(CallbackInfo ci) {
@@ -31,28 +35,85 @@ public abstract class TrainCrashMixin {
         String trainName = this.name != null ? this.name.getString() : "Unknown";
         int carriageCount = this.carriages != null ? this.carriages.size() : 0;
 
-        // Extract position from first carriage entity
+        // Extract position, driver, and passengers from carriage entities
         double[] pos = null;
         String dimension = null;
+        UUID driverUuid = null;
+        List<TrainCrashHandler.PlayerInfo> passengers = new ArrayList<>();
 
-        if (this.carriages != null && !this.carriages.isEmpty()) {
-            try {
-                final double[][] posHolder = {null};
-                final String[] dimHolder = {null};
+        if (this.carriages != null) {
+            for (Carriage carriage : this.carriages) {
+                try {
+                    carriage.forEachPresentEntity(entity -> {
+                        // Get controlling player (driver)
+                        Optional<UUID> controlling = entity.getControllingPlayer();
+                        if (controlling.isPresent()) {
+                            // Can't assign to local var from lambda, so add as a special passenger entry
+                            passengers.add(new TrainCrashHandler.PlayerInfo(
+                                    controlling.get(), null, true));
+                        }
 
-                this.carriages.get(0).forEachPresentEntity(entity -> {
-                    Vec3 entityPos = entity.position();
-                    posHolder[0] = new double[]{entityPos.x, entityPos.y, entityPos.z};
-                    dimHolder[0] = entity.level().dimension().location().toString();
-                });
+                        // Get all passengers
+                        for (Entity passenger : entity.getIndirectPassengers()) {
+                            if (passenger instanceof Player p) {
+                                boolean isDriver = controlling.isPresent()
+                                        && controlling.get().equals(p.getUUID());
+                                passengers.add(new TrainCrashHandler.PlayerInfo(
+                                        p.getUUID(), p.getName().getString(), isDriver));
+                            }
+                        }
+                    });
+                } catch (Exception ignored) {
+                }
+            }
 
-                pos = posHolder[0];
-                dimension = dimHolder[0];
-            } catch (Exception ignored) {
-                // Position extraction failed, continue without it
+            // Extract position from first carriage
+            if (!this.carriages.isEmpty()) {
+                try {
+                    final double[][] posHolder = {null};
+                    final String[] dimHolder = {null};
+
+                    this.carriages.get(0).forEachPresentEntity(entity -> {
+                        Vec3 entityPos = entity.position();
+                        posHolder[0] = new double[]{entityPos.x, entityPos.y, entityPos.z};
+                        dimHolder[0] = entity.level().dimension().location().toString();
+                    });
+
+                    pos = posHolder[0];
+                    dimension = dimHolder[0];
+                } catch (Exception ignored) {
+                }
             }
         }
 
-        TrainCrashHandler.reportCrash(this.id, trainName, this.speed, carriageCount, pos, dimension);
+        // Deduplicate passengers and resolve driver UUID
+        Map<UUID, TrainCrashHandler.PlayerInfo> deduped = new LinkedHashMap<>();
+        for (TrainCrashHandler.PlayerInfo p : passengers) {
+            deduped.merge(p.uuid(), p, (existing, incoming) -> new TrainCrashHandler.PlayerInfo(
+                    existing.uuid(),
+                    existing.name() != null ? existing.name() : incoming.name(),
+                    existing.isDriver() || incoming.isDriver()));
+        }
+
+        // Find driver UUID
+        for (TrainCrashHandler.PlayerInfo p : deduped.values()) {
+            if (p.isDriver()) {
+                driverUuid = p.uuid();
+                break;
+            }
+        }
+
+        // Backwards driver
+        String backwardsDriverName = null;
+        UUID backwardsDriverUuid = null;
+        if (this.backwardsDriver != null) {
+            backwardsDriverUuid = this.backwardsDriver.getUUID();
+            backwardsDriverName = this.backwardsDriver.getName().getString();
+        }
+
+        TrainCrashHandler.reportCrash(this.id, trainName, this.speed, carriageCount,
+                pos, dimension, this.owner, driverUuid,
+                new ArrayList<>(deduped.values()),
+                backwardsDriverUuid, backwardsDriverName);
     }
 }

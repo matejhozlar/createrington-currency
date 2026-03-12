@@ -6,19 +6,24 @@ import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.MoneyCommands;
 import org.slf4j.Logger;
 
+import javax.annotation.Nullable;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class TrainCrashHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
 
+    public record PlayerInfo(UUID uuid, @Nullable String name, boolean isDriver) {}
+
     public static void reportCrash(UUID trainId, String trainName, double speed,
-                                   int carriageCount, double[] position, String dimension) {
+                                   int carriageCount, double[] position, String dimension,
+                                   @Nullable UUID owner, @Nullable UUID driverUuid,
+                                   List<PlayerInfo> passengers,
+                                   @Nullable UUID backwardsDriverUuid,
+                                   @Nullable String backwardsDriverName) {
         if (!Config.TRAIN_CRASH_REPORTING_ENABLED.get()) return;
 
         MoneyCommands.EXECUTOR.submit(() -> {
@@ -40,6 +45,34 @@ public class TrainCrashHandler {
 
                 if (dimension != null) {
                     payload.put("dimension", dimension);
+                }
+
+                if (owner != null) {
+                    payload.put("owner", owner.toString());
+                }
+
+                if (driverUuid != null) {
+                    payload.put("driverUuid", driverUuid.toString());
+                }
+
+                // Build passenger list
+                List<Map<String, Object>> passengerList = new ArrayList<>();
+                for (PlayerInfo p : passengers) {
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("uuid", p.uuid().toString());
+                    if (p.name() != null) entry.put("name", p.name());
+                    entry.put("isDriver", p.isDriver());
+                    passengerList.add(entry);
+                }
+                if (!passengerList.isEmpty()) {
+                    payload.put("passengers", passengerList);
+                }
+
+                if (backwardsDriverUuid != null) {
+                    Map<String, String> bd = new HashMap<>();
+                    bd.put("uuid", backwardsDriverUuid.toString());
+                    if (backwardsDriverName != null) bd.put("name", backwardsDriverName);
+                    payload.put("backwardsDriver", bd);
                 }
 
                 String json = GSON.toJson(payload);
