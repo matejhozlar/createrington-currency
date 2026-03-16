@@ -38,6 +38,9 @@ public final class ATMNetworking {
         reg.playToServer(ATMQueryBalancePayload.TYPE, ATMQueryBalancePayload.STREAM_CODEC, ATMNetworking::handleQueryBalance);
 
         reg.playToClient(ATMBalancePayload.TYPE, ATMBalancePayload.STREAM_CODEC, ATMNetworking::handleBalanceClient);
+
+        reg.playToServer(ATMQueryHistoryPayload.TYPE, ATMQueryHistoryPayload.STREAM_CODEC, ATMNetworking::handleQueryHistory);
+        reg.playToClient(ATMHistoryPayload.TYPE, ATMHistoryPayload.STREAM_CODEC, ATMNetworking::handleHistoryClient);
     }
 
     private static void handleQueryBalance(final ATMQueryBalancePayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
@@ -96,6 +99,71 @@ public final class ATMNetworking {
         });
     }
 
+
+    private static void handleQueryHistory(final ATMQueryHistoryPayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        var p = ctx.player();
+        if (!(p instanceof ServerPlayer player)) return;
+
+        MoneyCommands.EXECUTOR.submit(() -> {
+            try {
+                var base = Config.API_BASE_URL.get();
+                var path = Config.API_HISTORY_URL.get();
+                var url = URI.create(MoneyCommands.safeJoin(base, path)
+                        + "?page=" + pkt.page() + "&limit=5").toURL();
+
+                String token = MoneyCommands.getOrFetchToken(player);
+
+                var conn = (HttpURLConnection) url.openConnection();
+                try {
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("Authorization", "Bearer " + token);
+                    conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
+                    conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
+
+                    int code = conn.getResponseCode();
+                    var is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
+                    var sb = new StringBuilder();
+                    if (is != null) {
+                        try (var br = new BufferedReader(new InputStreamReader(is))) {
+                            String line; while ((line = br.readLine()) != null) sb.append(line);
+                        }
+                    }
+
+                    int page = pkt.page();
+                    int hasMore = 0;
+                    String data = "[]";
+
+                    if (code == 200) {
+                        try {
+                            JsonObject json = JsonParser.parseString(sb.toString()).getAsJsonObject();
+                            page = json.has("page") ? json.get("page").getAsInt() : pkt.page();
+                            hasMore = json.has("hasMore") && json.get("hasMore").getAsBoolean() ? 1 : 0;
+                            data = json.has("transactions") ? json.get("transactions").toString() : "[]";
+                        } catch (Exception ignored) {}
+                    }
+
+                    player.connection.send(new ClientboundCustomPayloadPacket(
+                            new ATMHistoryPayload(page, hasMore, data)
+                    ));
+                } finally {
+                    conn.disconnect();
+                }
+            } catch (Exception e) {
+                player.connection.send(new ClientboundCustomPayloadPacket(
+                        new ATMHistoryPayload(pkt.page(), 0, "[]")
+                ));
+            }
+        });
+    }
+
+    private static void handleHistoryClient(final ATMHistoryPayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        mc.execute(() -> {
+            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
+                scr.updateHistory(pkt.page(), pkt.hasMore() == 1, pkt.data());
+            }
+        });
+    }
 
     private static void handleResultClient(final ATMResultPayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();

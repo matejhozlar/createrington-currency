@@ -3,6 +3,10 @@ package com.saunhardy.createringtoncurrency.client;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.network.ATMDepositPayload;
 import com.saunhardy.createringtoncurrency.network.ATMWithdrawPayload;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -14,6 +18,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Inventory;
 import org.jetbrains.annotations.NotNull;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
 
@@ -48,12 +57,13 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         WITHDRAW_MENU,
         WITHDRAW_TOTAL,
         WITHDRAW_SINGLE,
-        WITHDRAW_BUNDLE
+        WITHDRAW_BUNDLE,
+        HISTORY
     }
     private View view = View.HOME;
 
     private int homeSel = 0;
-    private Rect hitDeposit, hitWithdraw;
+    private Rect hitDeposit, hitWithdraw, hitHistory;
 
     private int depositSel = 0;
     private Rect hitDepAll, hitBack;
@@ -63,6 +73,14 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
 
     private int balance = -1;
     public void updateBalance(int v) { this.balance = v; }
+
+    private List<HistoryEntry> historyEntries = new ArrayList<>();
+    private int historyPage = 1;
+    private boolean historyHasMore = false;
+    private boolean historyLoading = false;
+    private Rect hitHistBack;
+
+    private record HistoryEntry(String type, String amount, String description, String createdAt) {}
 
     private static final int KEY_UP=265, KEY_DOWN=264, KEY_LEFT=263, KEY_RIGHT=262,
             KEY_ENTER=257, KEY_SPACE=32, KEY_E=69, KEY_ESCAPE=256,
@@ -227,6 +245,9 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             depositSel = 0;
         } else if (v == View.WITHDRAW_MENU) {
             withdrawSel = 0;
+        } else if (v == View.HISTORY) {
+            historyLoading = false;
+            historyEntries = new ArrayList<>();
         }
 
         setUiForView();
@@ -245,6 +266,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     private void goWithdrawTotal()   { setView(View.WITHDRAW_TOTAL); }
     private void goWithdrawSingle()  { setView(View.WITHDRAW_SINGLE); }
     private void goWithdrawBundle()  { setView(View.WITHDRAW_BUNDLE); }
+    private void goHistory()         { setView(View.HISTORY); requestHistory(1); }
 
     private void requestBalance() {
         var conn = Minecraft.getInstance().getConnection();
@@ -252,6 +274,42 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             conn.send(new ServerboundCustomPayloadPacket(
                     new com.saunhardy.createringtoncurrency.network.ATMQueryBalancePayload()));
         }
+    }
+
+    private void requestHistory(int page) {
+        historyPage = page;
+        historyLoading = true;
+        historyEntries = new ArrayList<>();
+        var conn = Minecraft.getInstance().getConnection();
+        if (conn != null) {
+            conn.send(new ServerboundCustomPayloadPacket(
+                    new com.saunhardy.createringtoncurrency.network.ATMQueryHistoryPayload(page)));
+        }
+    }
+
+    public void updateHistory(int page, boolean hasMore, String jsonData) {
+        this.historyPage = page;
+        this.historyHasMore = hasMore;
+        this.historyLoading = false;
+        this.historyEntries = parseHistory(jsonData);
+    }
+
+    private List<HistoryEntry> parseHistory(String json) {
+        var list = new ArrayList<HistoryEntry>();
+        try {
+            JsonArray array = JsonParser.parseString(json).getAsJsonArray();
+            for (JsonElement el : array) {
+                JsonObject obj = el.getAsJsonObject();
+                list.add(new HistoryEntry(
+                        obj.get("transactionType").getAsString(),
+                        obj.get("amount").getAsString(),
+                        obj.has("description") && !obj.get("description").isJsonNull()
+                                ? obj.get("description").getAsString() : "",
+                        obj.get("createdAt").getAsString()
+                ));
+            }
+        } catch (Exception ignored) {}
+        return list;
     }
 
     private int focusedBundleIndex() {
@@ -388,6 +446,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             case WITHDRAW_TOTAL -> renderWithdrawTotal(g, r);
             case WITHDRAW_SINGLE -> renderWithdrawSingle(g, r);
             case WITHDRAW_BUNDLE -> renderWithdrawBundle(g, r);
+            case HISTORY -> renderHistory(g, r);
         }
     }
 
@@ -425,7 +484,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         int itemW = uniformButtonW(r);
         int x = buttonX(r);
 
-        String[] items = {"Deposit", "Withdraw"};
+        String[] items = {"Deposit", "Withdraw", "History"};
         for (int i = 0; i < items.length; i++) {
             int y = startY + i * (rowH + 8);
             boolean sel = (homeSel == i);
@@ -438,8 +497,11 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             int ty = y + (rowH - this.font.lineHeight)/2;
             g.drawString(this.font, label, x + 8, ty, 0xFFFFFFFF, false);
 
-            if (i == 0) hitDeposit  = new Rect(x, y, itemW, rowH);
-            else        hitWithdraw = new Rect(x, y, itemW, rowH);
+            switch (i) {
+                case 0 -> hitDeposit  = new Rect(x, y, itemW, rowH);
+                case 1 -> hitWithdraw = new Rect(x, y, itemW, rowH);
+                case 2 -> hitHistory  = new Rect(x, y, itemW, rowH);
+            }
         }
 
         String hint = "Use ↑/↓ or W/S; Enter to select";
@@ -659,6 +721,103 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         hitWBBack = hits[1];
     }
 
+    private void renderHistory(GuiGraphics g, Rect r) {
+        g.drawString(this.font, "Transaction History", r.x, r.y, 0xFFFFFFFF, false);
+
+        String pageStr = "Page " + historyPage;
+        int pageW = this.font.width(pageStr);
+        g.drawString(this.font, pageStr, r.x + r.w - pageW, r.y, 0x80A0A0A0, false);
+
+        int listY = r.y + 16;
+
+        if (historyLoading) {
+            g.drawString(this.font, "Loading...", r.x, listY, 0xC0C0C0, false);
+        } else if (historyEntries.isEmpty()) {
+            g.drawString(this.font, "No transactions found.", r.x, listY, 0xC0C0C0, false);
+        } else {
+            int rowH = 11;
+            for (int i = 0; i < historyEntries.size(); i++) {
+                int y = listY + i * rowH;
+                var e = historyEntries.get(i);
+                String type = formatType(e.type);
+                boolean neg = e.amount.startsWith("-");
+                String displayAmt = neg ? "-$" + e.amount.substring(1) : "+$" + e.amount;
+                int amtColor = neg ? 0xE74C3C : 0x2ECC71;
+                String date = formatDate(e.createdAt);
+
+                g.drawString(this.font, type, r.x, y, 0xC0C0C0, false);
+                int dateW = this.font.width(date);
+                g.drawString(this.font, date, r.x + r.w - dateW, y, 0x808080, false);
+                int amtW = this.font.width(displayAmt);
+                g.drawString(this.font, displayAmt, r.x + r.w - dateW - 6 - amtW, y, amtColor, false);
+            }
+        }
+
+        // Page navigation arrows
+        int navY = listY + 5 * 11 + 6;
+        int cx = r.x + r.w / 2;
+        String pageText = "Page " + historyPage;
+        int ptW = this.font.width(pageText);
+        g.drawString(this.font, pageText, cx - ptW / 2, navY, 0xA0A0A0, false);
+        if (historyPage > 1) {
+            g.drawString(this.font, "<", cx - ptW / 2 - 12, navY, 0xFFFFFF, false);
+        }
+        if (historyHasMore) {
+            g.drawString(this.font, ">", cx + ptW / 2 + 6, navY, 0xFFFFFF, false);
+        }
+
+        // Back button
+        int x = buttonX(r);
+        int itemW = uniformButtonW(r);
+        int btnY = navY + 16;
+        g.fill(x, btnY, x + itemW, btnY + BTN_H, 0xFF2B3138);
+        g.fill(x, btnY, x + itemW, btnY + 1, 0x33FFFFFF);
+        g.fill(x, btnY + BTN_H - 1, x + itemW, btnY + BTN_H, 0x33000000);
+        int ty = btnY + (BTN_H - this.font.lineHeight) / 2;
+        g.drawString(this.font, "> Back", x + 8, ty, 0xFFFFFFFF, false);
+        hitHistBack = new Rect(x, btnY, itemW, BTN_H);
+
+        String hint = "Use \u2190/\u2192 for pages; Enter = Back";
+        g.drawString(this.font, hint, r.x, r.y + r.h - 10, 0x80A0A0A0, false);
+    }
+
+    private static String formatType(String type) {
+        return switch (type) {
+            case "transfer_send" -> "Sent";
+            case "transfer_receive" -> "Received";
+            case "deposit" -> "Deposit";
+            case "withdraw" -> "Withdraw";
+            case "admin_grant" -> "Admin Grant";
+            case "admin_deduct" -> "Admin Deduct";
+            case "reward" -> "Reward";
+            case "daily_reward" -> "Daily";
+            case "lottery_entry" -> "Lottery Entry";
+            case "lottery_win" -> "Lottery Win";
+            case "lottery_refund" -> "Lottery Refund";
+            case "crypto_buy" -> "Crypto Buy";
+            case "crypto_sell" -> "Crypto Sell";
+            default -> type;
+        };
+    }
+
+    private static String formatDate(String iso) {
+        try {
+            Instant then = Instant.parse(iso);
+            long seconds = Duration.between(then, Instant.now()).getSeconds();
+            if (seconds < 0) return "now";
+            if (seconds < 60) return seconds + "s ago";
+            long minutes = seconds / 60;
+            if (minutes < 60) return minutes + "m ago";
+            long hours = minutes / 60;
+            if (hours < 24) return hours + "h ago";
+            long days = hours / 24;
+            if (days < 30) return days + "d ago";
+            return days / 30 + "mo ago";
+        } catch (Exception e) {
+            return iso.length() >= 10 ? iso.substring(0, 10) : iso;
+        }
+    }
+
     @Override
     public boolean mouseScrolled(double mx, double my, double dx, double dy) {
         if (view == View.WITHDRAW_BUNDLE) {
@@ -697,6 +856,9 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
                     my >= hitWithdraw.y && my <= hitWithdraw.y + hitWithdraw.h) {
                 goWithdrawMenu(); return true;
             }
+            if (hitHistory != null && within(mx, my, hitHistory)) {
+                goHistory(); return true;
+            }
         }
 
         if (view == View.DEPOSIT) {
@@ -730,6 +892,10 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         if (view == View.WITHDRAW_BUNDLE) {
             if (hitWBAct  != null && within(mx,my,hitWBAct))  { performWithdrawBundle(); return true; }
             if (hitWBBack != null && within(mx,my,hitWBBack)) { goWithdrawMenu();        return true; }
+        }
+
+        if (view == View.HISTORY) {
+            if (hitHistBack != null && within(mx, my, hitHistBack)) { goHome(); return true; }
         }
 
         return super.mouseClicked(mx, my, button);
@@ -885,10 +1051,14 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
         }
 
         if (view == View.HOME) {
-            if (keyCode == KEY_UP || keyCode == KEY_W)   { homeSel = (homeSel + 2 - 1) % 2; clickSound(); return true; }
-            if (keyCode == KEY_DOWN || keyCode == KEY_S) { homeSel = (homeSel + 1) % 2; clickSound(); return true; }
+            if (keyCode == KEY_UP || keyCode == KEY_W)   { homeSel = (homeSel + 3 - 1) % 3; clickSound(); return true; }
+            if (keyCode == KEY_DOWN || keyCode == KEY_S) { homeSel = (homeSel + 1) % 3; clickSound(); return true; }
             if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E || keyCode == KEY_RIGHT || keyCode == KEY_D) {
-                if (homeSel == 0) goDeposit(); else goWithdrawMenu();
+                switch (homeSel) {
+                    case 0 -> goDeposit();
+                    case 1 -> goWithdrawMenu();
+                    case 2 -> goHistory();
+                }
                 return true;
             }
             if (keyCode == KEY_BACKSPACE) { this.onClose(); return true; }
@@ -953,6 +1123,25 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
                 return true;
             }
             if (keyCode == KEY_BACKSPACE) { clearTextFocus(); goWithdrawMenu(); return true; }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (view == View.HISTORY) {
+            if (keyCode == KEY_LEFT || keyCode == KEY_A) {
+                if (historyPage > 1 && !historyLoading) { requestHistory(historyPage - 1); clickSound(); }
+                return true;
+            }
+            if (keyCode == KEY_RIGHT || keyCode == KEY_D) {
+                if (historyHasMore && !historyLoading) { requestHistory(historyPage + 1); clickSound(); }
+                return true;
+            }
+            if (keyCode == KEY_ENTER || keyCode == KEY_SPACE || keyCode == KEY_E) {
+                goHome(); return true;
+            }
+            if (keyCode == KEY_UP || keyCode == KEY_W || keyCode == KEY_DOWN || keyCode == KEY_S) {
+                return true;
+            }
+            if (keyCode == KEY_BACKSPACE) { goHome(); return true; }
             return super.keyPressed(keyCode, scanCode, modifiers);
         }
 

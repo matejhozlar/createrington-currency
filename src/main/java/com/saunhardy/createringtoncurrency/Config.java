@@ -61,6 +61,10 @@ public class Config {
             .comment("API URL for joining a lottery, eg. '/currency/lottery/join', don't use this if you are not using integrated discord bots")
             .define("apiJoinLotteryUrl", "api/currency/lottery/join");
 
+    public static final ModConfigSpec.ConfigValue<String> API_HISTORY_URL = BUILDER
+            .comment("API URL for transaction history, eg. '/currency/history'")
+            .define("apiHistoryUrl", "api/currency/history");
+
     public static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP = BUILDER
             .comment("Drop chance of 1$ bills from zombies, spiders, creepers, eg. '50.0' = 50% chance")
             .define("zomSpiCreDrop", 2.0);
