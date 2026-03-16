@@ -115,6 +115,7 @@ public class CreateringtonCurrency {
         if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
             NeoForge.EVENT_BUS.register(MobDrops.class);
             NeoForge.EVENT_BUS.register(MoneyCommands.class);
+            NeoForge.EVENT_BUS.register(VoteCommand.class);
         }
         
         // Register Create integration if Create is loaded
