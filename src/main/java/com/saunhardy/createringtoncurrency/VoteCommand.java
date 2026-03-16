@@ -98,6 +98,7 @@ public class VoteCommand {
             player.sendSystemMessage(Component.literal("✅ Vote passed!")
                     .withStyle(ChatFormatting.GREEN));
             applyVote(type, server);
+            cooldownUntil = System.currentTimeMillis() + COOLDOWN_SUCCESS_MS;
             return 1;
         }
 
