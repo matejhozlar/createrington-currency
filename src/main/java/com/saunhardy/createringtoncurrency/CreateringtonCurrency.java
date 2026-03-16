@@ -3,6 +3,7 @@ package com.saunhardy.createringtoncurrency;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.block.ATMBlock;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
+import com.saunhardy.createringtoncurrency.datagen.DataGenerators;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
 import com.saunhardy.createringtoncurrency.item.BankCardItem;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
@@ -105,6 +106,7 @@ public class CreateringtonCurrency {
         ModEnchantmentEffects.register(modEventBus);
 
         modEventBus.addListener(ATMNetworking::register);
+        modEventBus.addListener(DataGenerators::gatherData);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
