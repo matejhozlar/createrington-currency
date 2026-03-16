@@ -94,14 +94,12 @@ public class VoteCommand {
         MinecraftServer server = player.getServer();
         if (server == null) return 0;
 
-        // TODO: re-enable solo player instant pass
-        // List<ServerPlayer> onlinePlayers = server.getPlayerList().getPlayers();
-        // if (onlinePlayers.size() <= 1) {
-        //     player.sendSystemMessage(Component.literal("✅ Vote passed!")
-        //             .withStyle(ChatFormatting.GREEN));
-        //     applyVote(type, server);
-        //     return 1;
-        // }
+        if (server.getPlayerList().getPlayers().size() <= 1) {
+            player.sendSystemMessage(Component.literal("✅ Vote passed!")
+                    .withStyle(ChatFormatting.GREEN));
+            applyVote(type, server);
+            return 1;
+        }
 
         // Start the vote
         activeVote = new ActiveVote(type, player.getUUID(), player.getName().getString());
