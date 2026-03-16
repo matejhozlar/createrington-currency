@@ -17,5 +17,8 @@
   "item.createringtoncurrency.keypad": "Keypad",
   "message.createringtoncurrency.withdrawal_success": "Withdrew %d x %s bills from your account",
   "message.createringtoncurrency.withdrawal_failed": "Failed to withdraw bills from your account",
-  "message.createringtoncurrency.insufficient_inventory_space": "Not enough inventory space!"
+  "message.createringtoncurrency.insufficient_inventory_space": "Not enough inventory space!",
+  "key.categories.createringtoncurrency": "Createrington Currency",
+  "key.createringtoncurrency.vote_yes": "Vote Yes",
+  "key.createringtoncurrency.vote_no": "Vote No"
 }

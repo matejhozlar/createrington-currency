@@ -110,6 +110,8 @@ public class CreateringtonCurrency {
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);
+            modEventBus.addListener(ClientOnlyHooks::registerKeyMappings);
+            NeoForge.EVENT_BUS.register(ClientOnlyHooks.class);
         }
 
         if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
