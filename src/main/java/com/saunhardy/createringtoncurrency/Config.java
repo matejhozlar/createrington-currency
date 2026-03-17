@@ -46,7 +46,7 @@ public class Config {
             .define("apiLoginUrl", "api/currency/login");
 
     public static final ModConfigSpec.IntValue MOB_DAILY_LIMIT = BUILDER
-            .comment("Maximum amount of currency a player can earn from mob kills per day (set to 0 to disable limit)")
+            .comment("Maximum amount of currency a player can earn from mob kills per day (0 = no mob drops)")
             .defineInRange("mobDailyLimit", 1000, 0, Integer.MAX_VALUE);
 
     public static final ModConfigSpec.ConfigValue<String> API_DAILY_URL = BUILDER

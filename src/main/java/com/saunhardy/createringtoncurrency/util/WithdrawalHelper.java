@@ -11,9 +11,6 @@ import net.minecraft.world.item.ItemStack;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;

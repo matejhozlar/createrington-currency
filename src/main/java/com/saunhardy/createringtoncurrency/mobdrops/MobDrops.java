@@ -3,17 +3,15 @@ package com.saunhardy.createringtoncurrency.mobdrops;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantments;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -22,32 +20,16 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.minecraft.world.entity.EntityType;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
-import java.lang.reflect.Type;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDate;
-import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
+import java.time.LocalDate;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MobDrops {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final Set<UUID> warnedToday = ConcurrentHashMap.newKeySet();
-    private static final Map<UUID, DailyEarnings> dailyEarnings = new ConcurrentHashMap<>();
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Type EARNINGS_MAP_TYPE = new TypeToken<Map<String, DailyEarningsData>>() {}.getType();
-    private static final AtomicBoolean dirty = new AtomicBoolean(false);
-    private static final int SAVE_INTERVAL_TICKS = 6000; // 5 minutes
-    private static int tickCounter = 0;
-    private static Path dataFile;
+    private static final Set<UUID> warnedToday = new HashSet<>();
+    private static final int PRUNE_INTERVAL_TICKS = 24000; // 20 minutes
     private static final Set<EntityType<?>> ALLOWED_MOB_TYPES = Set.of(
             EntityType.ZOMBIE,
             EntityType.CREEPER,
@@ -57,42 +39,52 @@ public class MobDrops {
             EntityType.BLAZE
     );
 
+    private static MobEarningsData earningsData;
+    private static LocalDate cachedToday = LocalDate.now();
+    private static int tickCounter = 0;
+
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
-        Path worldDir = event.getServer().getWorldPath(LevelResource.ROOT);
-        dataFile = worldDir.resolve("createringtoncurrency_mob_earnings.json");
-        loadDailyEarnings();
+        MinecraftServer server = event.getServer();
+        earningsData = server.overworld().getDataStorage()
+                .computeIfAbsent(MobEarningsData.factory(), MobEarningsData.dataName());
+        cachedToday = LocalDate.now();
+        warnedToday.clear();
     }
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
-        if (dirty.compareAndSet(true, false)) {
-            saveDailyEarnings();
-        }
+        earningsData = null;
+        warnedToday.clear();
     }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (++tickCounter >= SAVE_INTERVAL_TICKS) {
+        LocalDate now = LocalDate.now();
+        if (!now.equals(cachedToday)) {
+            cachedToday = now;
+            warnedToday.clear();
+            if (earningsData != null) {
+                earningsData.pruneStaleEntries(now);
+            }
+        }
+
+        if (++tickCounter >= PRUNE_INTERVAL_TICKS) {
             tickCounter = 0;
-            if (dirty.compareAndSet(true, false)) {
-                saveDailyEarnings();
+            if (earningsData != null) {
+                earningsData.pruneStaleEntries(cachedToday);
             }
         }
     }
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
-        ServerPlayer player = (ServerPlayer) event.getEntity();
-        UUID uuid = player.getUUID();
-        warnedToday.remove(uuid);
+        warnedToday.remove(event.getEntity().getUUID());
     }
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        ServerPlayer player = (ServerPlayer) event.getEntity();
-        UUID uuid = player.getUUID();
-        warnedToday.remove(uuid);
+        warnedToday.remove(event.getEntity().getUUID());
     }
 
     @SubscribeEvent
@@ -100,35 +92,31 @@ public class MobDrops {
         if (!(event.getSource().getEntity() instanceof ServerPlayer player)) return;
         if (player instanceof FakePlayer) return;
         if (player.isSpectator()) return;
+        if (earningsData == null) return;
 
         int dailyLimit = Config.MOB_DAILY_LIMIT.get();
-        if (dailyLimit <= 0) return; // limit disabled
+        if (dailyLimit <= 0) return;
+
+        LivingEntity dead = event.getEntity();
+        EntityType<?> type = dead.getType();
+        if (!ALLOWED_MOB_TYPES.contains(type)) return;
 
         ItemStack stack = player.getMainHandItem();
         int enchantmentLevel = 0;
-        if(!stack.isEmpty()) {
+        if (!stack.isEmpty()) {
             var registryAccess = player.level().registryAccess();
             var enchantmentRegistry = registryAccess.registryOrThrow(Registries.ENCHANTMENT);
             var lightningStrikerHolder = enchantmentRegistry.getHolderOrThrow(ModEnchantments.CAPITALIST_GREED);
             enchantmentLevel = stack.getEnchantmentLevel(lightningStrikerHolder);
         }
 
-        LivingEntity dead = event.getEntity();
-        EntityType<?> type = dead.getType();
-        if (!ALLOWED_MOB_TYPES.contains(type)) return;
         UUID uuid = player.getUUID();
+        LocalDate today = cachedToday;
+        int earnedSoFar = earningsData.getEarned(uuid, today);
 
-        DailyEarnings progress = dailyEarnings.computeIfAbsent(uuid, u -> new DailyEarnings(LocalDate.now(), 0));
-        if (!progress.date.equals(LocalDate.now())) {
-            progress.date = LocalDate.now();
-            progress.earnedToday = 0;
-            warnedToday.remove(uuid);
-        }
-
-        if (progress.earnedToday >= dailyLimit) {
-            if (!warnedToday.contains(uuid)) {
+        if (earnedSoFar >= dailyLimit) {
+            if (warnedToday.add(uuid)) {
                 player.sendSystemMessage(message(dailyLimit));
-                warnedToday.add(uuid);
             }
             return;
         }
@@ -155,7 +143,7 @@ public class MobDrops {
             case 3 -> baseChance += 10.0;
         }
 
-        if(ThreadLocalRandom.current().nextDouble() < (baseChance / 100.0)){
+        if (ThreadLocalRandom.current().nextDouble() < (baseChance / 100.0)) {
             earned = 1;
             billToDrop = CreateringtonCurrency.BILL_1.get();
         }
@@ -171,103 +159,22 @@ public class MobDrops {
         }
 
         if (earned > 0) {
-            if (progress.earnedToday + earned > dailyLimit) {
-                int allowed = dailyLimit - progress.earnedToday;
-                if (allowed > 0) {
-                    progress.earnedToday += allowed;
-                    dropBill(dead, billToDrop);
-                    dirty.set(true);
-                } else {
-                    if (!warnedToday.contains(uuid)) {
-                        player.sendSystemMessage(message(dailyLimit));
-                        warnedToday.add(uuid);
-                    }
-                }
-                return;
-            }
+            int allowed = Math.min(earned, dailyLimit - earnedSoFar);
+            if (allowed > 0) {
+                earningsData.addEarnings(uuid, allowed, today);
+                dropBill(dead, billToDrop);
 
-            progress.earnedToday += earned;
-            dropBill(dead, billToDrop);
-
-            if (progress.earnedToday >= dailyLimit) {
-                player.sendSystemMessage(message(dailyLimit));
-                warnedToday.add(uuid);
-            }
-
-            dirty.set(true);
-        }
-    }
-
-    private static void loadDailyEarnings() {
-        dailyEarnings.clear();
-        if (dataFile == null || !Files.exists(dataFile)) return;
-
-        try (Reader reader = Files.newBufferedReader(dataFile)) {
-            Map<String, DailyEarningsData> raw = GSON.fromJson(reader, EARNINGS_MAP_TYPE);
-            if (raw == null) return;
-
-            LocalDate today = LocalDate.now();
-            for (Map.Entry<String, DailyEarningsData> entry : raw.entrySet()) {
-                try {
-                    UUID uuid = UUID.fromString(entry.getKey());
-                    DailyEarningsData data = entry.getValue();
-                    LocalDate date = LocalDate.parse(data.date);
-                    if (date.equals(today)) {
-                        dailyEarnings.put(uuid, new DailyEarnings(date, data.earnedToday));
-                    }
-                } catch (Exception e) {
-                    LOGGER.warn("Skipping invalid mob earnings entry '{}': {}", entry.getKey(), e.getMessage());
+                if (earnedSoFar + allowed >= dailyLimit) {
+                    player.sendSystemMessage(message(dailyLimit));
+                    warnedToday.add(uuid);
                 }
             }
-            LOGGER.info("Loaded mob daily earnings for {} players", dailyEarnings.size());
-        } catch (IOException e) {
-            LOGGER.warn("Failed to load mob daily earnings: {}", e.getMessage());
-        }
-    }
-
-    private static void saveDailyEarnings() {
-        if (dataFile == null) return;
-
-        Map<String, DailyEarningsData> raw = new HashMap<>();
-        LocalDate today = LocalDate.now();
-        for (Map.Entry<UUID, DailyEarnings> entry : dailyEarnings.entrySet()) {
-            DailyEarnings de = entry.getValue();
-            if (de.date.equals(today)) {
-                raw.put(entry.getKey().toString(), new DailyEarningsData(de.date.toString(), de.earnedToday));
-            }
-        }
-
-        try (Writer writer = Files.newBufferedWriter(dataFile)) {
-            GSON.toJson(raw, EARNINGS_MAP_TYPE, writer);
-        } catch (IOException e) {
-            LOGGER.warn("Failed to save mob daily earnings: {}", e.getMessage());
         }
     }
 
     private static void dropBill(LivingEntity dead, Item bill) {
         if (bill != null) {
-            ItemStack stack = new ItemStack(bill, 1);
-            dead.spawnAtLocation(stack);
-        }
-    }
-
-    private static class DailyEarnings {
-        LocalDate date;
-        int earnedToday;
-
-        public DailyEarnings(LocalDate date, int earnedToday) {
-            this.date = date;
-            this.earnedToday = earnedToday;
-        }
-    }
-
-    private static class DailyEarningsData {
-        String date;
-        int earnedToday;
-
-        public DailyEarningsData(String date, int earnedToday) {
-            this.date = date;
-            this.earnedToday = earnedToday;
+            dead.spawnAtLocation(new ItemStack(bill, 1));
         }
     }
 
