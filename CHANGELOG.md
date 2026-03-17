@@ -1,5 +1,5 @@
-## Version 1.2.2
-- Added transaction history view to the ATM GUI
-- Navigate pages with left/right arrow keys, 5 transactions per page
-- New backend endpoint for paginated transaction history
-- Added `apiHistoryUrl` config option
+## Version 1.2.3
+- Migrated mob daily earnings to NeoForge SavedData for proper world save integration
+- Optimized daily limit tracking with per-tick date caching and stale entry pruning
+- Simplified daily earnings overflow logic
+- Cleaned up unused imports
