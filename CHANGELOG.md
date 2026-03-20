@@ -1,5 +1,3 @@
-## Version 1.2.3
-- Migrated mob daily earnings to NeoForge SavedData for proper world save integration
-- Optimized daily limit tracking with per-tick date caching and stale entry pruning
-- Simplified daily earnings overflow logic
-- Cleaned up unused imports
+## Version 1.2.4
+- Fixed train crash reports sometimes missing position and dimension data
+- Position now falls back to track graph data when no carriage entity is loaded
