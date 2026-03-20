@@ -1,7 +1,9 @@
 package com.saunhardy.createringtoncurrency.mixin;
 
 import com.simibubi.create.content.trains.entity.Carriage;
+import com.simibubi.create.content.trains.entity.TravellingPoint;
 import com.simibubi.create.content.trains.entity.Train;
+import com.simibubi.create.content.trains.graph.TrackGraph;
 import com.saunhardy.createringtoncurrency.events.TrainCrashHandler;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
@@ -26,6 +28,7 @@ public abstract class TrainCrashMixin {
     @Shadow public List<Carriage> carriages;
     @Shadow public @Nullable UUID owner;
     @Shadow public @Nullable Player backwardsDriver;
+    @Shadow public TrackGraph graph;
 
     @Inject(method = "crash", at = @At("HEAD"), remap = false)
     private void createringtoncurrency$onTrainCrash(CallbackInfo ci) {
@@ -42,13 +45,22 @@ public abstract class TrainCrashMixin {
         List<TrainCrashHandler.PlayerInfo> passengers = new ArrayList<>();
 
         if (this.carriages != null) {
+            final double[][] posHolder = {null};
+            final String[] dimHolder = {null};
+
             for (Carriage carriage : this.carriages) {
                 try {
                     carriage.forEachPresentEntity(entity -> {
+                        // Grab position from the first present entity we find
+                        if (posHolder[0] == null) {
+                            Vec3 entityPos = entity.position();
+                            posHolder[0] = new double[]{entityPos.x, entityPos.y, entityPos.z};
+                            dimHolder[0] = entity.level().dimension().location().toString();
+                        }
+
                         // Get controlling player (driver)
                         Optional<UUID> controlling = entity.getControllingPlayer();
                         if (controlling.isPresent()) {
-                            // Can't assign to local var from lambda, so add as a special passenger entry
                             passengers.add(new TrainCrashHandler.PlayerInfo(
                                     controlling.get(), null, true));
                         }
@@ -67,20 +79,18 @@ public abstract class TrainCrashMixin {
                 }
             }
 
-            // Extract position from first carriage
-            if (!this.carriages.isEmpty()) {
+            pos = posHolder[0];
+            dimension = dimHolder[0];
+
+            // Fallback: get position from track graph if no entity was loaded
+            if (pos == null && this.graph != null) {
                 try {
-                    final double[][] posHolder = {null};
-                    final String[] dimHolder = {null};
-
-                    this.carriages.get(0).forEachPresentEntity(entity -> {
-                        Vec3 entityPos = entity.position();
-                        posHolder[0] = new double[]{entityPos.x, entityPos.y, entityPos.z};
-                        dimHolder[0] = entity.level().dimension().location().toString();
-                    });
-
-                    pos = posHolder[0];
-                    dimension = dimHolder[0];
+                    TravellingPoint point = this.carriages.get(0).getLeadingPoint();
+                    if (point.node1 != null && point.edge != null) {
+                        Vec3 graphPos = point.getPosition(this.graph);
+                        pos = new double[]{graphPos.x, graphPos.y, graphPos.z};
+                        dimension = point.node1.getLocation().dimension.location().toString();
+                    }
                 } catch (Exception ignored) {
                 }
             }
