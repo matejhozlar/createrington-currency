@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
@@ -137,6 +138,20 @@ public class VoteCommand {
                 .withStyle(ChatFormatting.GREEN));
 
         return 1;
+    }
+
+    @SubscribeEvent
+    public static void onChat(ServerChatEvent event) {
+        if (activeVote == null) return;
+
+        String msg = event.getRawText();
+        if (msg.equals("1")) {
+            castVote(event.getPlayer(), true);
+            event.setCanceled(true);
+        } else if (msg.equals("2")) {
+            castVote(event.getPlayer(), false);
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
