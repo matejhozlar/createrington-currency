@@ -296,7 +296,7 @@ public class MoneyCommands {
                                     if (response.code == 200) {
                                         try {
                                             JsonObject json = GSON.fromJson(response.body, JsonObject.class);
-                                            String msg = json.has("message") ? json.get("message").getAsString() : "✅ Reward claimed!";
+                                            String msg = json.has("message") ? json.get("message").getAsString() : "Reward claimed!";
                                             player.sendSystemMessage(message("✅", msg, ChatFormatting.GREEN));
                                         } catch (Exception e) {
                                             player.sendSystemMessage(message("✅", "Reward claimed, but failed to parse response.", ChatFormatting.YELLOW));
