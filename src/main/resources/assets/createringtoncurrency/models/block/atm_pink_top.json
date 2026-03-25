@@ -8,7 +8,8 @@
 	],
 	"textures": {
 		"2": "createringtoncurrency:block/atm_pink",
-		"particle": "createringtoncurrency:block/atm_pink"
+		"particle": "createringtoncurrency:block/atm_pink",
+		"screen": "createringtoncurrency:block/atm_screen"
 	},
 	"elements": [
 		{
@@ -992,6 +993,38 @@
 						3.6
 					],
 					"texture": "#2"
+				}
+			}
+		},
+		{
+			"from": [
+				2,
+				1.5,
+				6.52
+			],
+			"to": [
+				14,
+				13.5,
+				6.53
+			],
+			"rotation": {
+				"angle": 0,
+				"axis": "y",
+				"origin": [
+					8,
+					-0.25,
+					6.75
+				]
+			},
+			"faces": {
+				"north": {
+					"uv": [
+						0,
+						0,
+						16,
+						16
+					],
+					"texture": "#screen"
 				}
 			}
 		}
