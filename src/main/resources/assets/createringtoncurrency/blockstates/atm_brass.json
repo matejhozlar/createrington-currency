@@ -1,66 +1,34 @@
 {
   "variants": {
-    "facing=north,half=lower,powered=true": {
+    "facing=north,half=lower": {
       "model": "createringtoncurrency:block/atm_brass_bottom",
       "y": 180
     },
-    "facing=north,half=lower,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_bottom",
-      "y": 180
-    },
-    "facing=north,half=upper,powered=true": {
+    "facing=north,half=upper": {
       "model": "createringtoncurrency:block/atm_brass_top",
       "y": 180
     },
-    "facing=north,half=upper,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_top",
-      "y": 180
-    },
-    "facing=south,half=lower,powered=true": {
+    "facing=south,half=lower": {
       "model": "createringtoncurrency:block/atm_brass_bottom",
       "y": 0
     },
-    "facing=south,half=lower,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_bottom",
-      "y": 0
-    },
-    "facing=south,half=upper,powered=true": {
+    "facing=south,half=upper": {
       "model": "createringtoncurrency:block/atm_brass_top",
       "y": 0
     },
-    "facing=south,half=upper,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_top",
-      "y": 0
-    },
-    "facing=west,half=lower,powered=true": {
+    "facing=west,half=lower": {
       "model": "createringtoncurrency:block/atm_brass_bottom",
       "y": 90
     },
-    "facing=west,half=lower,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_bottom",
-      "y": 90
-    },
-    "facing=west,half=upper,powered=true": {
+    "facing=west,half=upper": {
       "model": "createringtoncurrency:block/atm_brass_top",
       "y": 90
     },
-    "facing=west,half=upper,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_top",
-      "y": 90
-    },
-    "facing=east,half=lower,powered=true": {
+    "facing=east,half=lower": {
       "model": "createringtoncurrency:block/atm_brass_bottom",
       "y": 270
     },
-    "facing=east,half=lower,powered=false": {
-      "model": "createringtoncurrency:block/atm_brass_bottom",
-      "y": 270
-    },
-    "facing=east,half=upper,powered=true": {
-      "model": "createringtoncurrency:block/atm_brass_top",
-      "y": 270
-    },
-    "facing=east,half=upper,powered=false": {
+    "facing=east,half=upper": {
       "model": "createringtoncurrency:block/atm_brass_top",
       "y": 270
     }
