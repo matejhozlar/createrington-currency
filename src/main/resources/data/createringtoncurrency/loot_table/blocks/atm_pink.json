@@ -6,19 +6,12 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "createringtoncurrency:atm_blue"
+          "name": "createringtoncurrency:atm_pink"
         }
       ],
       "conditions": [
         {
           "condition": "minecraft:survives_explosion"
-        },
-        {
-          "condition": "minecraft:block_state_property",
-          "block": "createringtoncurrency:atm_blue",
-          "properties": {
-            "half": "lower"
-          }
         }
       ]
     }

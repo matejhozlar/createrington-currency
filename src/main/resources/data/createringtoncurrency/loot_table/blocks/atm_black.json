@@ -6,19 +6,12 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "createringtoncurrency:atm_andesite"
+          "name": "createringtoncurrency:atm_black"
         }
       ],
       "conditions": [
         {
           "condition": "minecraft:survives_explosion"
-        },
-        {
-          "condition": "minecraft:block_state_property",
-          "block": "createringtoncurrency:atm_andesite",
-          "properties": {
-            "half": "lower"
-          }
         }
       ]
     }
