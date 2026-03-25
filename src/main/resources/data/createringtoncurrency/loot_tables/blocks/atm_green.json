@@ -4,10 +4,22 @@
     {
       "rolls": 1,
       "entries": [
-        { "type": "minecraft:item", "name": "createringtoncurrency:atm_green" }
+        {
+          "type": "minecraft:item",
+          "name": "createringtoncurrency:atm_green"
+        }
       ],
       "conditions": [
-        { "condition": "minecraft:survives_explosion" }
+        {
+          "condition": "minecraft:survives_explosion"
+        },
+        {
+          "condition": "minecraft:block_state_property",
+          "block": "createringtoncurrency:atm_green",
+          "properties": {
+            "half": "lower"
+          }
+        }
       ]
     }
   ]
