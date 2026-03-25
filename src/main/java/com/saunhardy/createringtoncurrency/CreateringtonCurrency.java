@@ -95,6 +95,16 @@ public class CreateringtonCurrency {
     public static final DeferredItem<BlockItem> ATM_BLACK_ITEM =
             ITEMS.register("atm_black", () -> new BlockItem(ATM_BLACK_BLOCK.get(), new Item.Properties()));
 
+    public static final DeferredBlock<DecorativeATMBlock> ATM_BRASS_BLOCK = BLOCKS.register("atm_brass", () ->
+            new DecorativeATMBlock(DECORATIVE_ATM_PROPS));
+    public static final DeferredItem<BlockItem> ATM_BRASS_ITEM =
+            ITEMS.register("atm_brass", () -> new BlockItem(ATM_BRASS_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<DecorativeATMBlock> ATM_ANDESITE_BLOCK = BLOCKS.register("atm_andesite", () ->
+            new DecorativeATMBlock(DECORATIVE_ATM_PROPS));
+    public static final DeferredItem<BlockItem> ATM_ANDESITE_ITEM =
+            ITEMS.register("atm_andesite", () -> new BlockItem(ATM_ANDESITE_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<MenuType<?>, MenuType<ATMMenu>> ATM_MENU =
             MENUS.register("atm", () -> new MenuType<>(ATMMenu::new, FeatureFlags.VANILLA_SET));
 
@@ -111,6 +121,8 @@ public class CreateringtonCurrency {
                         out.accept(ATM_GREEN_ITEM.get());
                         out.accept(ATM_PURPLE_ITEM.get());
                         out.accept(ATM_BLACK_ITEM.get());
+                        out.accept(ATM_BRASS_ITEM.get());
+                        out.accept(ATM_ANDESITE_ITEM.get());
                         out.accept(BILL_1.get());
                         out.accept(BILL_5.get());
                         out.accept(BILL_10.get());
