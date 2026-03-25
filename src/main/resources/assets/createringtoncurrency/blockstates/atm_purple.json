@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,half=lower": { "model": "createringtoncurrency:block/atm_purple_bottom", "y": 180 },
+    "facing=south,half=lower": { "model": "createringtoncurrency:block/atm_purple_bottom", "y": 0   },
+    "facing=west,half=lower":  { "model": "createringtoncurrency:block/atm_purple_bottom", "y": 90  },
+    "facing=east,half=lower":  { "model": "createringtoncurrency:block/atm_purple_bottom", "y": 270 },
+    "facing=north,half=upper": { "model": "createringtoncurrency:block/atm_purple_top", "y": 180 },
+    "facing=south,half=upper": { "model": "createringtoncurrency:block/atm_purple_top", "y": 0   },
+    "facing=west,half=upper":  { "model": "createringtoncurrency:block/atm_purple_top", "y": 90  },
+    "facing=east,half=upper":  { "model": "createringtoncurrency:block/atm_purple_top", "y": 270 }
+  }
+}

@@ -2,6 +2,7 @@ package com.saunhardy.createringtoncurrency;
 
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.block.ATMBlock;
+import com.saunhardy.createringtoncurrency.block.DecorativeATMBlock;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
 import com.saunhardy.createringtoncurrency.datagen.DataGenerators;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
@@ -68,6 +69,32 @@ public class CreateringtonCurrency {
     public static final DeferredItem<BlockItem> ATM_ITEM =
             ITEMS.register("atm", () -> new BlockItem(ATM_BLOCK.get(), new Item.Properties()));
 
+    private static final BlockBehaviour.Properties DECORATIVE_ATM_PROPS = BlockBehaviour.Properties.of()
+            .strength(2.0F, 6.0F)
+            .sound(SoundType.METAL)
+            .requiresCorrectToolForDrops()
+            .noOcclusion();
+
+    public static final DeferredBlock<DecorativeATMBlock> ATM_BLUE_BLOCK = BLOCKS.register("atm_blue", () ->
+            new DecorativeATMBlock(DECORATIVE_ATM_PROPS));
+    public static final DeferredItem<BlockItem> ATM_BLUE_ITEM =
+            ITEMS.register("atm_blue", () -> new BlockItem(ATM_BLUE_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<DecorativeATMBlock> ATM_GREEN_BLOCK = BLOCKS.register("atm_green", () ->
+            new DecorativeATMBlock(DECORATIVE_ATM_PROPS));
+    public static final DeferredItem<BlockItem> ATM_GREEN_ITEM =
+            ITEMS.register("atm_green", () -> new BlockItem(ATM_GREEN_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<DecorativeATMBlock> ATM_PURPLE_BLOCK = BLOCKS.register("atm_purple", () ->
+            new DecorativeATMBlock(DECORATIVE_ATM_PROPS));
+    public static final DeferredItem<BlockItem> ATM_PURPLE_ITEM =
+            ITEMS.register("atm_purple", () -> new BlockItem(ATM_PURPLE_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<DecorativeATMBlock> ATM_BLACK_BLOCK = BLOCKS.register("atm_black", () ->
+            new DecorativeATMBlock(DECORATIVE_ATM_PROPS));
+    public static final DeferredItem<BlockItem> ATM_BLACK_ITEM =
+            ITEMS.register("atm_black", () -> new BlockItem(ATM_BLACK_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<MenuType<?>, MenuType<ATMMenu>> ATM_MENU =
             MENUS.register("atm", () -> new MenuType<>(ATMMenu::new, FeatureFlags.VANILLA_SET));
 
@@ -80,6 +107,10 @@ public class CreateringtonCurrency {
                     .icon(() -> MOD_ICON.get().getDefaultInstance())
                     .displayItems((params, out) -> {
                         out.accept(ATM_ITEM.get());
+                        out.accept(ATM_BLUE_ITEM.get());
+                        out.accept(ATM_GREEN_ITEM.get());
+                        out.accept(ATM_PURPLE_ITEM.get());
+                        out.accept(ATM_BLACK_ITEM.get());
                         out.accept(BILL_1.get());
                         out.accept(BILL_5.get());
                         out.accept(BILL_10.get());

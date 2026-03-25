@@ -1,6 +1,10 @@
 {
   "itemGroup.createringtoncurrency": "Createrington Currency",
   "block.createringtoncurrency.atm": "ATM",
+  "block.createringtoncurrency.atm_blue": "ATM (Blue)",
+  "block.createringtoncurrency.atm_green": "ATM (Green)",
+  "block.createringtoncurrency.atm_purple": "ATM (Purple)",
+  "block.createringtoncurrency.atm_black": "ATM (Black)",
   "menu.createringtoncurrency.atm": "ATM",
   "item.createringtoncurrency.bill_1": "$1 Bill",
   "item.createringtoncurrency.bill_5": "$5 Bill",
