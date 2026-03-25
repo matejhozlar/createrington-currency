@@ -1,20 +1,24 @@
 package com.saunhardy.createringtoncurrency.block;
 
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
@@ -68,6 +72,25 @@ public class DecorativeATMBlock extends Block {
         }
 
         return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
+    public @NotNull InteractionResult useWithoutItem(
+            @NotNull BlockState state,
+            Level level,
+            @NotNull BlockPos pos,
+            @NotNull Player player,
+            @NotNull BlockHitResult hit
+    ) {
+        if (level.isClientSide) return InteractionResult.SUCCESS;
+
+        MenuProvider provider = new SimpleMenuProvider(
+                (id, inv, ply) -> new ATMMenu(id, inv),
+                Component.translatable("menu.createringtoncurrency.atm")
+        );
+        player.openMenu(provider);
+
+        return InteractionResult.sidedSuccess(level.isClientSide);
     }
 
     @Override
