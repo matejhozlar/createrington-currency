@@ -1,0 +1,6 @@
+{
+	"parent": "createringtoncurrency:block/atm_green",
+	"textures": {
+		"2": "createringtoncurrency:block/atm_red"
+	}
+}

@@ -7,6 +7,8 @@
   "block.createringtoncurrency.atm_black": "ATM (Black)",
   "block.createringtoncurrency.atm_brass": "ATM (Brass)",
   "block.createringtoncurrency.atm_andesite": "ATM (Andesite)",
+  "block.createringtoncurrency.atm_red": "ATM (Red)",
+  "block.createringtoncurrency.atm_pink": "ATM (Pink)",
   "menu.createringtoncurrency.atm": "ATM",
   "item.createringtoncurrency.bill_1": "$1 Bill",
   "item.createringtoncurrency.bill_5": "$5 Bill",
