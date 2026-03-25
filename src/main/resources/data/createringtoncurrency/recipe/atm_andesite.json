@@ -1,0 +1,33 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "C": {
+      "item": "createringtoncurrency:circuit_board"
+    },
+    "B": {
+      "item": "minecraft:chest"
+    },
+    "I": {
+      "item": "create:andesite_casing"
+    },
+    "K": {
+      "item": "createringtoncurrency:keypad"
+    }
+  },
+  "pattern": [
+    "ICI",
+    "CBC",
+    "IKI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "createringtoncurrency:atm_andesite"
+  },
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "create"
+    }
+  ]
+}

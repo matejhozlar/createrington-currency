@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "C": {
+      "item": "createringtoncurrency:circuit_board"
+    },
+    "B": {
+      "item": "minecraft:chest"
+    },
+    "I": {
+      "item": "minecraft:lapis_block"
+    },
+    "K": {
+      "item": "createringtoncurrency:keypad"
+    }
+  },
+  "pattern": [
+    "ICI",
+    "CBC",
+    "IKI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "createringtoncurrency:atm_blue"
+  }
+}
