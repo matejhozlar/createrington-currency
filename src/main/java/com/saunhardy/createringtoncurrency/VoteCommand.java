@@ -192,7 +192,10 @@ public class VoteCommand {
     private static void applyVote(String type, MinecraftServer server) {
         ServerLevel overworld = server.overworld();
         switch (type) {
-            case "day" -> overworld.setDayTime(1000); // morning
+            case "day" -> {
+                overworld.setDayTime(1000); // morning
+                overworld.setWeatherParameters(6000, 0, false, false); // clear weather
+            }
             case "night" -> overworld.setDayTime(13000); // night
             case "clear" -> overworld.setWeatherParameters(6000, 0, false, false);
             case "rain" -> overworld.setWeatherParameters(0, 6000, true, false);
