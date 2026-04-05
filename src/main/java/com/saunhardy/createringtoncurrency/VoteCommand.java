@@ -27,8 +27,12 @@ public class VoteCommand {
     private static final long COOLDOWN_FAIL_MS = 3 * 60_000L;
     private static final List<String> VOTE_TYPES = List.of("day", "night", "clear", "thunder", "rain");
 
+    private static final Set<String> WEATHER_TYPES = Set.of("clear", "rain", "thunder");
+    private static final Set<String> TIME_TYPES = Set.of("day", "night");
+
     private static volatile ActiveVote activeVote = null;
-    private static long cooldownUntil = 0L;
+    private static long weatherCooldownUntil = 0L;
+    private static long timeCooldownUntil = 0L;
 
     private static class ActiveVote {
         final String type;
@@ -79,9 +83,11 @@ public class VoteCommand {
         }
 
         long now = System.currentTimeMillis();
+        long cooldownUntil = WEATHER_TYPES.contains(type) ? weatherCooldownUntil : timeCooldownUntil;
         if (now < cooldownUntil) {
             long secsLeft = (cooldownUntil - now) / 1000;
-            player.sendSystemMessage(Component.literal("❌ Vote is on cooldown! " + secsLeft + "s remaining")
+            String category = WEATHER_TYPES.contains(type) ? "Weather" : "Time";
+            player.sendSystemMessage(Component.literal("❌ " + category + " vote is on cooldown! " + secsLeft + "s remaining")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -99,7 +105,7 @@ public class VoteCommand {
             player.sendSystemMessage(Component.literal("✅ Vote passed!")
                     .withStyle(ChatFormatting.GREEN));
             applyVote(type, server);
-            cooldownUntil = System.currentTimeMillis() + COOLDOWN_SUCCESS_MS;
+            setCooldown(type, COOLDOWN_SUCCESS_MS);
             return 1;
         }
 
@@ -179,7 +185,7 @@ public class VoteCommand {
                 .append(Component.literal(no + " No").withStyle(ChatFormatting.RED));
         broadcastToAll(server, result);
 
-        cooldownUntil = System.currentTimeMillis() + (passed ? COOLDOWN_SUCCESS_MS : COOLDOWN_FAIL_MS);
+        setCooldown(vote.type, passed ? COOLDOWN_SUCCESS_MS : COOLDOWN_FAIL_MS);
 
         if (passed) {
             applyVote(vote.type, server);
@@ -187,6 +193,15 @@ public class VoteCommand {
 
         LOGGER.info("Vote for '{}' by {} {} ({} yes, {} no)",
                 vote.type, vote.initiatorName, passed ? "passed" : "failed", yes, no);
+    }
+
+    private static void setCooldown(String type, long durationMs) {
+        long until = System.currentTimeMillis() + durationMs;
+        if (WEATHER_TYPES.contains(type)) {
+            weatherCooldownUntil = until;
+        } else {
+            timeCooldownUntil = until;
+        }
     }
 
     private static void applyVote(String type, MinecraftServer server) {

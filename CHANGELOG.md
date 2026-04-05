@@ -1,3 +1,3 @@
-## Version 1.3.1
+## Version 1.3.2
 
-- Voting for day now also clears the weather
+- Weather votes (clear, rain, thunder) and time votes (day, night) now have separate cooldowns
