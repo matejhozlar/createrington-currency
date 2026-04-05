@@ -1,3 +1,4 @@
-## Version 1.3.2
+## Version 1.3.3
 
-- Weather votes (clear, rain, thunder) and time votes (day, night) now have separate cooldowns
+- Fix ATM deposit-all missing confirmation dialog
+- Fix stale inventory visuals after ATM deposit
