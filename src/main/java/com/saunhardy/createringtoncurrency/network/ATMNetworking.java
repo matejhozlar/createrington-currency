@@ -234,10 +234,9 @@ public final class ATMNetworking {
                                 player.getInventory().setItem(slot, net.minecraft.world.item.ItemStack.EMPTY);
                             }
                         }
-                        player.inventoryMenu.broadcastChanges();
-                        player.closeContainer();
+                        player.inventoryMenu.sendAllDataToRemote();
+                        sendResult(player, 1, "Deposited $" + totalAmount);
                     });
-                    sendResult(player, 1, "Deposited $" + totalAmount);
                     LOGGER.info("[ATM DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), totalAmount);
                 } else {
                     sendResult(player, 2, extractApiMessage(result.body, "Deposit failed. Please try again."));
