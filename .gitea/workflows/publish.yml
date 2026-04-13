@@ -2,6 +2,11 @@ name: Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_curseforge:
+        description: 'Publish to CurseForge'
+        type: boolean
+        default: true
 
 jobs:
   publish:
@@ -30,6 +35,7 @@ jobs:
         run: ./gradlew build
 
       - name: Publish to CurseForge
+        if: ${{ inputs.publish_curseforge }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           version: ${{ steps.version.outputs.value }}

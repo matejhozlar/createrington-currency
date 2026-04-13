@@ -2,6 +2,15 @@ name: Publish to CurseForge
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_curseforge:
+        description: 'Publish to CurseForge'
+        type: boolean
+        default: true
+      publish_github_release:
+        description: 'Create GitHub release'
+        type: boolean
+        default: true
 
 jobs:
   publish:
@@ -32,6 +41,7 @@ jobs:
         run: ./gradlew build
 
       - name: Publish to CurseForge
+        if: ${{ inputs.publish_curseforge }}
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           version: ${{ steps.version.outputs.value }}
@@ -45,5 +55,18 @@ jobs:
 
           curseforge-id: 1277058
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+
+      - name: Create GitHub Release
+        if: ${{ inputs.publish_github_release }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          version: ${{ steps.version.outputs.value }}
+          version-type: release
+          name: "[${{ steps.version.outputs.value }}] Createrington Currency"
+          changelog-file: CHANGELOG.md
+          loaders: neoforge
+          game-versions: 1.21.1
+          files: build/libs/!(*-@(dev|sources|javadoc)).jar
+          java: 21
 
           github-token: ${{ secrets.GITHUB_TOKEN }}
