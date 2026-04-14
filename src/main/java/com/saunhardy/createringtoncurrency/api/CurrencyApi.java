@@ -51,10 +51,6 @@ public final class CurrencyApi {
                 .build();
     }
 
-    public static boolean isReady() {
-        return client != null;
-    }
-
     // ---- Currency endpoints ------------------------------------------------
 
     public static CompletableFuture<ApiResponse<BalanceResponse>> balance(UUID playerUuid) {

@@ -363,6 +363,8 @@ public class MoneyCommands {
     }
 
     private static void submitBundleWithdrawals(ServerPlayer player, Map<Integer, Integer> bundle, long total, String tag) {
+        final int totalSteps = bundle.size();
+        var completedSteps = new java.util.concurrent.atomic.AtomicInteger(0);
         var overall = java.util.concurrent.CompletableFuture.completedFuture((ApiResponse<com.saunhardy.createrington.api.currency.WithdrawResponse>) null);
         var failed = new java.util.concurrent.atomic.AtomicBoolean(false);
         for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
@@ -377,6 +379,7 @@ public class MoneyCommands {
                             ItemStack stack = new ItemStack(billItem, count);
                             player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
                         }
+                        completedSteps.incrementAndGet();
                     } else {
                         failed.set(true);
                         sendApiError(player, "Withdraw", resp);
@@ -388,6 +391,11 @@ public class MoneyCommands {
         overall.whenComplete((ignored, ex) -> {
             if (ex != null) {
                 sendException(player, "Withdraw", ex);
+                return;
+            }
+            if (failed.get() && completedSteps.get() > 0) {
+                LOGGER.warn("[WITHDRAW] Partial {} bundle for {} ({}): {}/{} denominations completed before failure; player kept those bills",
+                        tag, player.getName().getString(), player.getUUID(), completedSteps.get(), totalSteps);
                 return;
             }
             if (!failed.get()) {

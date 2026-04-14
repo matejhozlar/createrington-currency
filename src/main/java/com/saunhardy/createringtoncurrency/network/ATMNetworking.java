@@ -76,7 +76,7 @@ public final class ATMNetworking {
     private static void handleDeposit(final ATMDepositPayload pkt, final IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
 
-        Map<Object, Integer> values = Map.of(
+        Map<net.minecraft.world.item.Item, Integer> values = Map.of(
                 CreateringtonCurrency.BILL_1.get(), 1,
                 CreateringtonCurrency.BILL_5.get(), 5,
                 CreateringtonCurrency.BILL_10.get(), 10,
@@ -178,6 +178,8 @@ public final class ATMNetworking {
     }
 
     private static void optimizedWithdraw(ServerPlayer player, Map<Integer, Integer> bundle, int totalRequested) {
+        final int totalSteps = bundle.size();
+        var completedSteps = new java.util.concurrent.atomic.AtomicInteger(0);
         var overall = java.util.concurrent.CompletableFuture.completedFuture(true);
         var failed = new java.util.concurrent.atomic.AtomicBoolean(false);
         for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
@@ -188,6 +190,7 @@ public final class ATMNetworking {
                 return CurrencyApi.withdraw(player.getUUID(), denom, count).thenApply(resp -> {
                     if (resp.isSuccess()) {
                         giveBill(player, denom, count);
+                        completedSteps.incrementAndGet();
                         return true;
                     }
                     failed.set(true);
@@ -200,6 +203,11 @@ public final class ATMNetworking {
             if (ex != null) {
                 LOGGER.error("ATM optimized withdraw failed for {}: {}", player.getName().getString(), ex.getMessage());
                 sendResult(player, 2, "Something went wrong. Please try again.");
+                return;
+            }
+            if (failed.get() && completedSteps.get() > 0) {
+                LOGGER.warn("[ATM WITHDRAW] Partial optimized bundle for {} ({}): {}/{} denominations completed before failure; player kept those bills",
+                        player.getName().getString(), player.getUUID(), completedSteps.get(), totalSteps);
                 return;
             }
             if (!failed.get()) {
