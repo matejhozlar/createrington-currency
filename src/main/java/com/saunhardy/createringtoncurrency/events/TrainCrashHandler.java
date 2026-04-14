@@ -1,20 +1,21 @@
 package com.saunhardy.createringtoncurrency.events;
 
-import com.google.gson.Gson;
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createrington.api.trains.BackwardsDriver;
+import com.saunhardy.createrington.api.trains.CrashPassenger;
+import com.saunhardy.createrington.api.trains.CrashRequest;
+import com.saunhardy.createrington.api.trains.Position;
 import com.saunhardy.createringtoncurrency.Config;
-import com.saunhardy.createringtoncurrency.MoneyCommands;
+import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 public class TrainCrashHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final Gson GSON = new Gson();
 
     public record PlayerInfo(UUID uuid, @Nullable String name, boolean isDriver) {}
 
@@ -26,83 +27,57 @@ public class TrainCrashHandler {
                                    @Nullable String backwardsDriverName) {
         if (!Config.TRAIN_CRASH_REPORTING_ENABLED.get()) return;
 
-        MoneyCommands.EXECUTOR.submit(() -> {
-            try {
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("trainId", trainId.toString());
-                payload.put("trainName", trainName);
-                payload.put("speed", speed);
-                payload.put("carriageCount", carriageCount);
-                payload.put("timestamp", System.currentTimeMillis());
+        UUID authUuid = pickAuthUuid(driverUuid, owner, passengers);
+        if (authUuid == null) {
+            LOGGER.warn("Skipping train crash report for {}: no authenticated player UUID available", trainName);
+            return;
+        }
 
-                if (position != null) {
-                    Map<String, Double> pos = new HashMap<>();
-                    pos.put("x", position[0]);
-                    pos.put("y", position[1]);
-                    pos.put("z", position[2]);
-                    payload.put("position", pos);
-                }
+        Position pos = position != null ? new Position(position[0], position[1], position[2]) : null;
 
-                if (dimension != null) {
-                    payload.put("dimension", dimension);
-                }
+        List<CrashPassenger> passengerRecords = new ArrayList<>();
+        for (PlayerInfo p : passengers) {
+            passengerRecords.add(new CrashPassenger(p.uuid().toString(), p.name(), p.isDriver()));
+        }
 
-                if (owner != null) {
-                    payload.put("owner", owner.toString());
-                }
+        BackwardsDriver bd = backwardsDriverUuid != null
+                ? new BackwardsDriver(backwardsDriverUuid.toString(), backwardsDriverName)
+                : null;
 
-                if (driverUuid != null) {
-                    payload.put("driverUuid", driverUuid.toString());
-                }
+        CrashRequest req = new CrashRequest(
+                trainId.toString(),
+                trainName,
+                speed,
+                carriageCount,
+                pos,
+                dimension,
+                System.currentTimeMillis(),
+                owner != null ? owner.toString() : null,
+                driverUuid != null ? driverUuid.toString() : null,
+                passengerRecords.isEmpty() ? null : passengerRecords,
+                bd
+        );
 
-                // Build passenger list
-                List<Map<String, Object>> passengerList = new ArrayList<>();
-                for (PlayerInfo p : passengers) {
-                    Map<String, Object> entry = new HashMap<>();
-                    entry.put("uuid", p.uuid().toString());
-                    if (p.name() != null) entry.put("name", p.name());
-                    entry.put("isDriver", p.isDriver());
-                    passengerList.add(entry);
-                }
-                if (!passengerList.isEmpty()) {
-                    payload.put("passengers", passengerList);
-                }
-
-                if (backwardsDriverUuid != null) {
-                    Map<String, String> bd = new HashMap<>();
-                    bd.put("uuid", backwardsDriverUuid.toString());
-                    if (backwardsDriverName != null) bd.put("name", backwardsDriverName);
-                    payload.put("backwardsDriver", bd);
-                }
-
-                String json = GSON.toJson(payload);
-                URL url = URI.create(MoneyCommands.safeJoin(
-                        Config.API_BASE_URL.get(), Config.API_TRAIN_CRASH_URL.get())).toURL();
-
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                try {
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setDoOutput(true);
-                    conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-                    conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-                    try (var os = conn.getOutputStream()) {
-                        os.write(json.getBytes());
-                    }
-
-                    int responseCode = conn.getResponseCode();
-                    if (responseCode == 200) {
+        CurrencyApi.trainCrash(authUuid, req)
+                .thenAccept(resp -> {
+                    if (resp.isSuccess()) {
                         LOGGER.info("Train crash reported: {} ({})", trainName, trainId);
                     } else {
-                        LOGGER.warn("Train crash report failed with status {}", responseCode);
+                        LOGGER.warn("Train crash report failed: {}", resp.getMessage());
                     }
-                } finally {
-                    conn.disconnect();
-                }
-            } catch (Exception e) {
-                LOGGER.error("Failed to report train crash: {}", e.getMessage());
-            }
-        });
+                })
+                .exceptionally(ex -> {
+                    LOGGER.error("Failed to report train crash: {}", ex.getMessage());
+                    return null;
+                });
+    }
+
+    private static UUID pickAuthUuid(@Nullable UUID driver, @Nullable UUID owner, List<PlayerInfo> passengers) {
+        if (driver != null) return driver;
+        if (owner != null) return owner;
+        for (PlayerInfo p : passengers) {
+            if (p.uuid() != null) return p.uuid();
+        }
+        return null;
     }
 }

@@ -1,189 +1,88 @@
 package com.saunhardy.createringtoncurrency;
 
-import com.google.gson.*;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.api.CurrencyApi;
+import com.saunhardy.crnet.http.ApiResponse;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.ChatFormatting;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
-
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.logging.LogUtils;
-
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URI;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.text.NumberFormat;
-import java.util.concurrent.TimeUnit;
-
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
 
+import java.text.NumberFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class MoneyCommands {
-    // lottery logic
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    private static final Map<UUID, Long> COOLDOWNS = new ConcurrentHashMap<>();
     private static long lastLotteryStartTime = 0L;
+
+    private static long getCooldownMs() {
+        return Config.COMMAND_COOLDOWN_MS.get();
+    }
+
     private static long getLotteryCooldownMs() {
         return Config.LOTTERY_COOLDOWN_MINUTES.get() * 60L * 1000L;
     }
-    // Refetching JWT
-    private static final Map<UUID, Long> TOKEN_EXPIRATION = new ConcurrentHashMap<>();
-    private static final long TOKEN_TTL_MS = 9 * 60 * 1000;
-    private static final long CLEANUP_INTERVAL_MS = 60 * 1000;
-    private static volatile long lastCleanupTime = 0;
-    // JWT Authentication
-    private static final Map<UUID, String> TOKEN_CACHE = new ConcurrentHashMap<>();
-    private static final Map<UUID, Object> TOKEN_LOCKS = new ConcurrentHashMap<>();
-    private static Component message(String emoji, String text, ChatFormatting color) {
-        return Component.literal(emoji + " " + text).withStyle(color);
-    }
-    private static final Logger LOGGER = LogUtils.getLogger();
-    // Reusing threads instead of creating new ones
-    public static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(10);
-    // Shutdown EXECUTOR on server stop
-    public static void shutdownExecutor() {
-        EXECUTOR.shutdown();
-        try {
-            if (!EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-                EXECUTOR.shutdownNow();
-                LOGGER.warn("Executor force-shutdown due to timeout");
-            }
-        } catch (InterruptedException e) {
-            LOGGER.warn("Interrupted during shutdown: {}", e.getMessage());
-            Thread.currentThread().interrupt();
-        }
-    }
+
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
-        LOGGER.info("Server is stopping, shutting down MoneyCommands executor.");
-        shutdownExecutor();
         COOLDOWNS.clear();
-        TOKEN_CACHE.clear();
-        TOKEN_EXPIRATION.clear();
-        TOKEN_LOCKS.clear();
     }
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         COOLDOWNS.remove(event.getEntity().getUUID());
-        TOKEN_CACHE.remove(event.getEntity().getUUID());
-        TOKEN_EXPIRATION.remove(event.getEntity().getUUID());
-        TOKEN_LOCKS.remove(event.getEntity().getUUID());
-    }
-    // JSON parser
-    private static final Gson GSON = new GsonBuilder().create();
-    // Cooldown
-    private static final Map<UUID, Long> COOLDOWNS = new ConcurrentHashMap<>();
-    private static long getCooldownMs() {
-        return Config.COMMAND_COOLDOWN_MS.get();
     }
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
-        if (!Config.API_BASE_URL.get().endsWith("/")) {
-            LOGGER.warn("API base URL is missing a trailing slash. This may cause URL errors.");
-        }
         event.getDispatcher().register(
                 Commands.literal("money")
-                        .executes(context -> {
-                            ServerPlayer player = context.getSource().getPlayerOrException();
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
                             if (isOnCooldown(player)) return 0;
-
-                            String uuid = player.getUUID().toString();
-
-                            EXECUTOR.submit(() -> {
-                                try {
-                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_BALANCE_URL.get()) + "?uuid=" + uuid).toURL();
-                                    HttpResponse response = sendGet(url, player);
-
-                                    String body = response.body;
-
-                                    // Parse balance from JSON
-                                    JsonObject json = GSON.fromJson(body, JsonObject.class);
-                                    if(json.has("balance")) {
-                                        int balance = json.get("balance").getAsInt();
-                                        String formatted = NumberFormat.getInstance().format(balance);
-                                        player.sendSystemMessage(message("💰", "Balance: $" + formatted, ChatFormatting.GREEN));
-                                    } else {
-                                        sendError(player, "Balance", body);
-                                    }
-                                } catch (Exception e) {
-                                    sendError(player, "Balance", e);
-                                    LOGGER.error("Exception in /money for {} (UUID: {}): {}", player.getName().getString(), uuid, e.getMessage());
-                                }
-                            });
-
+                            CurrencyApi.balance(player.getUUID())
+                                    .thenAccept(resp -> handleBalance(player, resp))
+                                    .exceptionally(ex -> { sendException(player, "Balance", ex); return null; });
                             return 1;
                         })
         );
+
         event.getDispatcher().register(
                 Commands.literal("pay")
                         .then(Commands.argument("target", EntityArgument.player())
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))
-                                        .executes(context -> {
-                                            ServerPlayer sender = context.getSource().getPlayerOrException();
+                                        .executes(ctx -> {
+                                            ServerPlayer sender = ctx.getSource().getPlayerOrException();
                                             if (isOnCooldown(sender)) return 0;
-                                            ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "target");
-                                            String toName = targetPlayer.getName().getString();
-                                            String toUuid = targetPlayer.getUUID().toString();
-                                            int amount = IntegerArgumentType.getInteger(context, "amount");
-
-                                            String fromUuid = sender.getUUID().toString();
-
-                                            Map<String, Object> payload = new HashMap<>();
-                                            payload.put("fromUuid", fromUuid);
-                                            payload.put("toUuid", toUuid);
-                                            payload.put("amount", amount);
-
-                                            String json = GSON.toJson(payload);
-
-                                            EXECUTOR.submit(() -> {
-                                                try {
-                                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_PAY_URL.get())).toURL();
-                                                    HttpResponse response = sendPost(url, sender, json);
-
-                                                    if (response.code == 200) {
-                                                        int displayedAmount = amount;
-                                                        try {
-                                                            JsonObject obj = GSON.fromJson(response.body, JsonObject.class);
-                                                            if (obj.has("amount")) displayedAmount = obj.get("amount").getAsInt();
-                                                        } catch (Exception ignored) {}
-
-                                                        String formatted = NumberFormat.getInstance().format(displayedAmount);
-                                                        sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + toName, ChatFormatting.GREEN));
-                                                        targetPlayer.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
-                                                        LOGGER.info("[PAY] {} ({}) -> {} ({}): ${}", sender.getName().getString(), fromUuid, toName, toUuid, formatted);
-                                                    } else {
-                                                        sendError(sender, "Pay", response.body);
-                                                    }
-                                                } catch (Exception e) {
-                                                    sendError(sender, "Pay", e);
-                                                    LOGGER.error("Exception in /pay for {} (UUID: {}): {}", sender.getName().getString(), fromUuid, e.getMessage());
-                                                }
-                                            });
-
-
+                                            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                                            int amount = IntegerArgumentType.getInteger(ctx, "amount");
+                                            CurrencyApi.pay(sender.getUUID(), target.getUUID().toString(), amount)
+                                                    .thenAccept(resp -> handlePay(sender, target, amount, resp))
+                                                    .exceptionally(ex -> { sendException(sender, "Pay", ex); return null; });
                                             return 1;
                                         })))
         );
+
         if (!Config.DISABLE_CASH_COMMANDS.get()) {
             event.getDispatcher().register(
                     Commands.literal("deposit")
-                            .executes(context -> {
-                                ServerPlayer player = context.getSource().getPlayerOrException();
+                            .executes(ctx -> {
+                                ServerPlayer player = ctx.getSource().getPlayerOrException();
                                 if (isOnCooldown(player)) return 0;
                                 handleDepositAll(player);
                                 return 1;
@@ -193,13 +92,11 @@ public class MoneyCommands {
             event.getDispatcher().register(
                     Commands.literal("withdraw")
                             .then(Commands.argument("input", StringArgumentType.greedyString())
-                                    .executes(context -> {
-                                        ServerPlayer player = context.getSource().getPlayerOrException();
+                                    .executes(ctx -> {
+                                        ServerPlayer player = ctx.getSource().getPlayerOrException();
                                         if (isOnCooldown(player)) return 0;
-                                        String input = StringArgumentType.getString(context, "input").trim();
-
+                                        String input = StringArgumentType.getString(ctx, "input").trim();
                                         try {
-                                            // Match: "50 2"
                                             if (input.matches("^\\d+ \\d+$")) {
                                                 String[] parts = input.split(" ");
                                                 int denom = Integer.parseInt(parts[0]);
@@ -210,13 +107,9 @@ public class MoneyCommands {
                                                 }
                                                 return withdrawFixed(player, denom, count);
                                             }
-
-                                            // Match: "50:2 20:1 5:3"
                                             if (input.contains(":")) {
                                                 return withdrawCustomBundle(player, input);
                                             }
-
-                                            // Match: "185"
                                             if (input.matches("^\\d+$")) {
                                                 int total = Integer.parseInt(input);
                                                 if (total <= 0) {
@@ -229,242 +122,187 @@ public class MoneyCommands {
                                             player.sendSystemMessage(message("[ERROR]", "Number too large.", ChatFormatting.RED));
                                             return 0;
                                         }
-
-                                        player.sendSystemMessage(message("[ERROR]" , "Invalid command format.", ChatFormatting.RED));
+                                        player.sendSystemMessage(message("[ERROR]", "Invalid command format.", ChatFormatting.RED));
                                         return 0;
                                     })
                             )
             );
         }
+
         event.getDispatcher().register(
                 Commands.literal("baltop")
-                        .executes(context -> {
-                            ServerPlayer player = context.getSource().getPlayerOrException();
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
                             if (isOnCooldown(player)) return 0;
-
-                            EXECUTOR.submit(() -> {
-                                try {
-                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_TOP_URL.get())).toURL();
-                                    HttpResponse response = sendGet(url, player);
-
-                                    if (response.code == 200) {
-                                        String body = response.body;
-
-                                        JsonArray topList = GSON.fromJson(body, JsonArray.class);
-                                        int rank = 1;
-
-                                        player.sendSystemMessage(message("🏆", "Top 10 Richest Players:", ChatFormatting.GREEN));
-                                        for (JsonElement entryElement: topList){
-                                            JsonObject entry = entryElement.getAsJsonObject();
-                                            String name = entry.get("name").getAsString();
-                                            int balance = entry.get("balance").getAsInt();
-                                            String formatted = NumberFormat.getInstance().format(balance);
-
-                                            player.sendSystemMessage(Component.literal(" " + rank + ". " + name + ": $" + formatted));
-                                            rank++;
-                                        }
-
-                                        if (rank == 1) {
-                                            player.sendSystemMessage(message("[ERROR]", "No data found.", ChatFormatting.RED));
-                                        }
-                                    } else {
-                                        sendError(player, "Baltop", response.body);
-                                    }
-
-                                } catch (Exception e) {
-                                    sendError(player, "Baltop", e);
-                                    LOGGER.error("Exception in /baltop for {} (UUID: {}): {}", player.getName().getString(), player.getUUID(), e.getMessage());
-                                }
-                            });
-
+                            CurrencyApi.top(player.getUUID())
+                                    .thenAccept(resp -> handleTop(player, resp))
+                                    .exceptionally(ex -> { sendException(player, "Baltop", ex); return null; });
                             return 1;
                         })
         );
+
         event.getDispatcher().register(
                 Commands.literal("daily")
-                        .executes(context -> {
-                            ServerPlayer player = context.getSource().getPlayerOrException();
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
                             if (isOnCooldown(player)) return 0;
-
-                            String uuid = player.getUUID().toString();
-
-                            EXECUTOR.submit(() -> {
-                                try {
-                                    URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_DAILY_URL.get()) + "?uuid=" + uuid).toURL();
-                                    HttpResponse response = sendPost(url, player, "{}");
-
-                                    if (response.code == 200) {
-                                        try {
-                                            JsonObject json = GSON.fromJson(response.body, JsonObject.class);
-                                            String msg = json.has("message") ? json.get("message").getAsString() : "Reward claimed!";
-                                            player.sendSystemMessage(message("✅", msg, ChatFormatting.GREEN));
-                                        } catch (Exception e) {
-                                            player.sendSystemMessage(message("✅", "Reward claimed, but failed to parse response.", ChatFormatting.YELLOW));
-                                        }
-                                    } else {
-                                        sendError(player, "Daily reward", response.body);
-                                    }
-
-                                } catch (Exception e) {
-                                    sendError(player, "Daily reward", e);
-                                    LOGGER.error("Exception in /daily for {} (UUID: {}): {}", player.getName().getString(), uuid, e.getMessage());
-                                }
-                            });
-
+                            CurrencyApi.daily(player.getUUID())
+                                    .thenAccept(resp -> handleDaily(player, resp))
+                                    .exceptionally(ex -> { sendException(player, "Daily reward", ex); return null; });
                             return 1;
                         })
         );
+
         event.getDispatcher().register(
                 Commands.literal("lottery")
-                        .then(Commands.argument("amount", IntegerArgumentType.integer(10)) // Min 10
-                                .executes(context -> {
-                                    ServerPlayer player = context.getSource().getPlayerOrException();
-                                    UUID uuid = player.getUUID();
-                                    int amount = IntegerArgumentType.getInteger(context, "amount");
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(10))
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
                                     long now = System.currentTimeMillis();
                                     long cooldownMs = getLotteryCooldownMs();
-
                                     if (cooldownMs > 0 && now - lastLotteryStartTime < cooldownMs) {
                                         long seconds = (cooldownMs - (now - lastLotteryStartTime)) / 1000;
                                         player.sendSystemMessage(Component.literal("⏳ A lottery is already running or was recently started. Try again in " + seconds + "s.").withStyle(ChatFormatting.RED));
                                         return 1;
                                     }
-
-                                    EXECUTOR.submit(() -> {
-                                        try {
-                                            Map<String, Object> payload = Map.of(
-                                                    "uuid", uuid.toString(),
-                                                    "name", player.getName().getString(),
-                                                    "amount", amount
-                                            );
-
-                                            String json = GSON.toJson(payload);
-                                            URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_START_LOTTERY_URL.get())).toURL();
-
-                                            HttpResponse response = sendPost(url, player, json);
-
-                                            if (response.code == 200) {
-                                                lastLotteryStartTime = System.currentTimeMillis();
-                                                player.sendSystemMessage(message("🎲", "You successfully started a lottery with $" + amount + "!", ChatFormatting.GREEN));
-                                            } else {
-                                                sendError(player, "Lottery start", response.body);
-                                            }
-
-                                        } catch (Exception e) {
-                                            sendError(player, "Lottery start", e);
-                                            LOGGER.error("Exception in /lottery for {}: {}", player.getName().getString(), e.getMessage());
-                                        }
-                                    });
-
+                                    CurrencyApi.lotteryStart(player.getUUID(), amount)
+                                            .thenAccept(resp -> handleLotteryStart(player, amount, resp))
+                                            .exceptionally(ex -> { sendException(player, "Lottery start", ex); return null; });
                                     return 1;
                                 })
                         )
         );
+
         event.getDispatcher().register(
                 Commands.literal("join")
-                        .then(Commands.argument("amount", IntegerArgumentType.integer(10)) // Min 10
-                                .executes(context -> {
-                                    ServerPlayer player = context.getSource().getPlayerOrException();
-                                    UUID uuid = player.getUUID();
-                                    int amount = IntegerArgumentType.getInteger(context, "amount");
-
-                                    EXECUTOR.submit(() -> {
-                                        try {
-                                            Map<String, Object> payload = Map.of(
-                                                    "uuid", uuid.toString(),
-                                                    "name", player.getName().getString(),
-                                                    "amount", amount
-                                            );
-
-                                            String json = GSON.toJson(payload);
-                                            URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_JOIN_LOTTERY_URL.get())).toURL();
-
-                                            HttpResponse response = sendPost(url, player, json);
-
-                                            if (response.code == 200) {
-                                                player.sendSystemMessage(message("✅", "You joined the lottery with $" + amount + ". Good luck!", ChatFormatting.GREEN));
-                                            } else {
-                                                sendError(player, "Join lottery", response.body);
-                                            }
-
-                                        } catch (Exception e) {
-                                            sendError(player, "Join lottery", e);
-                                            LOGGER.error("Exception in /join for {}: {}", player.getName().getString(), e.getMessage());
-                                        }
-                                    });
-
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(10))
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
+                                    CurrencyApi.lotteryJoin(player.getUUID(), amount)
+                                            .thenAccept(resp -> handleLotteryJoin(player, amount, resp))
+                                            .exceptionally(ex -> { sendException(player, "Join lottery", ex); return null; });
                                     return 1;
                                 })
                         )
         );
     }
-    private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
-        String uuid = player.getUUID().toString();
-        Item billItemCheck = getBillItem(denomination);
 
-        if (billItemCheck == null) {
+    // ---- Response handlers -------------------------------------------------
+
+    private static void handleBalance(ServerPlayer player, ApiResponse<?> resp) {
+        if (resp.isSuccess()) {
+            String text = resp.getPlayerMessage() != null
+                    ? resp.getPlayerMessage()
+                    : "Balance retrieved";
+            player.sendSystemMessage(message("💰", text, ChatFormatting.GREEN));
+        } else {
+            sendApiError(player, "Balance", resp);
+        }
+    }
+
+    private static void handlePay(ServerPlayer sender, ServerPlayer target, int amount, ApiResponse<?> resp) {
+        if (resp.isSuccess()) {
+            String formatted = NumberFormat.getInstance().format(amount);
+            sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + target.getName().getString(), ChatFormatting.GREEN));
+            target.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
+            LOGGER.info("[PAY] {} ({}) -> {} ({}): ${}", sender.getName().getString(), sender.getUUID(), target.getName().getString(), target.getUUID(), formatted);
+        } else {
+            sendApiError(sender, "Pay", resp);
+        }
+    }
+
+    private static void handleTop(ServerPlayer player, ApiResponse<java.util.List<com.saunhardy.createrington.api.currency.TopEntry>> resp) {
+        if (!resp.isSuccess()) {
+            sendApiError(player, "Baltop", resp);
+            return;
+        }
+        var entries = resp.getData();
+        if (entries == null || entries.isEmpty()) {
+            player.sendSystemMessage(message("[ERROR]", "No data found.", ChatFormatting.RED));
+            return;
+        }
+        player.sendSystemMessage(message("🏆", "Top 10 Richest Players:", ChatFormatting.GREEN));
+        int rank = 1;
+        for (var entry : entries) {
+            String formatted = NumberFormat.getInstance().format((long) entry.balance());
+            player.sendSystemMessage(Component.literal(" " + rank + ". " + entry.name() + ": $" + formatted));
+            rank++;
+        }
+    }
+
+    private static void handleDaily(ServerPlayer player, ApiResponse<?> resp) {
+        if (resp.isSuccess()) {
+            String text = resp.getPlayerMessage() != null ? resp.getPlayerMessage() : "Reward claimed!";
+            player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
+        } else {
+            sendApiError(player, "Daily reward", resp);
+        }
+    }
+
+    private static void handleLotteryStart(ServerPlayer player, int amount, ApiResponse<?> resp) {
+        if (resp.isSuccess()) {
+            lastLotteryStartTime = System.currentTimeMillis();
+            String text = resp.getPlayerMessage() != null
+                    ? resp.getPlayerMessage()
+                    : "You successfully started a lottery with $" + amount + "!";
+            player.sendSystemMessage(message("🎲", text, ChatFormatting.GREEN));
+        } else {
+            sendApiError(player, "Lottery start", resp);
+        }
+    }
+
+    private static void handleLotteryJoin(ServerPlayer player, int amount, ApiResponse<?> resp) {
+        if (resp.isSuccess()) {
+            String text = resp.getPlayerMessage() != null
+                    ? resp.getPlayerMessage()
+                    : "You joined the lottery with $" + amount + ". Good luck!";
+            player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
+        } else {
+            sendApiError(player, "Join lottery", resp);
+        }
+    }
+
+    // ---- Withdraw variants -------------------------------------------------
+
+    private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
+        Item billItem = getBillItem(denomination);
+        if (billItem == null) {
             player.sendSystemMessage(message("[ERROR]", "Invalid denomination.", ChatFormatting.RED));
             return 0;
         }
-
-        if (isInventoryFullFor(player, billItemCheck, count)) {
+        if (isInventoryFullFor(player, billItem, count)) {
             String formatted = NumberFormat.getInstance().format(count);
             player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
             return 0;
         }
-
-        EXECUTOR.submit(() -> {
-            try {
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("uuid", uuid);
-                payload.put("count", count);
-                payload.put("denomination", denomination);
-
-                String json = GSON.toJson(payload);
-
-                HttpResponse response = sendPost(
-                        URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player, json);
-
-
-                if (response.code == 200) {
-                    Item billItem = getBillItem(denomination);
-                    if (billItem == null) {
-                        player.sendSystemMessage(message("[ERROR]", "Invalid denomination.", ChatFormatting.RED));
-                        return;
+        CurrencyApi.withdraw(player.getUUID(), denomination, count)
+                .thenAccept(resp -> {
+                    if (resp.isSuccess()) {
+                        ItemStack stack = new ItemStack(billItem, count);
+                        player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
+                        long amount = (long) denomination * count;
+                        String formatted = NumberFormat.getInstance().format(amount);
+                        player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+                        LOGGER.info("[WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), player.getUUID(), formatted, count, denomination);
+                    } else {
+                        sendApiError(player, "Withdraw", resp);
                     }
-
-                    ItemStack stack = new ItemStack(billItem, count);
-                    player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-
-                    final long amount = (long) denomination * count;
-                    String formatted = NumberFormat.getInstance().format(amount);
-                    player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
-                    LOGGER.info("[WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), uuid, formatted, count, denomination);
-                } else {
-                    sendError(player, "Withdraw", response.body);
-                }
-
-            } catch (Exception e) {
-                sendError(player, "Withdraw", e);
-                LOGGER.error("Exception in /withdrawFixed: {}", e.getMessage());
-            }
-        });
-
+                })
+                .exceptionally(ex -> { sendException(player, "Withdraw", ex); return null; });
         return 1;
     }
 
     private static int withdrawCustomBundle(ServerPlayer player, String input) {
         Map<Integer, Integer> bundle = new LinkedHashMap<>();
         long totalAmount = 0;
-
-        // Phase 1: Parse and validate
         for (String part : input.split(" ")) {
             String[] pair = part.split(":");
             if (pair.length != 2) {
                 player.sendSystemMessage(message("[ERROR]", "Invalid format: " + part, ChatFormatting.RED));
                 return 0;
             }
-
             int denom, count;
             try {
                 denom = Integer.parseInt(pair[0]);
@@ -473,98 +311,44 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Invalid number in: " + part, ChatFormatting.RED));
                 return 0;
             }
-
             if (count <= 0 || denom <= 0) {
                 player.sendSystemMessage(message("[ERROR]", "Invalid denomination or count: " + part, ChatFormatting.RED));
                 return 0;
             }
-
             Item item = getBillItem(denom);
             if (item == null) {
                 player.sendSystemMessage(message("[ERROR]", "Unsupported denomination: $" + denom, ChatFormatting.RED));
                 return 0;
             }
-
             if (isInventoryFullFor(player, item, count)) {
                 player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for $" + denom + " x " + count, ChatFormatting.RED));
                 return 0;
             }
-
             bundle.put(denom, count);
             totalAmount += (long) denom * count;
         }
-
-        // Phase 2: Submit all withdrawals in 1 task
-        final long finalTotal = totalAmount;
-        EXECUTOR.submit(() -> {
-            boolean allSucceeded = true;
-
-            for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
-                int denom = entry.getKey();
-                int count = entry.getValue();
-
-                try {
-                    String uuid = player.getUUID().toString();
-
-                    Map<String, Object> payload = new HashMap<>();
-                    payload.put("uuid", uuid);
-                    payload.put("count", count);
-                    payload.put("denomination", denom);
-
-                    String json = GSON.toJson(payload);
-
-                    HttpResponse response = sendPost(
-                            URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player,json);
-
-                    if (response.code == 200) {
-                        Item billItem = getBillItem(denom);
-                        if (billItem != null) {
-                            ItemStack stack = new ItemStack(billItem, count);
-                            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-                        }
-                    } else {
-                        allSucceeded = false;
-                        sendError(player, "Withdraw", response.body);
-                    }
-
-                } catch (Exception e) {
-                    allSucceeded = false;
-                    sendError(player, "Withdraw", e);
-                    LOGGER.error("Exception in /withdrawCustomBundle: {}", e.getMessage());
-                }
-            }
-
-            if (allSucceeded) {
-                String formatted = NumberFormat.getInstance().format(finalTotal);
-                player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
-                LOGGER.info("[WITHDRAW] {} ({}): ${} (bundle)", player.getName().getString(), player.getUUID(), formatted);
-            }
-        });
-
+        submitBundleWithdrawals(player, bundle, totalAmount, "bundle");
         return 1;
     }
 
     private static int withdrawOptimized(ServerPlayer player, int totalAmount) {
         int[] denominations = CreateringtonCurrency.DENOMINATIONS;
         Map<Integer, Integer> result = new LinkedHashMap<>();
-        int originalTotal = totalAmount;
-
+        int remaining = totalAmount;
         for (int denom : denominations) {
-            int count = totalAmount / denom;
+            int count = remaining / denom;
             if (count > 0) {
                 result.put(denom, count);
-                totalAmount -= denom * count;
+                remaining -= denom * count;
             }
         }
-
-        if (totalAmount > 0) {
+        if (remaining > 0) {
             player.sendSystemMessage(message("[ERROR]", "Cannot make exact change.", ChatFormatting.RED));
             return 0;
         }
-
         for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
             Item billItem = getBillItem(entry.getKey());
-            if(billItem == null) {
+            if (billItem == null) {
                 player.sendSystemMessage(message("[ERROR]", "Invalid denomination: $" + entry.getKey(), ChatFormatting.RED));
                 return 0;
             }
@@ -574,95 +358,47 @@ public class MoneyCommands {
                 return 0;
             }
         }
-
-        EXECUTOR.submit(() -> {
-            boolean allSucceeded = true;
-
-            for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
-                try {
-                    String uuid = player.getUUID().toString();
-
-                    Map<String, Object> payload = new HashMap<>();
-                    payload.put("uuid", uuid);
-                    payload.put("count", entry.getValue());
-                    payload.put("denomination", entry.getKey());
-
-                    String json = GSON.toJson(payload);
-
-                    HttpResponse response = sendPost(
-                            URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player, json);
-
-                    if (response.code == 200) {
-                        Item billItem = getBillItem(entry.getKey());
-                        if (billItem != null) {
-                            ItemStack stack = new ItemStack(billItem, entry.getValue());
-                            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-                        }
-                    } else {
-                        allSucceeded = false;
-                        sendError(player, "Withdraw", response.body);
-                    }
-
-                } catch (Exception e) {
-                    allSucceeded = false;
-                    sendError(player, "Withdraw", e);
-                    LOGGER.error("Exception in /withdrawOptimized: {}", e.getMessage());
-                }
-            }
-
-            if (allSucceeded) {
-                String formatted = NumberFormat.getInstance().format(originalTotal);
-                player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
-                LOGGER.info("[WITHDRAW] {} ({}): ${} (optimized)", player.getName().getString(), player.getUUID(), formatted);
-            }
-
-        });
-
+        submitBundleWithdrawals(player, result, totalAmount, "optimized");
         return 1;
     }
 
-    @SuppressWarnings("unused")
-    private static void withdrawFixedSilent(ServerPlayer player, int denomination, int count) {
-        String uuid = player.getUUID().toString();
-        Item billItemCheck = getBillItem(denomination);
-        if (billItemCheck == null) return;
-
-        if (isInventoryFullFor(player, billItemCheck, count)) {
-            LOGGER.warn("Silent withdraw skipped due to insufficient inventory space for {}x${}", count, denomination);
-            return;
+    private static void submitBundleWithdrawals(ServerPlayer player, Map<Integer, Integer> bundle, long total, String tag) {
+        var overall = java.util.concurrent.CompletableFuture.completedFuture((ApiResponse<com.saunhardy.createrington.api.currency.WithdrawResponse>) null);
+        var failed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
+            int denom = entry.getKey();
+            int count = entry.getValue();
+            overall = overall.thenCompose(ignored -> {
+                if (failed.get()) return java.util.concurrent.CompletableFuture.completedFuture(null);
+                return CurrencyApi.withdraw(player.getUUID(), denom, count).thenApply(resp -> {
+                    if (resp.isSuccess()) {
+                        Item billItem = getBillItem(denom);
+                        if (billItem != null) {
+                            ItemStack stack = new ItemStack(billItem, count);
+                            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
+                        }
+                    } else {
+                        failed.set(true);
+                        sendApiError(player, "Withdraw", resp);
+                    }
+                    return resp;
+                });
+            });
         }
-
-        EXECUTOR.submit(() -> {
-            try {
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("uuid", uuid);
-                payload.put("count", count);
-                payload.put("denomination", denomination);
-
-                String json = GSON.toJson(payload);
-
-                HttpResponse response = sendPost(
-                        URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get())).toURL(), player, json);
-
-                if (response.code == 200) {
-                    Item billItem = getBillItem(denomination);
-                    if (billItem == null) return;
-                    ItemStack stack = new ItemStack(billItem, count);
-                    player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-                } else {
-                    sendError(player, "Withdraw", response.body);
-                }
-
-            } catch (Exception e) {
-                sendError(player, "Withdraw", e);
-                LOGGER.error("Exception in /withdrawFixedSilent: {}", e.getMessage());
+        overall.whenComplete((ignored, ex) -> {
+            if (ex != null) {
+                sendException(player, "Withdraw", ex);
+                return;
+            }
+            if (!failed.get()) {
+                String formatted = NumberFormat.getInstance().format(total);
+                player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
+                LOGGER.info("[WITHDRAW] {} ({}): ${} ({})", player.getName().getString(), player.getUUID(), formatted, tag);
             }
         });
     }
 
     public static void handleDepositAll(ServerPlayer player) {
-        final String uuid = player.getUUID().toString();
-
         Map<Item, Integer> billValues = Map.of(
                 CreateringtonCurrency.BILL_1.get(), 1,
                 CreateringtonCurrency.BILL_5.get(), 5,
@@ -674,21 +410,19 @@ public class MoneyCommands {
                 CreateringtonCurrency.BILL_1000.get(), 1000
         );
 
-        final Map<Integer, List<Integer>> slotsByDenomination = new HashMap<>();
+        Map<Integer, java.util.List<Integer>> slotsByDenom = new java.util.HashMap<>();
         int computedTotal = 0;
-
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack stack = player.getInventory().getItem(i);
             if (!stack.isEmpty() && billValues.containsKey(stack.getItem())) {
                 int value = billValues.get(stack.getItem());
-                int count = stack.getCount();
-                computedTotal += value * count;
-                slotsByDenomination.computeIfAbsent(value, k -> new ArrayList<>()).add(i);
+                computedTotal += value * stack.getCount();
+                slotsByDenom.computeIfAbsent(value, k -> new java.util.ArrayList<>()).add(i);
             }
         }
 
         if (computedTotal == 0) {
-            player.sendSystemMessage(message("[ERROR]" , "No bills to deposit.", ChatFormatting.RED));
+            player.sendSystemMessage(message("[ERROR]", "No bills to deposit.", ChatFormatting.RED));
             return;
         }
 
@@ -696,33 +430,33 @@ public class MoneyCommands {
         String formatted = NumberFormat.getInstance().format(totalAmount);
         player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
 
-        EXECUTOR.submit(() -> {
-            try {
-                URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get())).toURL();
-
-                String json = GSON.toJson(Map.of("uuid", uuid, "amount", totalAmount));
-                HttpResponse response = sendPost(url, player, json);
-
-                if (response.code == 200) {
-                    player.server.execute(() -> {
-                        for (Map.Entry<Integer, List<Integer>> e : slotsByDenomination.entrySet()) {
-                            for (int slot : e.getValue()) {
-                                player.getInventory().setItem(slot, ItemStack.EMPTY);
+        CurrencyApi.deposit(player.getUUID(), totalAmount)
+                .thenAccept(resp -> {
+                    if (resp.isSuccess()) {
+                        player.server.execute(() -> {
+                            for (Map.Entry<Integer, java.util.List<Integer>> e : slotsByDenom.entrySet()) {
+                                for (int slot : e.getValue()) {
+                                    player.getInventory().setItem(slot, ItemStack.EMPTY);
+                                }
                             }
-                        }
-                        player.inventoryMenu.broadcastChanges();
-                    });
+                            player.inventoryMenu.broadcastChanges();
+                        });
+                        String text = resp.getPlayerMessage() != null
+                                ? resp.getPlayerMessage()
+                                : "Deposited $" + formatted + " into your account!";
+                        player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
+                        LOGGER.info("[DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), formatted);
+                    } else {
+                        sendApiError(player, "Deposit", resp);
+                    }
+                })
+                .exceptionally(ex -> { sendException(player, "Deposit", ex); return null; });
+    }
 
-                    player.sendSystemMessage(message("✅", "Deposited $" + formatted + " into your account!", ChatFormatting.GREEN));
-                    LOGGER.info("[DEPOSIT] {} ({}): ${}", player.getName().getString(), uuid, formatted);
-                } else {
-                    sendError(player, "Deposit", response.body);
-                }
-            } catch (Exception e) {
-                sendError(player, "Deposit", e);
-                LOGGER.error("Exception in /deposit for {} (UUID: {}): {}", player.getName().getString(), uuid, e.getMessage());
-            }
-        });
+    // ---- Shared helpers ----------------------------------------------------
+
+    public static Component message(String emoji, String text, ChatFormatting color) {
+        return Component.literal(emoji + " " + text).withStyle(color);
     }
 
     private static Item getBillItem(int denomination) {
@@ -739,223 +473,47 @@ public class MoneyCommands {
         };
     }
 
-    private static HttpResponse sendGet(URL url, ServerPlayer player) throws Exception {
-        String token = getOrFetchToken(player);
-
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 401) {
-                TOKEN_CACHE.remove(player.getUUID());
-                TOKEN_EXPIRATION.remove(player.getUUID());
-            }
-            InputStream stream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
-            if (stream == null) {
-                return new HttpResponse(responseCode, "");
-            }
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(stream))) {
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    response.append(line);
-                }
-                return new HttpResponse(responseCode, response.toString());
-            }
-        } finally {
-            conn.disconnect();
-        }
-    }
-
-    private static class HttpResponse {
-        int code;
-        String body;
-
-        HttpResponse(int code, String body) {
-            this.code = code;
-            this.body = body;
-        }
-    }
-
-    private static HttpResponse sendPost(URL url, ServerPlayer player, String json) throws Exception {
-        String token = getOrFetchToken(player);
-
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-            try (var os = conn.getOutputStream()) {
-                os.write(json.getBytes());
-            }
-
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 401) {
-                TOKEN_CACHE.remove(player.getUUID());
-                TOKEN_EXPIRATION.remove(player.getUUID());
-            }
-            InputStream inputStream = (responseCode == 200)
-                    ? conn.getInputStream()
-                    : conn.getErrorStream();
-
-            if (inputStream == null) {
-                return new HttpResponse(responseCode, "");
-            }
-
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    response.append(line);
-                }
-                return new HttpResponse(responseCode, response.toString());
-            }
-        } finally {
-            conn.disconnect();
-        }
-    }
-
-    public static String getOrFetchToken(ServerPlayer player) throws Exception {
-        UUID uuid = player.getUUID();
-        evictExpiredTokens();
-        Object lock = TOKEN_LOCKS.computeIfAbsent(uuid, k -> new Object());
-
-        synchronized (lock) {
-            long now = System.currentTimeMillis();
-            if (!TOKEN_CACHE.containsKey(uuid) || TOKEN_EXPIRATION.getOrDefault(uuid, 0L) < now) {
-                String token = fetchJwtToken(player);
-                TOKEN_CACHE.put(uuid, token);
-                TOKEN_EXPIRATION.put(uuid, now + TOKEN_TTL_MS);
-            }
-            return TOKEN_CACHE.get(uuid);
-        }
-    }
-
-    private static void evictExpiredTokens() {
-        long now = System.currentTimeMillis();
-        if (now - lastCleanupTime < CLEANUP_INTERVAL_MS) return;
-        lastCleanupTime = now;
-
-        TOKEN_EXPIRATION.forEach((uid, expiry) -> {
-            if (expiry < now) {
-                TOKEN_CACHE.remove(uid);
-                TOKEN_EXPIRATION.remove(uid);
-                TOKEN_LOCKS.remove(uid);
-            }
-        });
-    }
-
-    // Inventory space checker (to overcome overflow)
     private static boolean isInventoryFullFor(ServerPlayer player, Item item, int totalCount) {
         int maxStackSize = new ItemStack(item).getMaxStackSize();
         int remaining = totalCount;
-
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack slot = player.getInventory().getItem(i);
-
             if (slot.isEmpty()) {
                 remaining -= maxStackSize;
             } else if (slot.getItem() == item && slot.getCount() < maxStackSize) {
                 remaining -= (maxStackSize - slot.getCount());
             }
-
-            if (remaining <= 0) return false; // not enough room
+            if (remaining <= 0) return false;
         }
-
         return true;
     }
 
-    // Cooldowns
     private static boolean isOnCooldown(ServerPlayer player) {
         long now = System.currentTimeMillis();
         UUID uuid = player.getUUID();
-
         if (COOLDOWNS.containsKey(uuid)) {
             long lastUsed = COOLDOWNS.get(uuid);
-            if(now - lastUsed < getCooldownMs()) {
+            if (now - lastUsed < getCooldownMs()) {
                 long secondsLeft = (getCooldownMs() - (now - lastUsed)) / 1000;
                 player.sendSystemMessage(message("[COOLDOWN]", "Please wait " + secondsLeft + "s before using this command again.", ChatFormatting.RED));
                 return true;
             }
         }
-
         COOLDOWNS.put(uuid, now);
         return false;
     }
 
-    private static String fetchJwtToken(ServerPlayer player) throws Exception {
-        String uuid = player.getUUID().toString();
-        String name = player.getName().getString();
-
-        URL url = URI.create(safeJoin(Config.API_BASE_URL.get(), Config.API_LOGIN_URL.get())).toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-            String json = GSON.toJson(Map.of("uuid", uuid, "name", name));
-            try (var os = conn.getOutputStream()) {
-                os.write(json.getBytes());
-            }
-
-            int responseCode = conn.getResponseCode();
-            InputStream input = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(input))) {
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) sb.append(line);
-
-                if (responseCode != 200) {
-                    LOGGER.error("Failed to fetch JWT (HTTP {}): {}", responseCode, sb);
-                    throw new Exception("Authentication failed (HTTP " + responseCode + ")");
-                }
-
-                JsonObject obj = JsonParser.parseString(sb.toString()).getAsJsonObject();
-                return obj.get("token").getAsString();
-            }
-        } finally {
-            conn.disconnect();
-        }
+    /** Surfaces {@code playerMessage} first, falls back to {@code message}, then a generic string. */
+    public static void sendApiError(ServerPlayer player, String context, ApiResponse<?> resp) {
+        String text = resp.getPlayerMessage() != null
+                ? resp.getPlayerMessage()
+                : (resp.getMessage() != null ? resp.getMessage() : "Something went wrong. Please try again.");
+        player.sendSystemMessage(message("❌", text, ChatFormatting.RED));
+        LOGGER.warn("{} failed for {}: {}", context, player.getName().getString(), resp.getMessage());
     }
 
-    // Safe join for urls
-    public static String safeJoin(String base, String path) {
-        if (!base.endsWith("/")) base += "/";
-        if (path.startsWith("/")) path = path.substring(1);
-        return base + path;
-    }
-
-    // clean error messages - only show the API message to the player
-    private static void sendError(ServerPlayer player, String context, Object errorSource) {
-        if (errorSource instanceof String body) {
-            try {
-                JsonObject json = JsonParser.parseString(body).getAsJsonObject();
-                if (json.has("message")) {
-                    player.sendSystemMessage(message("❌", json.get("message").getAsString(), ChatFormatting.RED));
-                    return;
-                } else if (json.has("error")) {
-                    player.sendSystemMessage(message("❌", json.get("error").getAsString(), ChatFormatting.RED));
-                    return;
-                }
-            } catch (Exception ignored) {}
-        }
-
-        if (errorSource instanceof Exception e) {
-            LOGGER.error("{} error: {}", context, e.getMessage());
-        }
-
+    public static void sendException(ServerPlayer player, String context, Throwable ex) {
+        LOGGER.error("{} error for {}: {}", context, player.getName().getString(), ex.getMessage());
         player.sendSystemMessage(message("❌", "Something went wrong. Please try again.", ChatFormatting.RED));
     }
 }

@@ -1,26 +1,23 @@
 package com.saunhardy.createringtoncurrency.network;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.saunhardy.createringtoncurrency.Config;
+import com.mojang.logging.LogUtils;
+import com.saunhardy.createrington.api.currency.HistoryResponse;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
-import com.saunhardy.createringtoncurrency.MoneyCommands;
+import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-
-import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public final class ATMNetworking {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -30,160 +27,54 @@ public final class ATMNetworking {
         PayloadRegistrar reg = event.registrar("1");
 
         reg.playToServer(ATMDepositPayload.TYPE, ATMDepositPayload.STREAM_CODEC, ATMNetworking::handleDeposit);
-
         reg.playToServer(ATMWithdrawPayload.TYPE, ATMWithdrawPayload.STREAM_CODEC, ATMNetworking::handleWithdraw);
-
         reg.playToClient(ATMResultPayload.TYPE, ATMResultPayload.STREAM_CODEC, ATMNetworking::handleResultClient);
-
         reg.playToServer(ATMQueryBalancePayload.TYPE, ATMQueryBalancePayload.STREAM_CODEC, ATMNetworking::handleQueryBalance);
-
         reg.playToClient(ATMBalancePayload.TYPE, ATMBalancePayload.STREAM_CODEC, ATMNetworking::handleBalanceClient);
-
         reg.playToServer(ATMQueryHistoryPayload.TYPE, ATMQueryHistoryPayload.STREAM_CODEC, ATMNetworking::handleQueryHistory);
         reg.playToClient(ATMHistoryPayload.TYPE, ATMHistoryPayload.STREAM_CODEC, ATMNetworking::handleHistoryClient);
     }
 
-    private static void handleQueryBalance(final ATMQueryBalancePayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        var p = ctx.player();
-        if (!(p instanceof net.minecraft.server.level.ServerPlayer player)) return;
+    // ---- Server-side handlers ---------------------------------------------
 
-        com.saunhardy.createringtoncurrency.MoneyCommands.EXECUTOR.submit(() -> {
-            try {
-                var base = com.saunhardy.createringtoncurrency.Config.API_BASE_URL.get();
-                var path = com.saunhardy.createringtoncurrency.Config.API_BALANCE_URL.get();
-                var url  = java.net.URI.create(com.saunhardy.createringtoncurrency.MoneyCommands.safeJoin(base, path) + "?uuid=" + player.getUUID()).toURL();
-
-                String token = com.saunhardy.createringtoncurrency.MoneyCommands.getOrFetchToken(player);
-
-                var conn = (java.net.HttpURLConnection) url.openConnection();
-                try {
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("Authorization", "Bearer " + token);
-                    conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-                    conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-                    int code = conn.getResponseCode();
-                    java.io.InputStream is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
-                    var sb = new StringBuilder();
-                    if (is != null) {
-                        try (var br = new java.io.BufferedReader(new java.io.InputStreamReader(is))) {
-                            String line; while ((line = br.readLine()) != null) sb.append(line);
-                        }
-                    }
-
-                    int balance = -1;
-                    try {
-                        JsonObject json = JsonParser.parseString(sb.toString()).getAsJsonObject();
-                        if (json.has("balance")) balance = json.get("balance").getAsInt();
-                    } catch (Exception ignored) {}
-                    player.connection.send(new net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket(
-                            new ATMBalancePayload(Math.max(0, balance))
-                    ));
-                } finally {
-                    conn.disconnect();
-                }
-            } catch (Exception e) {
-                player.connection.send(new net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket(
-                        new ATMBalancePayload(0)
-                ));
-            }
-        });
+    private static void handleQueryBalance(final ATMQueryBalancePayload pkt, final IPayloadContext ctx) {
+        if (!(ctx.player() instanceof ServerPlayer player)) return;
+        CurrencyApi.balance(player.getUUID())
+                .thenAccept(resp -> {
+                    int balance = resp.isSuccess() && resp.getData() != null ? (int) resp.getData().balance() : 0;
+                    player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(Math.max(0, balance))));
+                })
+                .exceptionally(ex -> {
+                    LOGGER.error("ATM balance query failed for {}: {}", player.getName().getString(), ex.getMessage());
+                    player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(0)));
+                    return null;
+                });
     }
 
-    private static void handleBalanceClient(final ATMBalancePayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        var mc = net.minecraft.client.Minecraft.getInstance();
-        mc.execute(() -> {
-            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
-                scr.updateBalance(pkt.balance());
-            }
-        });
-    }
-
-
-    private static void handleQueryHistory(final ATMQueryHistoryPayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        var p = ctx.player();
-        if (!(p instanceof ServerPlayer player)) return;
-
-        MoneyCommands.EXECUTOR.submit(() -> {
-            try {
-                var base = Config.API_BASE_URL.get();
-                var path = Config.API_HISTORY_URL.get();
-                var url = URI.create(MoneyCommands.safeJoin(base, path)
-                        + "?page=" + pkt.page() + "&limit=5").toURL();
-
-                String token = MoneyCommands.getOrFetchToken(player);
-
-                var conn = (HttpURLConnection) url.openConnection();
-                try {
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("Authorization", "Bearer " + token);
-                    conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-                    conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-                    int code = conn.getResponseCode();
-                    var is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
-                    var sb = new StringBuilder();
-                    if (is != null) {
-                        try (var br = new BufferedReader(new InputStreamReader(is))) {
-                            String line; while ((line = br.readLine()) != null) sb.append(line);
-                        }
+    private static void handleQueryHistory(final ATMQueryHistoryPayload pkt, final IPayloadContext ctx) {
+        if (!(ctx.player() instanceof ServerPlayer player)) return;
+        CurrencyApi.history(player.getUUID(), pkt.page(), 5)
+                .thenAccept(resp -> {
+                    if (!resp.isSuccess() || resp.getData() == null) {
+                        player.connection.send(new ClientboundCustomPayloadPacket(
+                                new ATMHistoryPayload(pkt.page(), 0, "[]")));
+                        return;
                     }
-
-                    int page = pkt.page();
-                    int hasMore = 0;
-                    String data = "[]";
-
-                    if (code == 200) {
-                        try {
-                            JsonObject json = JsonParser.parseString(sb.toString()).getAsJsonObject();
-                            page = json.has("page") ? json.get("page").getAsInt() : pkt.page();
-                            hasMore = json.has("hasMore") && json.get("hasMore").getAsBoolean() ? 1 : 0;
-                            data = json.has("transactions") ? json.get("transactions").toString() : "[]";
-                        } catch (Exception ignored) {}
-                    }
-
+                    HistoryResponse data = resp.getData();
+                    String json = GSON.toJson(data.transactions());
                     player.connection.send(new ClientboundCustomPayloadPacket(
-                            new ATMHistoryPayload(page, hasMore, data)
-                    ));
-                } finally {
-                    conn.disconnect();
-                }
-            } catch (Exception e) {
-                player.connection.send(new ClientboundCustomPayloadPacket(
-                        new ATMHistoryPayload(pkt.page(), 0, "[]")
-                ));
-            }
-        });
-    }
-
-    private static void handleHistoryClient(final ATMHistoryPayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        var mc = net.minecraft.client.Minecraft.getInstance();
-        mc.execute(() -> {
-            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
-                scr.updateHistory(pkt.page(), pkt.hasMore() == 1, pkt.data());
-            }
-        });
-    }
-
-    private static void handleResultClient(final ATMResultPayload pkt, final net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        mc.execute(() -> {
-            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
-                int color = switch (pkt.kind()) { case 1 -> 0x2ECC71; case 2 -> 0xE74C3C; default -> 0xFFFFFF; };
-                scr.showStatus(pkt.message(), color);
-            } else if (mc.player != null) {
-                mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal(pkt.message()), false);
-            }
-        });
-    }
-
-    private static void sendResult(ServerPlayer player, int kind, String msg) {
-        player.connection.send(new ClientboundCustomPayloadPacket(new ATMResultPayload(kind, msg)));
+                            new ATMHistoryPayload(data.page(), data.hasMore() ? 1 : 0, json)));
+                })
+                .exceptionally(ex -> {
+                    LOGGER.error("ATM history query failed for {}: {}", player.getName().getString(), ex.getMessage());
+                    player.connection.send(new ClientboundCustomPayloadPacket(
+                            new ATMHistoryPayload(pkt.page(), 0, "[]")));
+                    return null;
+                });
     }
 
     private static void handleDeposit(final ATMDepositPayload pkt, final IPayloadContext ctx) {
-        var p = ctx.player();
-        if (!(p instanceof ServerPlayer player)) return;
+        if (!(ctx.player() instanceof ServerPlayer player)) return;
 
         Map<Object, Integer> values = Map.of(
                 CreateringtonCurrency.BILL_1.get(), 1,
@@ -199,7 +90,7 @@ public final class ATMNetworking {
         Map<Integer, List<Integer>> slotsByDenom = new HashMap<>();
         int total = 0;
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            var st = player.getInventory().getItem(i);
+            ItemStack st = player.getInventory().getItem(i);
             if (!st.isEmpty() && values.containsKey(st.getItem())) {
                 int val = values.get(st.getItem());
                 total += val * st.getCount();
@@ -213,166 +104,171 @@ public final class ATMNetworking {
         }
 
         final int totalAmount = total;
-
-        MoneyCommands.EXECUTOR.submit(() -> {
-            try {
-                String token = MoneyCommands.getOrFetchToken(player);
-                URL url = URI.create(MoneyCommands.safeJoin(
-                        Config.API_BASE_URL.get(), Config.API_DEPOSIT_URL.get()
-                )).toURL();
-
-                var payload = Map.of(
-                        "uuid", player.getUUID().toString(),
-                        "amount", totalAmount
-                );
-                PostResult result = post(url, token, payload);
-
-                if (result.code == 200) {
-                    player.server.execute(() -> {
-                        for (var entry : slotsByDenom.entrySet()) {
-                            for (int slot : entry.getValue()) {
-                                player.getInventory().setItem(slot, net.minecraft.world.item.ItemStack.EMPTY);
+        CurrencyApi.deposit(player.getUUID(), totalAmount)
+                .thenAccept(resp -> {
+                    if (resp.isSuccess()) {
+                        player.server.execute(() -> {
+                            for (var entry : slotsByDenom.entrySet()) {
+                                for (int slot : entry.getValue()) {
+                                    player.getInventory().setItem(slot, ItemStack.EMPTY);
+                                }
                             }
-                        }
-                        player.inventoryMenu.sendAllDataToRemote();
-                        sendResult(player, 1, "Deposited $" + totalAmount);
-                    });
-                    LOGGER.info("[ATM DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), totalAmount);
-                } else {
-                    sendResult(player, 2, extractApiMessage(result.body, "Deposit failed. Please try again."));
-                }
-            } catch (Exception e) {
-                sendResult(player, 2, "Something went wrong. Please try again.");
-            }
-        });
+                            player.inventoryMenu.sendAllDataToRemote();
+                            sendResult(player, 1, "Deposited $" + totalAmount);
+                        });
+                        LOGGER.info("[ATM DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), totalAmount);
+                    } else {
+                        sendResult(player, 2, errorText(resp, "Deposit failed. Please try again."));
+                    }
+                })
+                .exceptionally(ex -> {
+                    LOGGER.error("ATM deposit failed for {}: {}", player.getName().getString(), ex.getMessage());
+                    sendResult(player, 2, "Something went wrong. Please try again.");
+                    return null;
+                });
     }
 
-
     private static void handleWithdraw(final ATMWithdrawPayload pkt, final IPayloadContext ctx) {
-        var p = ctx.player();
-        if (!(p instanceof ServerPlayer player)) return;
-
-        java.util.function.BiConsumer<Integer,Integer> give = (denom, count) -> {
-            var item = switch (denom) {
-                case 1 -> CreateringtonCurrency.BILL_1.get();
-                case 5 -> CreateringtonCurrency.BILL_5.get();
-                case 10 -> CreateringtonCurrency.BILL_10.get();
-                case 20 -> CreateringtonCurrency.BILL_20.get();
-                case 50 -> CreateringtonCurrency.BILL_50.get();
-                case 100 -> CreateringtonCurrency.BILL_100.get();
-                case 500 -> CreateringtonCurrency.BILL_500.get();
-                case 1000 -> CreateringtonCurrency.BILL_1000.get();
-                default -> null;
-            };
-            if (item == null) return;
-            var stack = new net.minecraft.world.item.ItemStack(item, count);
-            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-        };
+        if (!(ctx.player() instanceof ServerPlayer player)) return;
 
         if (pkt.a() <= 0 || (pkt.mode() == 0 && pkt.b() <= 0)) {
             sendResult(player, 2, "Invalid amount.");
             return;
         }
 
-        MoneyCommands.EXECUTOR.submit(() -> {
-            try {
-                String token = MoneyCommands.getOrFetchToken(player);
-                URL url = URI.create(MoneyCommands.safeJoin(
-                        Config.API_BASE_URL.get(), Config.API_WITHDRAW_URL.get()
-                )).toURL();
+        if (pkt.mode() == 0) {
+            singleWithdraw(player, pkt.a(), pkt.b());
+            return;
+        }
 
-                if (pkt.mode() == 0) {
-                    var payload = Map.of(
-                            "uuid", player.getUUID().toString(),
-                            "denomination", pkt.a(),
-                            "count", pkt.b()
-                    );
-                    PostResult result = post(url, token, payload);
-                    if (result.code == 200) {
-                        give.accept(pkt.a(), pkt.b());
-                        long amount = (long) pkt.a() * pkt.b();
+        int total = pkt.a();
+        int[] denoms = CreateringtonCurrency.DENOMINATIONS;
+        Map<Integer, Integer> bundle = new LinkedHashMap<>();
+        for (int d : denoms) {
+            int cnt = total / d;
+            if (cnt > 0) {
+                bundle.put(d, cnt);
+                total -= d * cnt;
+            }
+        }
+        if (total != 0) {
+            sendResult(player, 2, "Cannot make exact change.");
+            return;
+        }
+        optimizedWithdraw(player, bundle, pkt.a());
+    }
+
+    private static void singleWithdraw(ServerPlayer player, int denomination, int count) {
+        CurrencyApi.withdraw(player.getUUID(), denomination, count)
+                .thenAccept(resp -> {
+                    if (resp.isSuccess()) {
+                        giveBill(player, denomination, count);
+                        long amount = (long) denomination * count;
                         sendResult(player, 1, "Withdrew $" + amount);
-                        LOGGER.info("[ATM WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), player.getUUID(), amount, pkt.b(), pkt.a());
+                        LOGGER.info("[ATM WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), player.getUUID(), amount, count, denomination);
                     } else {
-                        sendResult(player, 2, extractApiMessage(result.body, "Withdraw failed. Please try again."));
+                        sendResult(player, 2, errorText(resp, "Withdraw failed. Please try again."));
                     }
-                } else {
-                    int total = pkt.a();
-                    int[] denoms = CreateringtonCurrency.DENOMINATIONS;
-                    Map<Integer,Integer> bundle = new LinkedHashMap<>();
-                    for (int d : denoms) {
-                        int cnt = total / d;
-                        if (cnt > 0) { bundle.put(d, cnt); total -= d * cnt; }
-                    }
-                    if (total != 0) {
-                        sendResult(player, 2, "Cannot make exact change.");
-                        return;
-                    }
+                })
+                .exceptionally(ex -> {
+                    LOGGER.error("ATM withdraw failed for {}: {}", player.getName().getString(), ex.getMessage());
+                    sendResult(player, 2, "Something went wrong. Please try again.");
+                    return null;
+                });
+    }
 
-                    boolean ok = true;
-                    for (var e : bundle.entrySet()) {
-                        var payload = Map.of(
-                                "uuid", player.getUUID().toString(),
-                                "denomination", e.getKey(),
-                                "count", e.getValue()
-                        );
-                        PostResult result = post(url, token, payload);
-                        if (result.code == 200) {
-                            give.accept(e.getKey(), e.getValue());
-                        } else {
-                            ok = false;
-                            sendResult(player, 2, extractApiMessage(result.body, "Withdraw failed. Please try again."));
-                        }
+    private static void optimizedWithdraw(ServerPlayer player, Map<Integer, Integer> bundle, int totalRequested) {
+        var overall = java.util.concurrent.CompletableFuture.completedFuture(true);
+        var failed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
+            int denom = entry.getKey();
+            int count = entry.getValue();
+            overall = overall.thenCompose(prevOk -> {
+                if (failed.get()) return java.util.concurrent.CompletableFuture.completedFuture(false);
+                return CurrencyApi.withdraw(player.getUUID(), denom, count).thenApply(resp -> {
+                    if (resp.isSuccess()) {
+                        giveBill(player, denom, count);
+                        return true;
                     }
-                    if (ok) {
-                        sendResult(player, 1, "Withdrawal complete");
-                        LOGGER.info("[ATM WITHDRAW] {} ({}): ${} (optimized)", player.getName().getString(), player.getUUID(), pkt.a());
-                    }
-                }
-            } catch (Exception e) {
+                    failed.set(true);
+                    sendResult(player, 2, errorText(resp, "Withdraw failed. Please try again."));
+                    return false;
+                });
+            });
+        }
+        overall.whenComplete((ignored, ex) -> {
+            if (ex != null) {
+                LOGGER.error("ATM optimized withdraw failed for {}: {}", player.getName().getString(), ex.getMessage());
                 sendResult(player, 2, "Something went wrong. Please try again.");
+                return;
+            }
+            if (!failed.get()) {
+                sendResult(player, 1, "Withdrawal complete");
+                LOGGER.info("[ATM WITHDRAW] {} ({}): ${} (optimized)", player.getName().getString(), player.getUUID(), totalRequested);
             }
         });
     }
 
-
-    private record PostResult(int code, String body) {}
-
-    private static PostResult post(URL url, String bearer, Object payload) throws Exception {
-        var conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "Bearer " + bearer);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(Config.API_TIMEOUT_MS.get());
-            conn.setReadTimeout(Config.API_TIMEOUT_MS.get());
-
-            try (var os = conn.getOutputStream()) {
-                os.write(new Gson().toJson(payload).getBytes());
-            }
-
-            int code = conn.getResponseCode();
-            var is = (code == 200) ? conn.getInputStream() : conn.getErrorStream();
-            if (is == null) {
-                return new PostResult(code, "");
-            }
-            try (var br = new BufferedReader(new InputStreamReader(is))) {
-                var sb = new StringBuilder();
-                String line; while ((line = br.readLine()) != null) sb.append(line);
-                return new PostResult(code, sb.toString());
-            }
-        } finally {
-            conn.disconnect();
-        }
+    private static void giveBill(ServerPlayer player, int denom, int count) {
+        var item = switch (denom) {
+            case 1 -> CreateringtonCurrency.BILL_1.get();
+            case 5 -> CreateringtonCurrency.BILL_5.get();
+            case 10 -> CreateringtonCurrency.BILL_10.get();
+            case 20 -> CreateringtonCurrency.BILL_20.get();
+            case 50 -> CreateringtonCurrency.BILL_50.get();
+            case 100 -> CreateringtonCurrency.BILL_100.get();
+            case 500 -> CreateringtonCurrency.BILL_500.get();
+            case 1000 -> CreateringtonCurrency.BILL_1000.get();
+            default -> null;
+        };
+        if (item == null) return;
+        ItemStack stack = new ItemStack(item, count);
+        player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
     }
 
-    private static String extractApiMessage(String body, String fallback) {
-        try {
-            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
-            if (json.has("message")) return json.get("message").getAsString();
-            if (json.has("error")) return json.get("error").getAsString();
-        } catch (Exception ignored) {}
+    private static String errorText(com.saunhardy.crnet.http.ApiResponse<?> resp, String fallback) {
+        if (resp.getPlayerMessage() != null) return resp.getPlayerMessage();
+        if (resp.getMessage() != null) return resp.getMessage();
         return fallback;
+    }
+
+    // ---- Client-side handlers ---------------------------------------------
+
+    private static void handleBalanceClient(final ATMBalancePayload pkt, final IPayloadContext ctx) {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        mc.execute(() -> {
+            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
+                scr.updateBalance(pkt.balance());
+            }
+        });
+    }
+
+    private static void handleHistoryClient(final ATMHistoryPayload pkt, final IPayloadContext ctx) {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        mc.execute(() -> {
+            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
+                scr.updateHistory(pkt.page(), pkt.hasMore() == 1, pkt.data());
+            }
+        });
+    }
+
+    private static void handleResultClient(final ATMResultPayload pkt, final IPayloadContext ctx) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        mc.execute(() -> {
+            if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
+                int color = switch (pkt.kind()) {
+                    case 1 -> 0x2ECC71;
+                    case 2 -> 0xE74C3C;
+                    default -> 0xFFFFFF;
+                };
+                scr.showStatus(pkt.message(), color);
+            } else if (mc.player != null) {
+                mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal(pkt.message()), false);
+            }
+        });
+    }
+
+    private static void sendResult(ServerPlayer player, int kind, String msg) {
+        player.connection.send(new ClientboundCustomPayloadPacket(new ATMResultPayload(kind, msg)));
     }
 }
