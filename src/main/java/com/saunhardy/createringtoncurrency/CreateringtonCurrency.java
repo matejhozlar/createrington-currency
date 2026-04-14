@@ -1,6 +1,7 @@
 package com.saunhardy.createringtoncurrency;
 
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.createringtoncurrency.block.ATMBlock;
 import com.saunhardy.createringtoncurrency.block.DecorativeATMBlock;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
@@ -10,6 +11,7 @@ import com.saunhardy.createringtoncurrency.item.BankCardItem;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.flag.FeatureFlags;
@@ -166,6 +168,8 @@ public class CreateringtonCurrency {
         modEventBus.addListener(DataGenerators::gatherData);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+
+        NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> CurrencyApi.init());
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);
