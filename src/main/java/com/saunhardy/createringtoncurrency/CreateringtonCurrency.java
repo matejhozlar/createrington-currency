@@ -169,7 +169,12 @@ public class CreateringtonCurrency {
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
-        NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> CurrencyApi.init());
+        // Skip CRNet-backed API init in integrated singleplayer — the backend is only used in multiplayer.
+        NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> {
+            if (e.getServer().isDedicatedServer()) {
+                CurrencyApi.init();
+            }
+        });
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);

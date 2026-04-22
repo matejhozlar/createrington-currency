@@ -54,45 +54,60 @@ public final class CurrencyApi {
     // ---- Currency endpoints ------------------------------------------------
 
     public static CompletableFuture<ApiResponse<BalanceResponse>> balance(UUID playerUuid) {
-        return client().get(Endpoints.CURRENCY_BALANCE, BalanceResponse.class, playerUuid);
+        CRNetClient c = client;
+        return c == null ? unavailable() : c.get(Endpoints.CURRENCY_BALANCE, BalanceResponse.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<PayResponse>> pay(UUID fromUuid, String toUuid, double amount) {
+        CRNetClient c = client;
+        if (c == null) return unavailable();
         PayRequest req = new PayRequest(toUuid, amount, null);
-        return client().post(Endpoints.CURRENCY_PAY, GSON.toJson(req), PayResponse.class, fromUuid);
+        return c.post(Endpoints.CURRENCY_PAY, GSON.toJson(req), PayResponse.class, fromUuid);
     }
 
     public static CompletableFuture<ApiResponse<DepositResponse>> deposit(UUID playerUuid, double amount) {
+        CRNetClient c = client;
+        if (c == null) return unavailable();
         DepositRequest req = new DepositRequest(amount, null);
-        return client().post(Endpoints.CURRENCY_DEPOSIT, GSON.toJson(req), DepositResponse.class, playerUuid);
+        return c.post(Endpoints.CURRENCY_DEPOSIT, GSON.toJson(req), DepositResponse.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<WithdrawResponse>> withdraw(UUID playerUuid, double denomination, int count) {
+        CRNetClient c = client;
+        if (c == null) return unavailable();
         WithdrawRequest req = new WithdrawRequest(denomination, count);
-        return client().post(Endpoints.CURRENCY_WITHDRAW, GSON.toJson(req), WithdrawResponse.class, playerUuid);
+        return c.post(Endpoints.CURRENCY_WITHDRAW, GSON.toJson(req), WithdrawResponse.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<List<TopEntry>>> top(UUID playerUuid) {
-        return client().getList(Endpoints.CURRENCY_TOP, TopEntry.class, playerUuid);
+        CRNetClient c = client;
+        return c == null ? unavailable() : c.getList(Endpoints.CURRENCY_TOP, TopEntry.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<DailyResponse>> daily(UUID playerUuid) {
-        return client().post(Endpoints.CURRENCY_DAILY, "{}", DailyResponse.class, playerUuid);
+        CRNetClient c = client;
+        return c == null ? unavailable() : c.post(Endpoints.CURRENCY_DAILY, "{}", DailyResponse.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<HistoryResponse>> history(UUID playerUuid, int page, int limit) {
+        CRNetClient c = client;
+        if (c == null) return unavailable();
         String path = Endpoints.CURRENCY_HISTORY + "?page=" + page + "&limit=" + limit;
-        return client().get(path, HistoryResponse.class, playerUuid);
+        return c.get(path, HistoryResponse.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<LotteryStartResponse>> lotteryStart(UUID playerUuid, double amount) {
+        CRNetClient c = client;
+        if (c == null) return unavailable();
         LotteryStartRequest req = new LotteryStartRequest(amount);
-        return client().post(Endpoints.CURRENCY_LOTTERY_START, GSON.toJson(req), LotteryStartResponse.class, playerUuid);
+        return c.post(Endpoints.CURRENCY_LOTTERY_START, GSON.toJson(req), LotteryStartResponse.class, playerUuid);
     }
 
     public static CompletableFuture<ApiResponse<LotteryJoinResponse>> lotteryJoin(UUID playerUuid, double amount) {
+        CRNetClient c = client;
+        if (c == null) return unavailable();
         LotteryJoinRequest req = new LotteryJoinRequest(amount);
-        return client().post(Endpoints.CURRENCY_LOTTERY_JOIN, GSON.toJson(req), LotteryJoinResponse.class, playerUuid);
+        return c.post(Endpoints.CURRENCY_LOTTERY_JOIN, GSON.toJson(req), LotteryJoinResponse.class, playerUuid);
     }
 
     // ---- Trains ------------------------------------------------------------
@@ -102,17 +117,20 @@ public final class CurrencyApi {
      * UUID for auth. Pick any valid online player UUID (driver if available).
      */
     public static CompletableFuture<ApiResponse<Void>> trainCrash(UUID authUuid, CrashRequest req) {
-        return client().postAsync(Endpoints.TRAINS_CRASH, GSON.toJson(req), authUuid);
+        CRNetClient c = client;
+        return c == null ? unavailable() : c.postAsync(Endpoints.TRAINS_CRASH, GSON.toJson(req), authUuid);
     }
 
     // ---- Internals ---------------------------------------------------------
 
-    private static CRNetClient client() {
-        CRNetClient c = client;
-        if (c == null) {
-            throw new IllegalStateException("CurrencyApi.init() has not been called");
-        }
-        return c;
+    /**
+     * Returns a failed future when the API is unavailable (e.g. integrated singleplayer,
+     * where {@link #init()} is intentionally skipped). Callers' existing async error
+     * handling (exceptionally / try-join-catch) absorbs it as a normal call failure.
+     */
+    private static <T> CompletableFuture<ApiResponse<T>> unavailable() {
+        return CompletableFuture.failedFuture(
+                new IllegalStateException("CurrencyApi unavailable — backend not initialised in this session"));
     }
 
     private static String stripTrailingSlash(String url) {
