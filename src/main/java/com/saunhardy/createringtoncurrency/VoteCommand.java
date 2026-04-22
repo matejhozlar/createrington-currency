@@ -1,5 +1,6 @@
 package com.saunhardy.createringtoncurrency;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.logging.LogUtils;
 import net.minecraft.ChatFormatting;
@@ -30,20 +31,26 @@ public class VoteCommand {
     private static final Set<String> WEATHER_TYPES = Set.of("clear", "rain", "thunder");
     private static final Set<String> TIME_TYPES = Set.of("day", "night");
 
+    private static final int MINECRAFT_DAY_TICKS = 24000;
+    private static final int DEFAULT_WEATHER_TICKS = 6000;
+    private static final int MAX_WEATHER_DAYS = 7;
+
     private static volatile ActiveVote activeVote = null;
     private static long weatherCooldownUntil = 0L;
     private static long timeCooldownUntil = 0L;
 
     private static class ActiveVote {
         final String type;
+        final int durationDays; // -1 when unspecified (non-weather or default)
         final UUID initiator;
         final String initiatorName;
         final Set<UUID> yesVotes = ConcurrentHashMap.newKeySet();
         final Set<UUID> noVotes = ConcurrentHashMap.newKeySet();
         int ticksRemaining;
 
-        ActiveVote(String type, UUID initiator, String initiatorName) {
+        ActiveVote(String type, int durationDays, UUID initiator, String initiatorName) {
             this.type = type;
+            this.durationDays = durationDays;
             this.initiator = initiator;
             this.initiatorName = initiatorName;
             this.ticksRemaining = VOTE_DURATION_TICKS;
@@ -69,15 +76,29 @@ public class VoteCommand {
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
                                     String type = StringArgumentType.getString(context, "type").toLowerCase();
-                                    return startVote(player, type);
+                                    return startVote(player, type, -1);
                                 })
+                                .then(Commands.argument("days", IntegerArgumentType.integer(1, MAX_WEATHER_DAYS))
+                                        .executes(context -> {
+                                            ServerPlayer player = context.getSource().getPlayerOrException();
+                                            String type = StringArgumentType.getString(context, "type").toLowerCase();
+                                            int days = IntegerArgumentType.getInteger(context, "days");
+                                            return startVote(player, type, days);
+                                        })
+                                )
                         )
         );
     }
 
-    private static int startVote(ServerPlayer player, String type) {
+    private static int startVote(ServerPlayer player, String type, int durationDays) {
         if (!VOTE_TYPES.contains(type)) {
             player.sendSystemMessage(Component.literal("❌ Invalid vote type. Use: " + String.join(", ", VOTE_TYPES))
+                    .withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
+        if (durationDays > 0 && !WEATHER_TYPES.contains(type)) {
+            player.sendSystemMessage(Component.literal("❌ Duration only applies to weather votes (clear, rain, thunder).")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -104,17 +125,18 @@ public class VoteCommand {
         if (server.getPlayerList().getPlayers().size() <= 1) {
             player.sendSystemMessage(Component.literal("✅ Vote passed!")
                     .withStyle(ChatFormatting.GREEN));
-            applyVote(type, server);
+            applyVote(type, durationDays, server);
             setCooldown(type, COOLDOWN_SUCCESS_MS);
             return 1;
         }
 
         // Start the vote
-        activeVote = new ActiveVote(type, player.getUUID(), player.getName().getString());
-        LOGGER.info("Vote started by {} for '{}'", player.getName().getString(), type);
+        activeVote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString());
+        LOGGER.info("Vote started by {} for '{}'{}", player.getName().getString(), type,
+                durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "");
 
         // Broadcast to all players
-        broadcastVoteStart(server, player.getName().getString(), type);
+        broadcastVoteStart(server, player.getName().getString(), type, durationDays);
 
         return 1;
     }
@@ -188,7 +210,7 @@ public class VoteCommand {
         setCooldown(vote.type, passed ? COOLDOWN_SUCCESS_MS : COOLDOWN_FAIL_MS);
 
         if (passed) {
-            applyVote(vote.type, server);
+            applyVote(vote.type, vote.durationDays, server);
         }
 
         LOGGER.info("Vote for '{}' by {} {} ({} yes, {} no)",
@@ -204,21 +226,19 @@ public class VoteCommand {
         }
     }
 
-    private static void applyVote(String type, MinecraftServer server) {
+    private static void applyVote(String type, int durationDays, MinecraftServer server) {
         ServerLevel overworld = server.overworld();
+        int ticks = durationDays > 0 ? durationDays * MINECRAFT_DAY_TICKS : DEFAULT_WEATHER_TICKS;
         switch (type) {
-            case "day" -> {
-                overworld.setDayTime(1000); // morning
-                overworld.setWeatherParameters(6000, 0, false, false); // clear weather
-            }
+            case "day" -> overworld.setDayTime(1000); // morning
             case "night" -> overworld.setDayTime(13000); // night
-            case "clear" -> overworld.setWeatherParameters(6000, 0, false, false);
-            case "rain" -> overworld.setWeatherParameters(0, 6000, true, false);
-            case "thunder" -> overworld.setWeatherParameters(0, 6000, true, true);
+            case "clear" -> overworld.setWeatherParameters(ticks, 0, false, false);
+            case "rain" -> overworld.setWeatherParameters(0, ticks, true, false);
+            case "thunder" -> overworld.setWeatherParameters(0, ticks, true, true);
         }
     }
 
-    private static void broadcastVoteStart(MinecraftServer server, String playerName, String type) {
+    private static void broadcastVoteStart(MinecraftServer server, String playerName, String type, int durationDays) {
         MutableComponent header = Component.literal("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 .withStyle(ChatFormatting.GOLD);
 
@@ -226,8 +246,13 @@ public class VoteCommand {
                 .withStyle(ChatFormatting.GOLD)
                 .append(Component.literal(playerName).withStyle(ChatFormatting.WHITE))
                 .append(Component.literal(" started a vote to set ").withStyle(ChatFormatting.GOLD))
-                .append(Component.literal(type).withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD))
-                .append(Component.literal("!").withStyle(ChatFormatting.GOLD));
+                .append(Component.literal(type).withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+        if (durationDays > 0) {
+            body.append(Component.literal(" for ").withStyle(ChatFormatting.GOLD))
+                    .append(Component.literal(durationDays + " day" + (durationDays == 1 ? "" : "s"))
+                            .withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+        }
+        body.append(Component.literal("!").withStyle(ChatFormatting.GOLD));
 
         MutableComponent buttons = Component.literal("   ")
                 .append(clickableButton("[ ✔ YES ]", "/vote yes", ChatFormatting.GREEN))
