@@ -1,7 +1,8 @@
-## Version 1.4.0
+## Version 1.5.0
 
 ### Changed
-- All backend communication now goes through the CRNet client library, improving reliability, token management, and error handling across all economy commands, ATM operations, and train crash reports.
-- Player-facing messages (such as balance responses and daily cooldown notices) now use the formatted text provided by the backend server when available, giving server operators more control over display strings.
-- Configuration file restructured into sections (`general`, `api`, `mobDrops`, `lottery`, `integrations`). Existing `createringtoncurrency-common.toml` files will be regenerated with defaults on first launch — review and re-apply any customized values after upgrading.
-- Individual per-endpoint API URL settings have been consolidated into a single `apiBaseUrl` option. Update your config to use the new field instead of the old per-endpoint URLs.
+- Weather votes (`/vote clear`, `/vote rain`, `/vote thunder`) now accept an optional duration of 1–7 Minecraft days. Omitting the duration preserves the previous behavior (roughly 6000 ticks).
+- `/vote day` no longer forces clear weather when advancing time to morning — existing rain or storms are now left untouched.
+
+### Fixed
+- Fixed currency features (ATM, stock ticker integration, train crash payouts) crashing instead of failing gracefully when used in integrated singleplayer where the backend API is unavailable.
