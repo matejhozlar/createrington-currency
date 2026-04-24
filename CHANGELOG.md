@@ -1,8 +1,7 @@
-## Version 1.5.0
+## Version 1.6.0
+
+### Added
+- New `jwtSecret` config option (in `createringtoncurrency-common.toml`) for signing backend authentication tokens. Server operators upgrading from 1.5.0 must set this value to match the backend's configured secret; leaving it at the default will cause all currency API calls to be rejected with a 401 error.
 
 ### Changed
-- Weather votes (`/vote clear`, `/vote rain`, `/vote thunder`) now accept an optional duration of 1–7 Minecraft days. Omitting the duration preserves the previous behavior (roughly 6000 ticks).
-- `/vote day` no longer forces clear weather when advancing time to morning — existing rain or storms are now left untouched.
-
-### Fixed
-- Fixed currency features (ATM, stock ticker integration, train crash payouts) crashing instead of failing gracefully when used in integrated singleplayer where the backend API is unavailable.
+- Authentication with the currency backend no longer performs a separate login request. The mod now issues self-signed short-lived tokens locally, reducing network overhead and aligning with how other Createrington services authenticate.
