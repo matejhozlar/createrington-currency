@@ -1,6 +1,7 @@
 package com.saunhardy.createringtoncurrency.api;
 
 import com.google.gson.Gson;
+import com.mojang.authlib.GameProfile;
 import com.saunhardy.createrington.api.Endpoints;
 import com.saunhardy.createrington.api.currency.BalanceResponse;
 import com.saunhardy.createrington.api.currency.DailyResponse;
@@ -21,19 +22,27 @@ import com.saunhardy.crnet.CRNetClient;
 import com.saunhardy.crnet.auth.AuthStrategy;
 import com.saunhardy.crnet.http.ApiResponse;
 import com.saunhardy.createringtoncurrency.Config;
+import net.minecraft.server.MinecraftServer;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * Single point of contact for every backend HTTP call the mod makes.
  *
- * CRNet owns the transport, JSON, envelope parsing, and the mod-JWT
- * lifecycle (via {@code /api/currency/login}). Typed request/response
- * records come from the bundled {@code createrington-api} library.
+ * CRNet owns the transport, JSON, and envelope parsing. Mod JWTs are
+ * self-signed locally using the shared {@code jwtSecret} from {@link Config}
+ * and carry an {@code aud} claim of {@code "createrington.mod"} plus per-player
+ * {@code uuid}/{@code name} claims so the backend's mod JWT middleware can
+ * identify the acting player. Typed request/response records come from the
+ * bundled {@code createrington-api} library.
  */
 public final class CurrencyApi {
+    private static final String MOD_AUDIENCE = "createrington.mod";
+    private static final int MOD_TOKEN_TTL_SECONDS = 60;
+
     private static final Gson GSON = new Gson();
     private static volatile CRNetClient client;
 
@@ -41,13 +50,22 @@ public final class CurrencyApi {
 
     /**
      * Builds the shared client from the current {@link Config}. Must be
-     * called after the config is loaded (e.g. on server-starting).
+     * called after the config is loaded (e.g. on server-starting). The
+     * server is retained only to resolve player names from the profile
+     * cache when signing per-player JWTs.
      */
-    public static void init() {
+    public static void init(MinecraftServer server) {
         String baseUrl = stripTrailingSlash(Config.API_BASE_URL.get());
+        Function<UUID, String> nameResolver = uuid -> server.getProfileCache() == null
+                ? null
+                : server.getProfileCache().get(uuid).map(GameProfile::getName).orElse(null);
         client = new CRNetClient.Builder()
                 .baseUrl(baseUrl)
-                .auth(AuthStrategy.loginEndpoint(Endpoints.CURRENCY_LOGIN))
+                .auth(AuthStrategy.selfSignedJwt(
+                        Config.JWT_SECRET.get(),
+                        MOD_TOKEN_TTL_SECONDS,
+                        MOD_AUDIENCE,
+                        nameResolver))
                 .build();
     }
 
@@ -61,7 +79,7 @@ public final class CurrencyApi {
     public static CompletableFuture<ApiResponse<PayResponse>> pay(UUID fromUuid, String toUuid, double amount) {
         CRNetClient c = client;
         if (c == null) return unavailable();
-        PayRequest req = new PayRequest(toUuid, amount, null);
+        PayRequest req = new PayRequest(toUuid, amount);
         return c.post(Endpoints.CURRENCY_PAY, GSON.toJson(req), PayResponse.class, fromUuid);
     }
 
