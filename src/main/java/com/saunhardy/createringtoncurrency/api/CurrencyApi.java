@@ -143,8 +143,8 @@ public final class CurrencyApi {
 
     /**
      * Returns a failed future when the API is unavailable (e.g. integrated singleplayer,
-     * where {@link #init()} is intentionally skipped). Callers' existing async error
-     * handling (exceptionally / try-join-catch) absorbs it as a normal call failure.
+     * where {@link #init(MinecraftServer)} is intentionally skipped). Callers' existing async
+     * error handling (exceptionally / try-join-catch) absorbs it as a normal call failure.
      */
     private static <T> CompletableFuture<ApiResponse<T>> unavailable() {
         return CompletableFuture.failedFuture(
