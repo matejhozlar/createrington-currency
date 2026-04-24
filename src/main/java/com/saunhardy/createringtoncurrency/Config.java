@@ -45,7 +45,7 @@ public class Config {
 
         JWT_SECRET = BUILDER
                 .comment("Shared HMAC secret used to sign short-lived mod JWTs. Must match the backend's auth secret. Requires server restart to take effect.")
-                .define("jwtSecret", "your-secret-key-change-this");
+                .define("jwtSecret", "CHANGE-ME-must-be-at-least-32-chars");
 
         BUILDER.pop();
 
