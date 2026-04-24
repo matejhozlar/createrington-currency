@@ -172,7 +172,7 @@ public class CreateringtonCurrency {
         // Skip CRNet-backed API init in integrated singleplayer — the backend is only used in multiplayer.
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> {
             if (e.getServer().isDedicatedServer()) {
-                CurrencyApi.init();
+                CurrencyApi.init(e.getServer());
             }
         });
 

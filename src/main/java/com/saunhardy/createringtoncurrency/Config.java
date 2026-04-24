@@ -10,6 +10,7 @@ public class Config {
     public static final ModConfigSpec.ConfigValue<Long> COMMAND_COOLDOWN_MS;
 
     public static final ModConfigSpec.ConfigValue<String> API_BASE_URL;
+    public static final ModConfigSpec.ConfigValue<String> JWT_SECRET;
 
     public static final ModConfigSpec.IntValue MOB_DAILY_LIMIT;
     public static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP;
@@ -41,6 +42,10 @@ public class Config {
         API_BASE_URL = BUILDER
                 .comment("Base URL for the Createrington backend, eg. 'http://127.0.0.1:5000'")
                 .define("apiBaseUrl", "http://127.0.0.1:5000");
+
+        JWT_SECRET = BUILDER
+                .comment("Shared HMAC secret used to sign short-lived mod JWTs. Must match the backend's auth secret. Requires server restart to take effect.")
+                .define("jwtSecret", "your-secret-key-change-this");
 
         BUILDER.pop();
 
