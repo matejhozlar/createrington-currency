@@ -2,7 +2,9 @@ import express from "express";
 import jwt from "jsonwebtoken";
 
 const app = express();
-const PORT = 5000;
+// Must match the mod's `apiBaseUrl` in createringtoncurrency-common.toml
+// (default: http://127.0.0.1:5000). Override with the PORT env var if needed.
+const PORT = Number(process.env.PORT) || 5000;
 const JWT_SECRET = "CHANGE-ME-must-be-at-least-32-chars"; // Must match mod config
 const MOD_AUDIENCE = "createrington.mod";
 
@@ -316,13 +318,21 @@ app.post("/api/currency/lottery/join", verifyJWT, (req, res) => {
 // ---- Trains endpoint -------------------------------------------------------
 
 // POST /api/trains/crash
+// Body: CrashRequest { trainId, trainName, speed?, carriageCount?, position?,
+//                      dimension?, timestamp?, owner?, driverUuid?, passengers?,
+//                      backwardsDriver? }
 app.post("/api/trains/crash", verifyJWT, (req, res) => {
-  const { trainId, location, speed, reason } = req.body || {};
+  const b = req.body || {};
   console.log("\n=== Train Crash Report ===");
-  console.log(`Train ID: ${trainId ?? "unknown"}`);
-  console.log(`Location: ${location ? JSON.stringify(location) : "unknown"}`);
-  console.log(`Speed: ${speed ?? "unknown"}`);
-  console.log(`Reason: ${reason ?? "unknown"}`);
+  console.log(`Train ID:   ${b.trainId ?? "unknown"}`);
+  console.log(`Train name: ${b.trainName ?? "unknown"}`);
+  console.log(`Speed:      ${b.speed ?? "unknown"}`);
+  console.log(`Carriages:  ${b.carriageCount ?? "unknown"}`);
+  console.log(`Position:   ${b.position ? JSON.stringify(b.position) : "unknown"}`);
+  console.log(`Dimension:  ${b.dimension ?? "unknown"}`);
+  console.log(`Owner:      ${b.owner ?? "unknown"}`);
+  console.log(`Driver:     ${b.driverUuid ?? "unknown"}`);
+  console.log(`Passengers: ${Array.isArray(b.passengers) ? b.passengers.length : 0}`);
   console.log("==========================\n");
   res.json({ success: true, message: "Crash reported" });
 });
