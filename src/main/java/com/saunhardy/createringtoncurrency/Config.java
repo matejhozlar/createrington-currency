@@ -7,7 +7,7 @@ public class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue DISABLE_CASH_COMMANDS;
-    public static final ModConfigSpec.ConfigValue<Long> COMMAND_COOLDOWN_MS;
+    public static final ModConfigSpec.IntValue COMMAND_COOLDOWN_MS;
 
     public static final ModConfigSpec.ConfigValue<String> API_BASE_URL;
     public static final ModConfigSpec.ConfigValue<String> JWT_SECRET;
@@ -33,7 +33,7 @@ public class Config {
 
         COMMAND_COOLDOWN_MS = BUILDER
                 .comment("Global cooldown for all currency commands in milliseconds")
-                .define("commandCooldownMs", 5000L);
+                .defineInRange("commandCooldownMs", 5000, 0, Integer.MAX_VALUE);
 
         BUILDER.pop();
 
