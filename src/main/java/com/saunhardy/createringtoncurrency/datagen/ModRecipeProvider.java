@@ -37,16 +37,5 @@ public class ModRecipeProvider extends RecipeProvider{
                 .define('I', Items.IRON_INGOT)
                 .unlockedBy("has_button", has(Items.STONE_BUTTON))
                 .save(out);
-
-        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, CreateringtonCurrency.ATM_ITEM.get())
-                .pattern("ICI")
-                .pattern("CBC")
-                .pattern("IKI")
-                .define('I', Items.IRON_BLOCK)
-                .define('C', CreateringtonCurrency.CIRCUIT_BOARD.get())
-                .define('B', Items.CHEST)
-                .define('K', CreateringtonCurrency.KEYPAD.get())
-                .unlockedBy("has_circuit_board", has(CreateringtonCurrency.CIRCUIT_BOARD.get()))
-                .save(out);
     }
 }

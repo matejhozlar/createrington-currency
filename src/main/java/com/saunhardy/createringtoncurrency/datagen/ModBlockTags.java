@@ -4,8 +4,10 @@ import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.data.BlockTagsProvider;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
@@ -19,8 +21,11 @@ public class ModBlockTags extends BlockTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.@NotNull Provider provider) {
-        tag(BlockTags.MINEABLE_WITH_PICKAXE).add(CreateringtonCurrency.ATM_BLOCK.get());
-        tag(BlockTags.NEEDS_IRON_TOOL).add(CreateringtonCurrency.ATM_BLOCK.get());
+        Block[] atms = CreateringtonCurrency.DECORATIVE_ATMS.stream()
+                .map(DeferredBlock::get)
+                .toArray(Block[]::new);
+        tag(BlockTags.MINEABLE_WITH_PICKAXE).add(atms);
+        tag(BlockTags.NEEDS_IRON_TOOL).add(atms);
     }
 
     @Override

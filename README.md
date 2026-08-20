@@ -63,7 +63,7 @@ All planned features have been implemented and the mod is stable for production 
 All commands enforce a global cooldown, configurable via `commandCooldownMs`. If a player executes a command too quickly, they will see a cooldown message.
 
 ### ATM Block & GUI
-- **Interactive ATM:** A new block called the ATM can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
+- **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
 - **PIN & authentication:** The GUI guides players through a simple login flow; once authenticated it displays their balance, deposit buttons and withdraw options. The screen class organises the UI into views for deposit, withdraw total, withdraw single bills and withdraw bundles.
 - **Bundled withdrawals:** Players can specify denominations and counts for withdrawal, or enter a lump sum to automatically get the best combination of bills.
 - **Feedback:** After each deposit or withdrawal the server sends a success or error payload so the screen can display a coloured status message.
