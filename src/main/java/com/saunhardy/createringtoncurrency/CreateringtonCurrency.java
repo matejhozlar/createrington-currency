@@ -36,6 +36,8 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.slf4j.Logger;
 
+import java.util.List;
+
 @Mod(CreateringtonCurrency.MODID)
 public class CreateringtonCurrency {
     public static final String MODID = "createringtoncurrency";
@@ -108,6 +110,11 @@ public class CreateringtonCurrency {
     public static final DeferredItem<BlockItem> ATM_PINK_ITEM =
             ITEMS.register("atm_pink", () -> new BlockItem(ATM_PINK_BLOCK.get(), new Item.Properties()));
 
+    /** Every decorative ATM, in creative-tab and block-tag order. */
+    public static final List<DeferredBlock<DecorativeATMBlock>> DECORATIVE_ATMS = List.of(
+            ATM_BLUE_BLOCK, ATM_GREEN_BLOCK, ATM_PURPLE_BLOCK, ATM_BLACK_BLOCK,
+            ATM_BRASS_BLOCK, ATM_ANDESITE_BLOCK, ATM_RED_BLOCK, ATM_PINK_BLOCK);
+
     public static final DeferredHolder<MenuType<?>, MenuType<ATMMenu>> ATM_MENU =
             MENUS.register("atm", () -> new MenuType<>(ATMMenu::new, FeatureFlags.VANILLA_SET));
 
@@ -119,14 +126,7 @@ public class CreateringtonCurrency {
                     .title(Component.translatable("itemGroup.createringtoncurrency"))
                     .icon(() -> MOD_ICON.get().getDefaultInstance())
                     .displayItems((params, out) -> {
-                        out.accept(ATM_BLUE_ITEM.get());
-                        out.accept(ATM_GREEN_ITEM.get());
-                        out.accept(ATM_PURPLE_ITEM.get());
-                        out.accept(ATM_BLACK_ITEM.get());
-                        out.accept(ATM_BRASS_ITEM.get());
-                        out.accept(ATM_ANDESITE_ITEM.get());
-                        out.accept(ATM_RED_ITEM.get());
-                        out.accept(ATM_PINK_ITEM.get());
+                        DECORATIVE_ATMS.forEach(atm -> out.accept(atm.get()));
                         out.accept(BILL_1.get());
                         out.accept(BILL_5.get());
                         out.accept(BILL_10.get());
