@@ -2,7 +2,6 @@ package com.saunhardy.createringtoncurrency;
 
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
-import com.saunhardy.createringtoncurrency.block.ATMBlock;
 import com.saunhardy.createringtoncurrency.block.DecorativeATMBlock;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
 import com.saunhardy.createringtoncurrency.datagen.DataGenerators;
@@ -62,16 +61,6 @@ public class CreateringtonCurrency {
     public static final DeferredItem<Item> CIRCUIT_BOARD = ITEMS.register("circuit_board", () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> KEYPAD = ITEMS.register("keypad", () -> new Item(new Item.Properties().stacksTo(64)));
 
-    public static final DeferredBlock<ATMBlock> ATM_BLOCK = BLOCKS.register("atm", () ->
-            new ATMBlock(BlockBehaviour.Properties.of()
-                    .strength(2.0F, 6.0F)
-                    .sound(SoundType.METAL)
-                    .requiresCorrectToolForDrops()
-            )
-    );
-    public static final DeferredItem<BlockItem> ATM_ITEM =
-            ITEMS.register("atm", () -> new BlockItem(ATM_BLOCK.get(), new Item.Properties()));
-
     private static final BlockBehaviour.Properties DECORATIVE_ATM_PROPS = BlockBehaviour.Properties.of()
             .strength(2.0F, 6.0F)
             .sound(SoundType.METAL)
@@ -130,7 +119,6 @@ public class CreateringtonCurrency {
                     .title(Component.translatable("itemGroup.createringtoncurrency"))
                     .icon(() -> MOD_ICON.get().getDefaultInstance())
                     .displayItems((params, out) -> {
-                        out.accept(ATM_ITEM.get());
                         out.accept(ATM_BLUE_ITEM.get());
                         out.accept(ATM_GREEN_ITEM.get());
                         out.accept(ATM_PURPLE_ITEM.get());
