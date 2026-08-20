@@ -1,4 +1,4 @@
-## Version 1.7.0
+## Version 1.8.0
 
-### Fixed
-- Fixed the config file being continuously rewritten on every server tick, which spammed the log with correction messages and caused excessive disk IO.
+### Removed
+- Removed the original base ATM block. The eight decorative ATM variants replace it; any previously placed base ATM blocks will be lost when loading existing worlds.
