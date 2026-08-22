@@ -85,6 +85,15 @@ config="createringtoncurrency.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# CRNet - required library providing the backend HTTP client, JWT auth, and shared request queue
+[[dependencies.${mod_id}]]
+    modId="crnet"
+    type="required"
+    reason="Every backend call this mod makes is routed through CRNet's HTTP client and JWT authentication."
+    versionRange="${crnet_version_range}"
+    ordering="AFTER"
+    side="BOTH"
+
 # Create mod - optional dependency
 [[dependencies.${mod_id}]]
     modId="create"
