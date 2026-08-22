@@ -111,7 +111,7 @@ dependencies {
     implementation "com.google.code.gson:gson:2.10.1"
 
     // CRNet -- HTTP client + auth + bundled createrington-api types
-    implementation 'com.saunhardy:crnet:3.0.0'
+    implementation "com.saunhardy:crnet:${crnet_version}"
 
     // Create mod - optional dependency
     compileOnly "com.simibubi.create:create-${minecraft_version}:${create_version}:slim"
@@ -166,6 +166,8 @@ tasks.withType(ProcessResources).configureEach {
             mod_description        : mod_description,
             create_version         : create_version,
             create_version_range   : create_version_range,
+            crnet_version          : crnet_version,
+            crnet_version_range    : crnet_version_range,
     ]
     inputs.properties replaceProperties
 
