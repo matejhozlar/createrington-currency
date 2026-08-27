@@ -28,6 +28,9 @@ public class Config {
 
     public static final ModConfigSpec.BooleanValue TRAIN_CRASH_REPORTING_ENABLED;
 
+    public static final ModConfigSpec.IntValue DEPOSITOR_PULSE_TICKS;
+    public static final ModConfigSpec.IntValue DEPOSITOR_MAX_PRICE;
+
     public static final ModConfigSpec SPEC;
 
     static {
@@ -116,6 +119,18 @@ public class Config {
         TRAIN_CRASH_REPORTING_ENABLED = BUILDER
                 .comment("Enable reporting Create train crashes to the API (requires Create mod)")
                 .define("trainCrashReportingEnabled", true);
+
+        BUILDER.pop();
+
+        BUILDER.comment("Depositor terminal settings").push("depositor");
+
+        DEPOSITOR_PULSE_TICKS = BUILDER
+                .comment("How long a depositor terminal stays powered after a successful payment, in ticks (20 = 1 second)")
+                .defineInRange("depositorPulseTicks", 20, 1, 1200);
+
+        DEPOSITOR_MAX_PRICE = BUILDER
+                .comment("Highest price an owner can set on a depositor terminal")
+                .defineInRange("depositorMaxPrice", 1000000, 1, Integer.MAX_VALUE);
 
         BUILDER.pop();
 

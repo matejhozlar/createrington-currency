@@ -3,13 +3,17 @@ package com.saunhardy.createringtoncurrency;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.createringtoncurrency.block.DecorativeATMBlock;
+import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlock;
+import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlockEntity;
 import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
 import com.saunhardy.createringtoncurrency.datagen.DataGenerators;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
 import com.saunhardy.createringtoncurrency.item.BankCardItem;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
+import com.saunhardy.createringtoncurrency.menu.DepositorMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
+import com.saunhardy.createringtoncurrency.network.DepositorNetworking;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -19,6 +23,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.neoforged.api.distmarker.Dist;
@@ -29,7 +34,10 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -50,6 +58,8 @@ public class CreateringtonCurrency {
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
     public static final DeferredRegister<MenuType<?>> MENUS =
             DeferredRegister.create(Registries.MENU, MODID);
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MODID);
 
     public static final DeferredItem<Item> BILL_1    = ITEMS.register("bill_1",    () -> new Item(new Item.Properties().stacksTo(64)));
     public static final DeferredItem<Item> BILL_5    = ITEMS.register("bill_5",    () -> new Item(new Item.Properties().stacksTo(64)));
@@ -115,8 +125,22 @@ public class CreateringtonCurrency {
             ATM_BLUE_BLOCK, ATM_GREEN_BLOCK, ATM_PURPLE_BLOCK, ATM_BLACK_BLOCK,
             ATM_BRASS_BLOCK, ATM_ANDESITE_BLOCK, ATM_RED_BLOCK, ATM_PINK_BLOCK);
 
+    public static final DeferredBlock<DepositorTerminalBlock> DEPOSITOR_TERMINAL_BLOCK = BLOCKS.register("depositor_terminal", () ->
+            new DepositorTerminalBlock(BlockBehaviour.Properties.of()
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion()));
+    public static final DeferredItem<BlockItem> DEPOSITOR_TERMINAL_ITEM =
+            ITEMS.register("depositor_terminal", () -> new BlockItem(DEPOSITOR_TERMINAL_BLOCK.get(), new Item.Properties()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DepositorTerminalBlockEntity>> DEPOSITOR_TERMINAL_BLOCK_ENTITY =
+            BLOCK_ENTITIES.register("depositor_terminal", () ->
+                    BlockEntityType.Builder.of(DepositorTerminalBlockEntity::new, DEPOSITOR_TERMINAL_BLOCK.get()).build(null));
+
     public static final DeferredHolder<MenuType<?>, MenuType<ATMMenu>> ATM_MENU =
             MENUS.register("atm", () -> new MenuType<>(ATMMenu::new, FeatureFlags.VANILLA_SET));
+    public static final DeferredHolder<MenuType<?>, MenuType<DepositorMenu>> DEPOSITOR_MENU =
+            MENUS.register("depositor_terminal", () -> IMenuTypeExtension.create(DepositorMenu::fromBuf));
 
     public static final DeferredItem<Item> MOD_ICON =
             ITEMS.register("mod_icon", () -> new Item(new Item.Properties()));
@@ -127,6 +151,7 @@ public class CreateringtonCurrency {
                     .icon(() -> MOD_ICON.get().getDefaultInstance())
                     .displayItems((params, out) -> {
                         DECORATIVE_ATMS.forEach(atm -> out.accept(atm.get()));
+                        out.accept(DEPOSITOR_TERMINAL_BLOCK.get());
                         out.accept(BILL_1.get());
                         out.accept(BILL_5.get());
                         out.accept(BILL_10.get());
@@ -148,11 +173,14 @@ public class CreateringtonCurrency {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         MENUS.register(modEventBus);
+        BLOCK_ENTITIES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
 
         ModEnchantmentEffects.register(modEventBus);
 
         modEventBus.addListener(ATMNetworking::register);
+        modEventBus.addListener(DepositorNetworking::register);
+        modEventBus.addListener(CreateringtonCurrency::registerCapabilities);
         modEventBus.addListener(DataGenerators::gatherData);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
@@ -168,6 +196,10 @@ public class CreateringtonCurrency {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);
             modEventBus.addListener(ClientOnlyHooks::registerKeyMappings);
             NeoForge.EVENT_BUS.register(ClientOnlyHooks.class);
+
+            if (ModList.get().isLoaded("create")) {
+                NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.client.DepositorShopOverlay.class);
+            }
         }
 
         if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
@@ -181,6 +213,11 @@ public class CreateringtonCurrency {
             NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.events.StockTickerIntegration.class);
             LOGGER.info("Create mod detected - Stock Ticker integration enabled");
         }
+    }
+
+    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, DEPOSITOR_TERMINAL_BLOCK_ENTITY.get(),
+                (be, side) -> be.getExtractOnlyStorage());
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

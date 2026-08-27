@@ -7,6 +7,7 @@
     "createringtoncurrency:atm_brass",
     "createringtoncurrency:atm_andesite",
     "createringtoncurrency:atm_red",
-    "createringtoncurrency:atm_pink"
+    "createringtoncurrency:atm_pink",
+    "createringtoncurrency:depositor_terminal"
   ]
 }
