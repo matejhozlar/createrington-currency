@@ -1,5 +1,6 @@
 package com.saunhardy.createringtoncurrency.block;
 
+import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.util.Bills;
 import net.minecraft.core.BlockPos;
@@ -8,6 +9,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Containers;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -24,6 +26,8 @@ import java.util.UUID;
 
 public class DepositorTerminalBlockEntity extends BlockEntity {
     public static final int STORAGE_SLOTS = 9;
+    /** Bills stack to 64, so this is the most bills the storage can ever hold and the most a single price may ask for. */
+    public static final int MAX_BILLS = STORAGE_SLOTS * 64;
 
     private static final String TAG_OWNER = "Owner";
     private static final String TAG_OWNER_NAME = "OwnerName";
@@ -35,6 +39,11 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
     private String ownerName = "";
     private int priceDenomination = 0;
     private int priceCount = 0;
+
+    /** Game time at which the current redstone pulse ends. Not persisted: a pulse interrupted by a chunk unload just ends on reload. */
+    private long poweredUntil;
+    /** A payment landed while a pulse was still running: the signal was dropped for one tick and must be raised again. */
+    private boolean raisePending;
 
     private final ItemStackHandler storage = new ItemStackHandler(STORAGE_SLOTS) {
         @Override
@@ -89,10 +98,42 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
         sync();
     }
 
+    /** Drops every stored bill on the ground and empties the storage, so a menu still bound to it cannot hand the bills out again. */
     public void dropContents(Level level, BlockPos pos) {
         for (int slot = 0; slot < storage.getSlots(); slot++) {
             ItemStack stack = storage.getStackInSlot(slot);
-            if (!stack.isEmpty()) Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
+            if (stack.isEmpty()) continue;
+            storage.setStackInSlot(slot, ItemStack.EMPTY);
+            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
+        }
+    }
+
+    /**
+     * Fires the redstone pulse for a completed payment. If a pulse is already running the signal is dropped for one tick
+     * and raised again by {@link #serverTick}, so every payment produces its own rising edge.
+     */
+    public void pulse() {
+        if (!(level instanceof ServerLevel serverLevel)) return;
+        BlockState state = serverLevel.getBlockState(worldPosition);
+        if (!(state.getBlock() instanceof DepositorTerminalBlock block)) return;
+
+        poweredUntil = serverLevel.getGameTime() + Config.DEPOSITOR_PULSE_TICKS.get();
+        if (state.getValue(DepositorTerminalBlock.POWERED)) {
+            block.setPowered(serverLevel, worldPosition, state, false);
+            raisePending = true;
+        } else {
+            block.setPowered(serverLevel, worldPosition, state, true);
+        }
+    }
+
+    void serverTick(ServerLevel level, BlockPos pos, BlockState state) {
+        if (!(state.getBlock() instanceof DepositorTerminalBlock block)) return;
+        boolean powered = state.getValue(DepositorTerminalBlock.POWERED);
+        if (raisePending) {
+            raisePending = false;
+            if (!powered) block.setPowered(level, pos, state, true);
+        } else if (powered && level.getGameTime() >= poweredUntil) {
+            block.setPowered(level, pos, state, false);
         }
     }
 
@@ -104,13 +145,17 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
         }
     }
 
-    @Override
-    protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
-        super.saveAdditional(tag, registries);
+    private void saveSyncedData(CompoundTag tag) {
         if (owner != null) tag.putUUID(TAG_OWNER, owner);
         tag.putString(TAG_OWNER_NAME, ownerName);
         tag.putInt(TAG_PRICE_DENOMINATION, priceDenomination);
         tag.putInt(TAG_PRICE_COUNT, priceCount);
+    }
+
+    @Override
+    protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
+        super.saveAdditional(tag, registries);
+        saveSyncedData(tag);
         tag.put(TAG_STORAGE, storage.serializeNBT(registries));
     }
 
@@ -124,9 +169,12 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
         if (tag.contains(TAG_STORAGE)) storage.deserializeNBT(registries, tag.getCompound(TAG_STORAGE));
     }
 
+    /** Clients only need the owner and the price (overlay, menu validation); the takings stay on the server. */
     @Override
     public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
-        return saveWithoutMetadata(registries);
+        CompoundTag tag = super.getUpdateTag(registries);
+        saveSyncedData(tag);
+        return tag;
     }
 
     @Override

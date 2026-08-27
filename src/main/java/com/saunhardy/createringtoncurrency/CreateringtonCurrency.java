@@ -191,6 +191,7 @@ public class CreateringtonCurrency {
                 CurrencyApi.init(e.getServer());
             }
         });
+        NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);

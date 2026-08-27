@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "C": {
+      "item": "createringtoncurrency:circuit_board"
+    },
+    "H": {
+      "item": "minecraft:hopper"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "ICI",
+    "IHI",
+    "IRI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "createringtoncurrency:depositor_terminal"
+  }
+}

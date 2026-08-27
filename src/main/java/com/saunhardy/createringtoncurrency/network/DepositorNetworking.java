@@ -16,7 +16,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -37,7 +37,8 @@ public final class DepositorNetworking {
     public static final int KIND_SUCCESS = 1;
     public static final int KIND_ERROR = 2;
 
-    public static final int MAX_PRICE_COUNT = 999;
+    /** A price higher than this could never be paid: the bills would not fit even into an empty terminal. */
+    public static final int MAX_PRICE_COUNT = DepositorTerminalBlockEntity.MAX_BILLS;
 
     private static final long PAY_COOLDOWN_MS = 750;
 
@@ -51,6 +52,13 @@ public final class DepositorNetworking {
         reg.playToServer(DepositorSetPricePayload.TYPE, DepositorSetPricePayload.STREAM_CODEC, DepositorNetworking::handleSetPrice);
         reg.playToServer(DepositorTakeAllPayload.TYPE, DepositorTakeAllPayload.STREAM_CODEC, DepositorNetworking::handleTakeAll);
         reg.playToClient(DepositorResultPayload.TYPE, DepositorResultPayload.STREAM_CODEC, DepositorNetworking::handleResultClient);
+    }
+
+    /** Game-bus listener: forget per-player payment state so the maps don't grow for the lifetime of the process. */
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        UUID id = event.getEntity().getUUID();
+        IN_FLIGHT.remove(id);
+        LAST_PAYMENT.remove(id);
     }
 
     public static boolean hasBankCard(Container inventory) {
@@ -67,14 +75,21 @@ public final class DepositorNetworking {
     private static void handleSetPrice(final DepositorSetPricePayload pkt, final IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
         DepositorTerminalBlockEntity be = terminalNear(player, pkt.pos());
-        if (be == null) return;
+        if (be == null) {
+            sendResult(player, KIND_ERROR, "The terminal is out of reach.");
+            return;
+        }
 
         if (!be.canConfigure(player)) {
             sendResult(player, KIND_ERROR, "Only the owner can change the price.");
             return;
         }
-        if (Bills.indexOfDenomination(pkt.denomination()) < 0 || pkt.count() < 0 || pkt.count() > MAX_PRICE_COUNT) {
+        if (Bills.indexOfDenomination(pkt.denomination()) < 0 || pkt.count() < 0) {
             sendResult(player, KIND_ERROR, "Invalid price.");
+            return;
+        }
+        if (pkt.count() > MAX_PRICE_COUNT) {
+            sendResult(player, KIND_ERROR, "A terminal holds at most " + MAX_PRICE_COUNT + " bills.");
             return;
         }
         int max = Config.DEPOSITOR_MAX_PRICE.get();
@@ -96,7 +111,10 @@ public final class DepositorNetworking {
     private static void handleTakeAll(final DepositorTakeAllPayload pkt, final IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
         DepositorTerminalBlockEntity be = terminalNear(player, pkt.pos());
-        if (be == null) return;
+        if (be == null) {
+            sendResult(player, KIND_ERROR, "The terminal is out of reach.");
+            return;
+        }
 
         if (!be.canConfigure(player)) {
             sendResult(player, KIND_ERROR, "Only the owner can take bills out.");
@@ -127,7 +145,11 @@ public final class DepositorNetworking {
     }
 
     public static void hint(ServerPlayer player, DepositorTerminalBlockEntity be) {
-        if (be.getOwner() == null || !be.hasPrice() || be.getOwner().equals(player.getUUID())) return;
+        if (be.getOwner() == null || be.getOwner().equals(player.getUUID())) return;
+        if (!be.hasPrice()) {
+            actionBar(player, KIND_INFO, "This terminal isn't set up yet.");
+            return;
+        }
         actionBar(player, KIND_INFO,
                 "Hold " + describe(be.getPriceDenomination(), be.getPriceCount()) + " or a Bank Card, then right-click to pay.");
     }
@@ -147,9 +169,10 @@ public final class DepositorNetworking {
             return;
         }
 
-        long now = System.currentTimeMillis();
+        // The cooldown only starts on a successful payment (see completePayment), so a failed attempt can be retried
+        // right away; its job is to swallow the repeat clicks of a held right mouse button after a payment went through.
         Long last = LAST_PAYMENT.get(player.getUUID());
-        if (last != null && now - last < PAY_COOLDOWN_MS) return;
+        if (last != null && System.currentTimeMillis() - last < PAY_COOLDOWN_MS) return;
         if (IN_FLIGHT.contains(player.getUUID())) return;
 
         int denomIndex = Bills.indexOfDenomination(be.getPriceDenomination());
@@ -159,7 +182,6 @@ public final class DepositorNetworking {
             return;
         }
 
-        LAST_PAYMENT.put(player.getUUID(), now);
         if (card) payByCard(player, be, owner, denomIndex, count);
         else payInCash(player, be, owner, denomIndex, count);
     }
@@ -225,14 +247,12 @@ public final class DepositorNetworking {
     }
 
     private static void completePayment(ServerPlayer payer, DepositorTerminalBlockEntity be, UUID owner, String how, String payerMessage) {
+        LAST_PAYMENT.put(payer.getUUID(), System.currentTimeMillis());
         actionBar(payer, KIND_SUCCESS, payerMessage);
 
+        // The terminal pulses in its own level; the payer may have changed dimension while a card payment was in flight.
         BlockPos pos = be.getBlockPos();
-        ServerLevel level = payer.serverLevel();
-        BlockState state = level.getBlockState(pos);
-        if (state.getBlock() instanceof DepositorTerminalBlock block) {
-            block.pulse(level, pos, state);
-        }
+        be.pulse();
 
         String priced = describe(be.getPriceDenomination(), be.getPriceCount());
         LOGGER.info("[DEPOSITOR] {} ({}) paid {} by {} at {} (owner {} / {})",

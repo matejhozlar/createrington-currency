@@ -16,6 +16,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 
+import java.util.UUID;
+
 public final class DepositorShopOverlay {
     private static final ResourceLocation WIDGETS =
             ResourceLocation.fromNamespaceAndPath("create", "textures/gui/widgets.png");
@@ -30,7 +32,17 @@ public final class DepositorShopOverlay {
 
     private static final int BACKDROP_COLOR = 0x88000000;
 
+    /** The overlay renders every frame while a terminal is in the crosshair; reuse the profile instead of allocating one per frame. */
+    private static GameProfile ownerProfile;
+
     private DepositorShopOverlay() {}
+
+    private static GameProfile profileFor(UUID id, String name) {
+        if (ownerProfile == null || !id.equals(ownerProfile.getId()) || !name.equals(ownerProfile.getName())) {
+            ownerProfile = new GameProfile(id, name);
+        }
+        return ownerProfile;
+    }
 
     @SubscribeEvent
     public static void onRenderHotbar(RenderGuiLayerEvent.Post event) {
@@ -61,8 +73,10 @@ public final class DepositorShopOverlay {
         g.renderItem(bill, x0 + SLOT_INSET, y + SLOT_INSET);
         g.renderItemDecorations(mc.font, bill, x0 + SLOT_INSET, y + SLOT_INSET);
 
-        PlayerSkin skin = mc.getSkinManager().getInsecureSkin(new GameProfile(be.getOwner(), be.getOwnerName()));
+        PlayerSkin skin = mc.getSkinManager().getInsecureSkin(profileFor(be.getOwner(), be.getOwnerName()));
         PlayerFaceRenderer.draw(g, skin, x0 + 51 + SLOT_INSET, y + SLOT_INSET, 16);
+
+        RenderSystem.disableBlend();
     }
 
     private static void blit(GuiGraphics g, int[] region, int x, int y) {

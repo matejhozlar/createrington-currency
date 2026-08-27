@@ -274,8 +274,11 @@ public class DepositorScreen extends AbstractContainerScreen<DepositorMenu> {
     }
 
     private void savePrice() {
+        int typed = typedCount();
+        int clamped = Math.min(typed, DepositorNetworking.MAX_PRICE_COUNT);
+        if (clamped != typed && countBox != null) countBox.setValue(Integer.toString(clamped));
         pendingDenomIndex = denomIndex;
-        pendingCount = typedCount();
+        pendingCount = clamped;
         pending = Pending.SAVE_PRICE;
         busy = true;
         PacketDistributor.sendToServer(new DepositorSetPricePayload(this.menu.getPos(), DENOMS[denomIndex], pendingCount));

@@ -1,6 +1,5 @@
 package com.saunhardy.createringtoncurrency.block;
 
-import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.menu.DepositorMenu;
 import com.saunhardy.createringtoncurrency.network.DepositorNetworking;
@@ -11,7 +10,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.InteractionHand;
@@ -27,6 +25,8 @@ import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -71,6 +71,14 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new DepositorTerminalBlockEntity(pos, state);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, @NotNull BlockState state, @NotNull BlockEntityType<T> type) {
+        if (level.isClientSide || type != CreateringtonCurrency.DEPOSITOR_TERMINAL_BLOCK_ENTITY.get()) return null;
+        return (BlockEntityTicker<T>) (BlockEntityTicker<DepositorTerminalBlockEntity>)
+                (lvl, pos, st, be) -> be.serverTick((ServerLevel) lvl, pos, st);
     }
 
     @Override
@@ -133,30 +141,21 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
     private void openOwnerMenu(ServerPlayer player, DepositorTerminalBlockEntity be) {
         player.openMenu(
                 new SimpleMenuProvider(
-                        (id, inv, p) -> new DepositorMenu(id, inv, be, true),
+                        (id, inv, p) -> new DepositorMenu(id, inv, be),
                         Component.translatable("menu.createringtoncurrency.depositor_terminal")),
                 buf -> {
                     buf.writeBlockPos(be.getBlockPos());
-                    buf.writeBoolean(true);
                     buf.writeVarInt(be.getPriceDenomination());
                     buf.writeVarInt(be.getPriceCount());
                     buf.writeUtf(be.getOwnerName());
                 });
     }
 
-    public void pulse(ServerLevel level, BlockPos pos, BlockState state) {
-        if (state.getValue(POWERED)) return;
-        level.setBlock(pos, state.setValue(POWERED, true), Block.UPDATE_ALL);
-        updateNeighbours(level, pos, state);
-        level.scheduleTick(pos, this, Config.DEPOSITOR_PULSE_TICKS.get());
-    }
-
-    @Override
-    protected void tick(@NotNull BlockState state, @NotNull ServerLevel level, @NotNull BlockPos pos, @NotNull RandomSource random) {
-        if (state.getValue(POWERED)) {
-            level.setBlock(pos, state.setValue(POWERED, false), Block.UPDATE_ALL);
-            updateNeighbours(level, pos, state);
-        }
+    /** Pulse timing lives in {@link DepositorTerminalBlockEntity#pulse()}; this only flips the state and notifies neighbours. */
+    void setPowered(ServerLevel level, BlockPos pos, BlockState state, boolean powered) {
+        BlockState next = state.setValue(POWERED, powered);
+        level.setBlock(pos, next, Block.UPDATE_ALL);
+        updateNeighbours(level, pos, next);
     }
 
     private void updateNeighbours(Level level, BlockPos pos, BlockState state) {
@@ -169,14 +168,15 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         return true;
     }
 
+    /** Like an observer: only the block behind the terminal is powered (strongly), never the sides or the front. */
     @Override
     protected int getSignal(@NotNull BlockState state, @NotNull BlockGetter level, @NotNull BlockPos pos, @NotNull Direction direction) {
-        return state.getValue(POWERED) ? 15 : 0;
+        return state.getValue(POWERED) && state.getValue(FACING) == direction ? 15 : 0;
     }
 
     @Override
     protected int getDirectSignal(@NotNull BlockState state, @NotNull BlockGetter level, @NotNull BlockPos pos, @NotNull Direction direction) {
-        return state.getValue(POWERED) && state.getValue(FACING) == direction ? 15 : 0;
+        return getSignal(state, level, pos, direction);
     }
 
     @Override
