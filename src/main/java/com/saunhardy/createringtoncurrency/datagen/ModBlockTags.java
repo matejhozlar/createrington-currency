@@ -24,8 +24,9 @@ public class ModBlockTags extends BlockTagsProvider {
         Block[] atms = CreateringtonCurrency.DECORATIVE_ATMS.stream()
                 .map(DeferredBlock::get)
                 .toArray(Block[]::new);
-        tag(BlockTags.MINEABLE_WITH_PICKAXE).add(atms);
-        tag(BlockTags.NEEDS_IRON_TOOL).add(atms);
+        Block depositor = CreateringtonCurrency.DEPOSITOR_TERMINAL_BLOCK.get();
+        tag(BlockTags.MINEABLE_WITH_PICKAXE).add(atms).add(depositor);
+        tag(BlockTags.NEEDS_IRON_TOOL).add(atms).add(depositor);
     }
 
     @Override

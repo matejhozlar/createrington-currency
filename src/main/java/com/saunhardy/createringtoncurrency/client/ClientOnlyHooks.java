@@ -29,6 +29,7 @@ public final class ClientOnlyHooks {
 
     public static void registerScreens(RegisterMenuScreensEvent e) {
         e.register(CreateringtonCurrency.ATM_MENU.get(), ATMScreen::new);
+        e.register(CreateringtonCurrency.DEPOSITOR_MENU.get(), DepositorScreen::new);
     }
 
     public static void registerKeyMappings(RegisterKeyMappingsEvent e) {
