@@ -62,6 +62,18 @@ All planned features have been implemented and the mod is stable for production 
 
 All commands enforce a global cooldown, configurable via `commandCooldownMs`. If a player executes a command too quickly, they will see a cooldown message.
 
+Every command can be switched off individually in the config. A disabled command is not registered at all, so it won't show up in tab completion:
+
+| Config key                | Disables                 |
+|---------------------------|--------------------------|
+| `disableMoneyCommand`     | `/money`                 |
+| `disablePayCommand`       | `/pay`                   |
+| `disableCashCommands`     | `/deposit`, `/withdraw`  |
+| `disableBaltopCommand`    | `/baltop`                |
+| `disableDailyCommand`     | `/daily`                 |
+| `disableLotteryCommands`  | `/lottery`, `/join`      |
+| `disableVoteCommand`      | `/vote`                  |
+
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
 - **PIN & authentication:** The GUI guides players through a simple login flow; once authenticated it displays their balance, deposit buttons and withdraw options. The screen class organises the UI into views for deposit, withdraw total, withdraw single bills and withdraw bundles.
@@ -127,6 +139,7 @@ Inside, you can set:
 - Mob drop rates
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
+- Per-command `disable*Command` toggles to turn off any command
 
 ---
 

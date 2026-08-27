@@ -60,6 +60,8 @@ public class VoteCommand {
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
+        if (Config.DISABLE_VOTE_COMMAND.get()) return;
+
         event.getDispatcher().register(
                 Commands.literal("vote")
                         .then(Commands.literal("yes").executes(context -> {
