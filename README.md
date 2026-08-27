@@ -62,17 +62,16 @@ All planned features have been implemented and the mod is stable for production 
 
 All commands enforce a global cooldown, configurable via `commandCooldownMs`. If a player executes a command too quickly, they will see a cooldown message.
 
-Every command can be switched off individually in the config. A disabled command is not registered at all, so it won't show up in tab completion:
+Any command can be turned off in the config, see [Disabling commands](#disabling-commands).
 
-| Config key                | Disables                 |
-|---------------------------|--------------------------|
-| `disableMoneyCommand`     | `/money`                 |
-| `disablePayCommand`       | `/pay`                   |
-| `disableCashCommands`     | `/deposit`, `/withdraw`  |
-| `disableBaltopCommand`    | `/baltop`                |
-| `disableDailyCommand`     | `/daily`                 |
-| `disableLotteryCommands`  | `/lottery`, `/join`      |
-| `disableVoteCommand`      | `/vote`                  |
+### Vote Command
+
+| Command                  | Description                                                                                                                                              |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/vote <type> [days]`    | Start a 30-second server-wide vote to change the time or weather. Types: `day`, `night`, `clear`, `rain`, `thunder`. `days` (1-7) only applies to weather |
+| `/vote yes` / `/vote no` | Cast your vote while one is running (typing `1` or `2` in chat also works)                                                                               |
+
+If you are the only player online the vote passes immediately.
 
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
@@ -139,7 +138,23 @@ Inside, you can set:
 - Mob drop rates
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
-- Per-command `disable*Command` toggles to turn off any command
+- Per-command `disable*Command` toggles (see below)
+
+### Disabling commands
+
+Every chat command can be switched off individually. A disabled command is not registered at all, so it won't show up in tab completion:
+
+| Config key                | Disables                 |
+|---------------------------|--------------------------|
+| `disableMoneyCommand`     | `/money`                 |
+| `disablePayCommand`       | `/pay`                   |
+| `disableCashCommands`     | `/deposit`, `/withdraw`  |
+| `disableBaltopCommand`    | `/baltop`                |
+| `disableDailyCommand`     | `/daily`                 |
+| `disableLotteryCommands`  | `/lottery`, `/join`      |
+| `disableVoteCommand`      | `/vote`                  |
+
+These toggles only affect the chat commands. The ATM block and the Create Stock Ticker integration have their own deposit/withdraw paths and keep working regardless, so for example `disableCashCommands = true` makes the ATM the only way to move bills in and out of an account.
 
 ---
 

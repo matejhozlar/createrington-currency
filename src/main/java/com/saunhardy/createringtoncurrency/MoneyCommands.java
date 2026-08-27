@@ -15,7 +15,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -53,7 +52,7 @@ public class MoneyCommands {
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
-        registerUnlessDisabled(event, Config.DISABLE_MONEY_COMMAND,
+        registerUnlessDisabled(event, Config.DISABLE_MONEY_COMMAND.get(),
                 Commands.literal("money")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -65,7 +64,7 @@ public class MoneyCommands {
                         })
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_PAY_COMMAND,
+        registerUnlessDisabled(event, Config.DISABLE_PAY_COMMAND.get(),
                 Commands.literal("pay")
                         .then(Commands.argument("target", EntityArgument.player())
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))
@@ -81,7 +80,7 @@ public class MoneyCommands {
                                         })))
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_CASH_COMMANDS,
+        registerUnlessDisabled(event, Config.DISABLE_CASH_COMMANDS.get(),
                 Commands.literal("deposit")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -91,7 +90,7 @@ public class MoneyCommands {
                         })
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_CASH_COMMANDS,
+        registerUnlessDisabled(event, Config.DISABLE_CASH_COMMANDS.get(),
                 Commands.literal("withdraw")
                         .then(Commands.argument("input", StringArgumentType.greedyString())
                                 .executes(ctx -> {
@@ -130,7 +129,7 @@ public class MoneyCommands {
                         )
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_BALTOP_COMMAND,
+        registerUnlessDisabled(event, Config.DISABLE_BALTOP_COMMAND.get(),
                 Commands.literal("baltop")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -142,7 +141,7 @@ public class MoneyCommands {
                         })
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_DAILY_COMMAND,
+        registerUnlessDisabled(event, Config.DISABLE_DAILY_COMMAND.get(),
                 Commands.literal("daily")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -154,7 +153,7 @@ public class MoneyCommands {
                         })
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS,
+        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS.get(),
                 Commands.literal("lottery")
                         .then(Commands.argument("amount", IntegerArgumentType.integer(10))
                                 .executes(ctx -> {
@@ -175,7 +174,7 @@ public class MoneyCommands {
                         )
         );
 
-        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS,
+        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS.get(),
                 Commands.literal("join")
                         .then(Commands.argument("amount", IntegerArgumentType.integer(10))
                                 .executes(ctx -> {
@@ -191,9 +190,9 @@ public class MoneyCommands {
     }
 
     private static void registerUnlessDisabled(RegisterCommandsEvent event,
-                                               ModConfigSpec.BooleanValue disabled,
+                                               boolean disabled,
                                                LiteralArgumentBuilder<CommandSourceStack> command) {
-        if (disabled.get()) return;
+        if (disabled) return;
         event.getDispatcher().register(command);
     }
 
