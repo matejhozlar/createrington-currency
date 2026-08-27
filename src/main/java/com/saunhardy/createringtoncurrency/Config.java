@@ -6,7 +6,13 @@ public class Config {
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
+    public static final ModConfigSpec.BooleanValue DISABLE_MONEY_COMMAND;
+    public static final ModConfigSpec.BooleanValue DISABLE_PAY_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_CASH_COMMANDS;
+    public static final ModConfigSpec.BooleanValue DISABLE_BALTOP_COMMAND;
+    public static final ModConfigSpec.BooleanValue DISABLE_DAILY_COMMAND;
+    public static final ModConfigSpec.BooleanValue DISABLE_LOTTERY_COMMANDS;
+    public static final ModConfigSpec.BooleanValue DISABLE_VOTE_COMMAND;
     public static final ModConfigSpec.IntValue COMMAND_COOLDOWN_MS;
 
     public static final ModConfigSpec.ConfigValue<String> API_BASE_URL;
@@ -27,9 +33,33 @@ public class Config {
     static {
         BUILDER.comment("General command and gameplay settings").push("general");
 
+        DISABLE_MONEY_COMMAND = BUILDER
+                .comment("If true, the /money command will NOT be registered")
+                .define("disableMoneyCommand", false);
+
+        DISABLE_PAY_COMMAND = BUILDER
+                .comment("If true, the /pay command will NOT be registered")
+                .define("disablePayCommand", false);
+
         DISABLE_CASH_COMMANDS = BUILDER
                 .comment("If true, the /deposit and /withdraw commands will NOT be registered")
                 .define("disableCashCommands", false);
+
+        DISABLE_BALTOP_COMMAND = BUILDER
+                .comment("If true, the /baltop command will NOT be registered")
+                .define("disableBaltopCommand", false);
+
+        DISABLE_DAILY_COMMAND = BUILDER
+                .comment("If true, the /daily command will NOT be registered")
+                .define("disableDailyCommand", false);
+
+        DISABLE_LOTTERY_COMMANDS = BUILDER
+                .comment("If true, the /lottery and /join commands will NOT be registered")
+                .define("disableLotteryCommands", false);
+
+        DISABLE_VOTE_COMMAND = BUILDER
+                .comment("If true, the /vote command will NOT be registered")
+                .define("disableVoteCommand", false);
 
         COMMAND_COOLDOWN_MS = BUILDER
                 .comment("Global cooldown for all currency commands in milliseconds")

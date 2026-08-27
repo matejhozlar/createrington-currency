@@ -2,10 +2,12 @@ package com.saunhardy.createringtoncurrency;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.crnet.http.ApiResponse;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
@@ -50,7 +52,7 @@ public class MoneyCommands {
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
-        event.getDispatcher().register(
+        registerUnlessDisabled(event, Config.DISABLE_MONEY_COMMAND.get(),
                 Commands.literal("money")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -62,7 +64,7 @@ public class MoneyCommands {
                         })
         );
 
-        event.getDispatcher().register(
+        registerUnlessDisabled(event, Config.DISABLE_PAY_COMMAND.get(),
                 Commands.literal("pay")
                         .then(Commands.argument("target", EntityArgument.player())
                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1))
@@ -78,58 +80,56 @@ public class MoneyCommands {
                                         })))
         );
 
-        if (!Config.DISABLE_CASH_COMMANDS.get()) {
-            event.getDispatcher().register(
-                    Commands.literal("deposit")
-                            .executes(ctx -> {
-                                ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                if (isOnCooldown(player)) return 0;
-                                handleDepositAll(player);
-                                return 1;
-                            })
-            );
+        registerUnlessDisabled(event, Config.DISABLE_CASH_COMMANDS.get(),
+                Commands.literal("deposit")
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            if (isOnCooldown(player)) return 0;
+                            handleDepositAll(player);
+                            return 1;
+                        })
+        );
 
-            event.getDispatcher().register(
-                    Commands.literal("withdraw")
-                            .then(Commands.argument("input", StringArgumentType.greedyString())
-                                    .executes(ctx -> {
-                                        ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                        if (isOnCooldown(player)) return 0;
-                                        String input = StringArgumentType.getString(ctx, "input").trim();
-                                        try {
-                                            if (input.matches("^\\d+ \\d+$")) {
-                                                String[] parts = input.split(" ");
-                                                int denom = Integer.parseInt(parts[0]);
-                                                int count = Integer.parseInt(parts[1]);
-                                                if (denom <= 0 || count <= 0) {
-                                                    player.sendSystemMessage(message("[ERROR]", "Amount must be positive.", ChatFormatting.RED));
-                                                    return 0;
-                                                }
-                                                return withdrawFixed(player, denom, count);
+        registerUnlessDisabled(event, Config.DISABLE_CASH_COMMANDS.get(),
+                Commands.literal("withdraw")
+                        .then(Commands.argument("input", StringArgumentType.greedyString())
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    if (isOnCooldown(player)) return 0;
+                                    String input = StringArgumentType.getString(ctx, "input").trim();
+                                    try {
+                                        if (input.matches("^\\d+ \\d+$")) {
+                                            String[] parts = input.split(" ");
+                                            int denom = Integer.parseInt(parts[0]);
+                                            int count = Integer.parseInt(parts[1]);
+                                            if (denom <= 0 || count <= 0) {
+                                                player.sendSystemMessage(message("[ERROR]", "Amount must be positive.", ChatFormatting.RED));
+                                                return 0;
                                             }
-                                            if (input.contains(":")) {
-                                                return withdrawCustomBundle(player, input);
-                                            }
-                                            if (input.matches("^\\d+$")) {
-                                                int total = Integer.parseInt(input);
-                                                if (total <= 0) {
-                                                    player.sendSystemMessage(message("[ERROR]", "Amount must be positive.", ChatFormatting.RED));
-                                                    return 0;
-                                                }
-                                                return withdrawOptimized(player, total);
-                                            }
-                                        } catch (NumberFormatException e) {
-                                            player.sendSystemMessage(message("[ERROR]", "Number too large.", ChatFormatting.RED));
-                                            return 0;
+                                            return withdrawFixed(player, denom, count);
                                         }
-                                        player.sendSystemMessage(message("[ERROR]", "Invalid command format.", ChatFormatting.RED));
+                                        if (input.contains(":")) {
+                                            return withdrawCustomBundle(player, input);
+                                        }
+                                        if (input.matches("^\\d+$")) {
+                                            int total = Integer.parseInt(input);
+                                            if (total <= 0) {
+                                                player.sendSystemMessage(message("[ERROR]", "Amount must be positive.", ChatFormatting.RED));
+                                                return 0;
+                                            }
+                                            return withdrawOptimized(player, total);
+                                        }
+                                    } catch (NumberFormatException e) {
+                                        player.sendSystemMessage(message("[ERROR]", "Number too large.", ChatFormatting.RED));
                                         return 0;
-                                    })
-                            )
-            );
-        }
+                                    }
+                                    player.sendSystemMessage(message("[ERROR]", "Invalid command format.", ChatFormatting.RED));
+                                    return 0;
+                                })
+                        )
+        );
 
-        event.getDispatcher().register(
+        registerUnlessDisabled(event, Config.DISABLE_BALTOP_COMMAND.get(),
                 Commands.literal("baltop")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -141,7 +141,7 @@ public class MoneyCommands {
                         })
         );
 
-        event.getDispatcher().register(
+        registerUnlessDisabled(event, Config.DISABLE_DAILY_COMMAND.get(),
                 Commands.literal("daily")
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
@@ -153,7 +153,7 @@ public class MoneyCommands {
                         })
         );
 
-        event.getDispatcher().register(
+        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS.get(),
                 Commands.literal("lottery")
                         .then(Commands.argument("amount", IntegerArgumentType.integer(10))
                                 .executes(ctx -> {
@@ -174,7 +174,7 @@ public class MoneyCommands {
                         )
         );
 
-        event.getDispatcher().register(
+        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS.get(),
                 Commands.literal("join")
                         .then(Commands.argument("amount", IntegerArgumentType.integer(10))
                                 .executes(ctx -> {
@@ -187,6 +187,13 @@ public class MoneyCommands {
                                 })
                         )
         );
+    }
+
+    private static void registerUnlessDisabled(RegisterCommandsEvent event,
+                                               boolean disabled,
+                                               LiteralArgumentBuilder<CommandSourceStack> command) {
+        if (disabled) return;
+        event.getDispatcher().register(command);
     }
 
     // ---- Response handlers -------------------------------------------------
