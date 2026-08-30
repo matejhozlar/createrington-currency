@@ -119,7 +119,7 @@ If you are the only player online the vote passes immediately.
 
 - Minecraft version **1.21.1**
 - Requires **NeoForge** mod loader
-- Requires **[CRNet](https://www.curseforge.com/minecraft/mc-mods/crnet)** `3.0.0` or newer - the shared library that handles all backend HTTP calls and JWT authentication
+- Requires **[CRNet](https://www.curseforge.com/minecraft/mc-mods/crnet)** `3.0.5` or newer - the shared library that handles all backend HTTP calls and JWT authentication
 
 ### Backend API
 

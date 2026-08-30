@@ -83,17 +83,17 @@ public final class CurrencyApi {
         return c.post(Endpoints.CURRENCY_PAY, GSON.toJson(req), PayResponse.class, fromUuid);
     }
 
-    public static CompletableFuture<ApiResponse<DepositResponse>> deposit(UUID playerUuid, double amount) {
+    public static CompletableFuture<ApiResponse<DepositResponse>> deposit(UUID playerUuid, double amount, String idempotencyKey) {
         CRNetClient c = client;
         if (c == null) return unavailable();
-        DepositRequest req = new DepositRequest(amount, null);
+        DepositRequest req = new DepositRequest(amount, null, idempotencyKey);
         return c.post(Endpoints.CURRENCY_DEPOSIT, GSON.toJson(req), DepositResponse.class, playerUuid);
     }
 
-    public static CompletableFuture<ApiResponse<WithdrawResponse>> withdraw(UUID playerUuid, double denomination, int count) {
+    public static CompletableFuture<ApiResponse<WithdrawResponse>> withdraw(UUID playerUuid, double denomination, int count, String idempotencyKey) {
         CRNetClient c = client;
         if (c == null) return unavailable();
-        WithdrawRequest req = new WithdrawRequest(denomination, count);
+        WithdrawRequest req = new WithdrawRequest(denomination, count, idempotencyKey);
         return c.post(Endpoints.CURRENCY_WITHDRAW, GSON.toJson(req), WithdrawResponse.class, playerUuid);
     }
 
@@ -147,6 +147,10 @@ public final class CurrencyApi {
         if (resp.getPlayerMessage() != null) return resp.getPlayerMessage();
         if (resp.getMessage() != null) return resp.getMessage();
         return fallback;
+    }
+
+    public static String newIdempotencyKey() {
+        return UUID.randomUUID().toString();
     }
 
     // ---- Internals ---------------------------------------------------------
