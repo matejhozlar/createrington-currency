@@ -200,6 +200,7 @@ public class CreateringtonCurrency {
                 CurrencyApi.init(e.getServer());
             }
         });
+        NeoForge.EVENT_BUS.register(AdminMode.class);
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
         NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
         NeoForge.EVENT_BUS.addListener(MobDropTable::onTagsUpdated);

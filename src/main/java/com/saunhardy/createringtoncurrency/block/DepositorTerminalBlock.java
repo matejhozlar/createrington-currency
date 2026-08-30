@@ -138,6 +138,10 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         }
 
         if (be.canConfigure(player)) {
+            if (!be.isOwner(player)) {
+                player.sendSystemMessage(Component.literal("Admin mode: opened " + be.getOwnerName() + "'s terminal.")
+                        .withStyle(ChatFormatting.GOLD));
+            }
             openOwnerMenu(serverPlayer, be);
         } else {
             DepositorNetworking.hint(serverPlayer, be);

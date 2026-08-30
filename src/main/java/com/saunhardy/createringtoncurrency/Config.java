@@ -15,6 +15,7 @@ public class Config {
     public static final ModConfigSpec.BooleanValue DISABLE_DAILY_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_LOTTERY_COMMANDS;
     public static final ModConfigSpec.BooleanValue DISABLE_VOTE_COMMAND;
+    public static final ModConfigSpec.BooleanValue DISABLE_ADMIN_MODE_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_BANK_CARD_USE;
     public static final ModConfigSpec.IntValue COMMAND_COOLDOWN_MS;
 
@@ -64,6 +65,10 @@ public class Config {
         DISABLE_VOTE_COMMAND = BUILDER
                 .comment("If true, the /vote command will NOT be registered")
                 .define("disableVoteCommand", false);
+
+        DISABLE_ADMIN_MODE_COMMAND = BUILDER
+                .comment("If true, the /createringtoncurrency admin-mode command will NOT be registered; operators then always use depositor terminals as ordinary customers")
+                .define("disableAdminModeCommand", false);
 
         DISABLE_BANK_CARD_USE = BUILDER
                 .comment("If true, right-clicking a Bank Card will not show the balance or recent transactions")
