@@ -44,7 +44,7 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
     public static final EnumProperty<Light> LIGHT = EnumProperty.create("light", Light.class);
 
-    /** Tint index of the LED faces in the block model; the colour handlers in {@code ClientOnlyHooks} answer for it. */
+    /** Tint index of the LED faces in the block model. */
     public static final int LED_TINT_INDEX = 0;
     /** LED colour while {@link #POWERED}: a sale just went through. Brass, to match the Create palette. */
     public static final int LED_FLASH_COLOR = 0xDCB05A;
@@ -217,14 +217,9 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         return state.setValue(FACING, mirror.getRotation(facing).rotate(facing));
     }
 
-    /**
-     * What the panel LED reports. {@link DepositorTerminalBlockEntity} re-evaluates it whenever the price or the storage
-     * changes; the colours are plain RGB and get applied client-side through the tint on the LED faces.
-     */
+    /** What the panel LED shows; the colours are plain RGB. */
     public enum Light implements StringRepresentable {
-        /** No price set: the terminal is not selling anything. */
         OFF("off", 0x141414),
-        /** Priced, and the next payment fits into the storage. */
         READY("ready", 0x1E9C24),
         /** Priced, but the next payment would not fit: the owner has to empty the storage. */
         FULL("full", 0xE03030);

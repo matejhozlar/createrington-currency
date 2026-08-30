@@ -49,7 +49,6 @@ public final class ClientOnlyHooks {
         }, CreateringtonCurrency.DEPOSITOR_TERMINAL_BLOCK.get());
     }
 
-    /** The item shows the terminal as it looks in service. */
     public static void registerItemColors(RegisterColorHandlersEvent.Item e) {
         e.register((stack, tintIndex) -> tintIndex == DepositorTerminalBlock.LED_TINT_INDEX
                         ? DepositorTerminalBlock.Light.READY.color()

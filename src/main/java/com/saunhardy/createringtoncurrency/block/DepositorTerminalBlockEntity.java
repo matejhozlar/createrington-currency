@@ -148,7 +148,6 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
         }
     }
 
-    /** The LED state the price and the storage currently call for. */
     private DepositorTerminalBlock.Light currentLight() {
         if (!hasPrice()) return DepositorTerminalBlock.Light.OFF;
         int[] payment = Bills.only(Bills.indexOfDenomination(priceDenomination), priceCount);
