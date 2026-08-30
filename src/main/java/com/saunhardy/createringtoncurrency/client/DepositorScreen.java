@@ -413,7 +413,7 @@ public class DepositorScreen extends AbstractContainerScreen<DepositorMenu> {
         return Component.translatable("gui.createringtoncurrency.depositor." + key, args);
     }
 
-    private static String fmt(int amount) {
+    private static String fmt(long amount) {
         return NumberFormat.getInstance().format(amount);
     }
 

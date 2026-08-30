@@ -5,9 +5,11 @@ import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -20,46 +22,63 @@ public final class Withdrawals {
     private static final Set<UUID> IN_FLIGHT = ConcurrentHashMap.newKeySet();
 
     public static final int MAX_BILLS = Inventory.INVENTORY_SIZE * 64;
+    static final String MALFORMED = "Invalid request.";
+    static final String NOTHING = "Invalid amount.";
 
     public interface Reporter {
-        void succeeded(long amount);
-        void failed(String text);
+        void succeeded(ServerPlayer player, long amount);
+        void failed(ServerPlayer player, String text);
     }
 
     private Withdrawals() {}
 
+    public static void onServerStopped(ServerStoppedEvent event) {
+        IN_FLIGHT.clear();
+    }
+
+    @Nullable
+    public static String validate(int[] counts) {
+        if (counts.length != Bills.DENOMINATIONS.length) return MALFORMED;
+        for (int count : counts) {
+            if (count < 0) return MALFORMED;
+        }
+        long bills = Bills.pieces(counts);
+        if (bills == 0) return NOTHING;
+        if (bills > MAX_BILLS) return noRoom(bills);
+        return null;
+    }
+
+    static String noRoom(long bills) {
+        return "Not enough inventory space for " + Bills.fmt(bills) + " bills.";
+    }
+
     public static void withdraw(ServerPlayer player, int[] counts, String tag, Reporter reporter) {
-        if (counts.length != Bills.DENOMINATIONS.length) {
-            reporter.failed("Invalid amount.");
-            return;
-        }
-        long total = 0;
-        long bills = 0;
-        for (int i = 0; i < counts.length; i++) {
-            if (counts[i] < 0) {
-                reporter.failed("Invalid amount.");
-                return;
-            }
-            bills += counts[i];
-            total += (long) counts[i] * Bills.DENOMINATIONS[i];
-        }
-        final long amount = total;
-        if (bills == 0) {
-            reporter.failed("Invalid amount.");
-            return;
-        }
-        if (bills > MAX_BILLS || !Bills.fitsInventory(player, counts)) {
-            reporter.failed("Not enough inventory space for " + fmt(bills) + " bills.");
-            return;
-        }
         UUID uuid = player.getUUID();
+        String name = player.getName().getString();
+
+        String problem = validate(counts);
+        if (problem != null) {
+            if (MALFORMED.equals(problem)) {
+                LOGGER.warn("[WITHDRAW:{}] malformed request from {} ({}): {}", tag, name, uuid, Arrays.toString(counts));
+            }
+            reporter.failed(player, problem);
+            return;
+        }
+        if (!Bills.fitsInventory(player, counts)) {
+            reporter.failed(player, noRoom(Bills.pieces(counts)));
+            return;
+        }
+        if (!CurrencyApi.isAvailable()) {
+            reporter.failed(player, "The bank is not available on this server.");
+            return;
+        }
         if (!IN_FLIGHT.add(uuid)) {
-            reporter.failed("A withdrawal is already in progress.");
+            reporter.failed(player, "A withdrawal is already in progress.");
             return;
         }
 
         MinecraftServer server = player.server;
-        String name = player.getName().getString();
+        long amount = Bills.value(counts);
         AtomicInteger completed = new AtomicInteger();
         AtomicBoolean rejected = new AtomicBoolean();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
@@ -76,7 +95,8 @@ public final class Withdrawals {
                     if (!resp.isSuccess()) {
                         rejected.set(true);
                         LOGGER.warn("[WITHDRAW:{}] {} ({}): {} x ${} rejected: {}", tag, name, uuid, count, denomination, resp.getMessage());
-                        reporter.failed(CurrencyApi.errorText(resp, "Withdraw failed. Please try again."));
+                        String text = CurrencyApi.errorText(resp, "Withdraw failed. Please try again.");
+                        BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, text));
                         return;
                     }
                     completed.incrementAndGet();
@@ -90,8 +110,8 @@ public final class Withdrawals {
             IN_FLIGHT.remove(uuid);
             if (ex != null) {
                 LOGGER.error("[WITHDRAW:{}] {} ({}): ${} failed after {}/{} denominations: {}",
-                        tag, name, uuid, fmt(amount), completed.get(), totalSteps, ex.getMessage());
-                reporter.failed("Something went wrong. Please try again.");
+                        tag, name, uuid, Bills.fmt(amount), completed.get(), totalSteps, ex.getMessage());
+                BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, "Something went wrong. Please try again."));
                 return;
             }
             if (rejected.get()) {
@@ -101,12 +121,8 @@ public final class Withdrawals {
                 }
                 return;
             }
-            LOGGER.info("[WITHDRAW:{}] {} ({}): ${}", tag, name, uuid, fmt(amount));
-            reporter.succeeded(amount);
+            LOGGER.info("[WITHDRAW:{}] {} ({}): ${}", tag, name, uuid, Bills.fmt(amount));
+            BillDelivery.whenOnline(server, uuid, p -> reporter.succeeded(p, amount));
         });
-    }
-
-    private static String fmt(long amount) {
-        return NumberFormat.getInstance().format(amount);
     }
 }

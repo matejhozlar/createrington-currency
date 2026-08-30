@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createrington.api.currency.HistoryResponse;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
+import com.saunhardy.createringtoncurrency.util.Bills;
 import com.saunhardy.createringtoncurrency.util.Deposits;
 import com.saunhardy.createringtoncurrency.util.Withdrawals;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
@@ -75,18 +76,18 @@ public final class ATMNetworking {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
         Deposits.depositAll(player, "atm", new Deposits.Reporter() {
             @Override
-            public void started(int amount) {
-                sendResult(player, KIND_INFO, "Depositing $" + amount + "...");
+            public void started(ServerPlayer recipient, long amount) {
+                sendResult(recipient, KIND_INFO, "Depositing $" + Bills.fmt(amount) + "...");
             }
 
             @Override
-            public void succeeded(int amount, String playerMessage) {
-                sendResult(player, KIND_SUCCESS, "Deposited $" + amount);
+            public void succeeded(ServerPlayer recipient, long amount, String playerMessage) {
+                sendResult(recipient, KIND_SUCCESS, playerMessage != null ? playerMessage : "Deposited $" + Bills.fmt(amount));
             }
 
             @Override
-            public void failed(String text) {
-                sendResult(player, KIND_ERROR, text);
+            public void failed(ServerPlayer recipient, String text) {
+                sendResult(recipient, KIND_ERROR, text);
             }
         });
     }
@@ -95,13 +96,13 @@ public final class ATMNetworking {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
         Withdrawals.withdraw(player, pkt.toArray(), "atm", new Withdrawals.Reporter() {
             @Override
-            public void succeeded(long amount) {
-                sendResult(player, KIND_SUCCESS, "Withdrew $" + amount);
+            public void succeeded(ServerPlayer recipient, long amount) {
+                sendResult(recipient, KIND_SUCCESS, "Withdrew $" + Bills.fmt(amount));
             }
 
             @Override
-            public void failed(String text) {
-                sendResult(player, KIND_ERROR, text);
+            public void failed(ServerPlayer recipient, String text) {
+                sendResult(recipient, KIND_ERROR, text);
             }
         });
     }

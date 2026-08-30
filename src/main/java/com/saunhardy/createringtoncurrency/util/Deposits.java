@@ -4,10 +4,10 @@ import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-import java.text.NumberFormat;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,53 +16,68 @@ public final class Deposits {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Set<UUID> IN_FLIGHT = ConcurrentHashMap.newKeySet();
 
+    private static final String REFUNDED = " Your bills were returned.";
+
     public interface Reporter {
-        void started(int amount);
-        void succeeded(int amount, @Nullable String playerMessage);
-        void failed(String text);
+        void started(ServerPlayer player, long amount);
+        void succeeded(ServerPlayer player, long amount, @Nullable String playerMessage);
+        void failed(ServerPlayer player, String text);
     }
 
     private Deposits() {}
 
+    public static void onServerStopped(ServerStoppedEvent event) {
+        IN_FLIGHT.clear();
+    }
+
     public static void depositAll(ServerPlayer player, String tag, Reporter reporter) {
+        if (!CurrencyApi.isAvailable()) {
+            reporter.failed(player, "The bank is not available on this server.");
+            return;
+        }
         int[] bills = Bills.count(player.getInventory());
-        int amount = Bills.value(bills);
+        long amount = Bills.value(bills);
         if (amount <= 0) {
-            reporter.failed("No bills to deposit.");
+            reporter.failed(player, "No bills to deposit.");
             return;
         }
         UUID uuid = player.getUUID();
         if (!IN_FLIGHT.add(uuid)) {
-            reporter.failed("A deposit is already in progress.");
+            reporter.failed(player, "A deposit is already in progress.");
             return;
         }
 
-        Bills.extract(player.getInventory(), bills);
-        player.inventoryMenu.sendAllDataToRemote();
-        reporter.started(amount);
-
         MinecraftServer server = player.server;
         String name = player.getName().getString();
-        CurrencyApi.deposit(uuid, amount).whenComplete((resp, ex) -> {
+        String refundReason = "the refund of a failed deposit";
+        try {
+            Bills.extract(player.getInventory(), bills);
+            player.inventoryMenu.sendAllDataToRemote();
+            reporter.started(player, amount);
+            CurrencyApi.deposit(uuid, amount).whenComplete((resp, ex) -> {
+                IN_FLIGHT.remove(uuid);
+                if (ex == null && resp.isSuccess()) {
+                    LOGGER.info("[DEPOSIT:{}] {} ({}): ${}", tag, name, uuid, Bills.fmt(amount));
+                    BillDelivery.whenOnline(server, uuid, p -> reporter.succeeded(p, amount, resp.getPlayerMessage()));
+                    return;
+                }
+
+                BillDelivery.deliver(server, uuid, bills, refundReason);
+                String text;
+                if (ex != null) {
+                    LOGGER.error("[DEPOSIT:{}] {} ({}): ${} failed, bills returned: {}", tag, name, uuid, Bills.fmt(amount), ex.getMessage());
+                    text = "Something went wrong. Please try again." + REFUNDED;
+                } else {
+                    LOGGER.warn("[DEPOSIT:{}] {} ({}): ${} rejected, bills returned: {}", tag, name, uuid, Bills.fmt(amount), resp.getMessage());
+                    text = CurrencyApi.errorText(resp, "Deposit failed. Please try again.") + REFUNDED;
+                }
+                BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, text));
+            });
+        } catch (RuntimeException e) {
             IN_FLIGHT.remove(uuid);
-            if (ex == null && resp.isSuccess()) {
-                LOGGER.info("[DEPOSIT:{}] {} ({}): ${}", tag, name, uuid, fmt(amount));
-                reporter.succeeded(amount, resp.getPlayerMessage());
-                return;
-            }
-
-            BillDelivery.deliver(server, uuid, bills, "the refund of a failed deposit");
-            if (ex != null) {
-                LOGGER.error("[DEPOSIT:{}] {} ({}): ${} failed, bills returned: {}", tag, name, uuid, fmt(amount), ex.getMessage());
-                reporter.failed("Something went wrong. Please try again. Your bills were returned.");
-            } else {
-                LOGGER.warn("[DEPOSIT:{}] {} ({}): ${} rejected, bills returned: {}", tag, name, uuid, fmt(amount), resp.getMessage());
-                reporter.failed(CurrencyApi.errorText(resp, "Deposit failed. Please try again.") + " Your bills were returned.");
-            }
-        });
-    }
-
-    private static String fmt(long amount) {
-        return NumberFormat.getInstance().format(amount);
+            BillDelivery.deliver(server, uuid, bills, refundReason);
+            LOGGER.error("[DEPOSIT:{}] {} ({}): ${} could not be submitted, bills returned", tag, name, uuid, Bills.fmt(amount), e);
+            reporter.failed(player, "Something went wrong. Please try again." + REFUNDED);
+        }
     }
 }

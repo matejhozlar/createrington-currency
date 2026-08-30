@@ -26,3 +26,5 @@ runs
 run-data
 
 repo
+# log4j output from the JUnit test JVM
+/logs/

@@ -283,7 +283,8 @@ public class MoneyCommands {
     }
 
     private static int withdrawCustomBundle(ServerPlayer player, String input) {
-        int[] counts = Bills.none();
+        long[] totals = new long[Bills.DENOMINATIONS.length];
+        long bills = 0;
         for (String part : input.split(" ")) {
             String[] pair = part.split(":");
             if (pair.length != 2) {
@@ -307,8 +308,19 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Unsupported denomination: $" + denom, ChatFormatting.RED));
                 return 0;
             }
-            counts[index] += count;
+            if (count > Withdrawals.MAX_BILLS) {
+                player.sendSystemMessage(message("[ERROR]", "Too many bills in " + part + " (at most " + Bills.fmt(Withdrawals.MAX_BILLS) + " per withdrawal).", ChatFormatting.RED));
+                return 0;
+            }
+            totals[index] += count;
+            bills += count;
         }
+        if (bills > Withdrawals.MAX_BILLS) {
+            player.sendSystemMessage(message("[ERROR]", "Too many bills: at most " + Bills.fmt(Withdrawals.MAX_BILLS) + " per withdrawal.", ChatFormatting.RED));
+            return 0;
+        }
+        int[] counts = Bills.none();
+        for (int i = 0; i < counts.length; i++) counts[i] = (int) totals[i];
         return submitWithdrawal(player, counts);
     }
 
@@ -319,13 +331,13 @@ public class MoneyCommands {
     private static int submitWithdrawal(ServerPlayer player, int[] counts) {
         Withdrawals.withdraw(player, counts, "command", new Withdrawals.Reporter() {
             @Override
-            public void succeeded(long amount) {
-                player.sendSystemMessage(message("✅", "Successfully withdrew $" + NumberFormat.getInstance().format(amount), ChatFormatting.GREEN));
+            public void succeeded(ServerPlayer recipient, long amount) {
+                recipient.sendSystemMessage(message("✅", "Successfully withdrew $" + Bills.fmt(amount), ChatFormatting.GREEN));
             }
 
             @Override
-            public void failed(String text) {
-                player.sendSystemMessage(message("❌", text, ChatFormatting.RED));
+            public void failed(ServerPlayer recipient, String text) {
+                recipient.sendSystemMessage(message("❌", text, ChatFormatting.RED));
             }
         });
         return 1;
@@ -334,21 +346,21 @@ public class MoneyCommands {
     private static void handleDepositAll(ServerPlayer player) {
         Deposits.depositAll(player, "command", new Deposits.Reporter() {
             @Override
-            public void started(int amount) {
-                player.sendSystemMessage(message("Processing deposit of", "$" + NumberFormat.getInstance().format(amount) + "...", ChatFormatting.YELLOW));
+            public void started(ServerPlayer recipient, long amount) {
+                recipient.sendSystemMessage(message("Processing deposit of", "$" + Bills.fmt(amount) + "...", ChatFormatting.YELLOW));
             }
 
             @Override
-            public void succeeded(int amount, String playerMessage) {
+            public void succeeded(ServerPlayer recipient, long amount, String playerMessage) {
                 String text = playerMessage != null
                         ? playerMessage
-                        : "Deposited $" + NumberFormat.getInstance().format(amount) + " into your account!";
-                player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
+                        : "Deposited $" + Bills.fmt(amount) + " into your account!";
+                recipient.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
             }
 
             @Override
-            public void failed(String text) {
-                player.sendSystemMessage(message("❌", text, ChatFormatting.RED));
+            public void failed(ServerPlayer recipient, String text) {
+                recipient.sendSystemMessage(message("❌", text, ChatFormatting.RED));
             }
         });
     }

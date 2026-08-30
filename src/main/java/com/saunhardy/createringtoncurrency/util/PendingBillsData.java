@@ -25,6 +25,10 @@ public class PendingBillsData extends SavedData {
                 .computeIfAbsent(new SavedData.Factory<>(PendingBillsData::new, PendingBillsData::load, null), DATA_NAME);
     }
 
+    public static void flush(MinecraftServer server) {
+        server.overworld().getDataStorage().save();
+    }
+
     public static PendingBillsData load(CompoundTag tag, HolderLookup.Provider registries) {
         PendingBillsData data = new PendingBillsData();
         CompoundTag pendingTag = tag.getCompound(TAG_PENDING);
@@ -51,7 +55,9 @@ public class PendingBillsData extends SavedData {
 
     public void add(UUID uuid, int[] counts) {
         int[] existing = pending.computeIfAbsent(uuid, u -> Bills.none());
-        for (int i = 0; i < existing.length; i++) existing[i] += counts[i];
+        for (int i = 0; i < existing.length; i++) {
+            existing[i] = (int) Math.min((long) existing[i] + counts[i], Integer.MAX_VALUE);
+        }
         setDirty();
     }
 

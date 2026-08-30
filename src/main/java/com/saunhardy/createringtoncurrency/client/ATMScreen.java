@@ -351,6 +351,7 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
             return;
         }
         sendWithdraw(Bills.breakdown(t));
+        clickSound();
     }
 
     private void performWithdrawBundle() {
