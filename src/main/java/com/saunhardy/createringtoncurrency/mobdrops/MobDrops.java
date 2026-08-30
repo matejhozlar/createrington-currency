@@ -104,10 +104,10 @@ public class MobDrops {
         ItemStack stack = player.getMainHandItem();
         int enchantmentLevel = 0;
         if (!stack.isEmpty()) {
-            var registryAccess = player.level().registryAccess();
-            var enchantmentRegistry = registryAccess.registryOrThrow(Registries.ENCHANTMENT);
-            var lightningStrikerHolder = enchantmentRegistry.getHolderOrThrow(ModEnchantments.CAPITALIST_GREED);
-            enchantmentLevel = stack.getEnchantmentLevel(lightningStrikerHolder);
+            enchantmentLevel = player.level().registryAccess().registryOrThrow(Registries.ENCHANTMENT)
+                    .getHolder(ModEnchantments.CAPITALIST_GREED)
+                    .map(stack::getEnchantmentLevel)
+                    .orElse(0);
         }
 
         UUID uuid = player.getUUID();

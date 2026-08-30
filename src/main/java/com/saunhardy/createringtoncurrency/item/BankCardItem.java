@@ -27,8 +27,8 @@ public class BankCardItem extends Item {
             tooltip.add(Component.literal("Usage Instructions:").withStyle(ChatFormatting.GOLD));
             tooltip.add(Component.literal("1. Hold shopping list in main hand").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("2. Hold bank card in offhand").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("3. Right-click Stock Ticker entity or Blaze Burner").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("4. Bills will be withdrawn automatically").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("3. Right-click the Stock Keeper or its Blaze Burner").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("4. Missing bills are withdrawn; right-click again to pay").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.empty());
             tooltip.add(Component.literal("Requirements:").withStyle(ChatFormatting.BLUE));
             tooltip.add(Component.literal("• Shopping list must contain currency bills").withStyle(ChatFormatting.GRAY));

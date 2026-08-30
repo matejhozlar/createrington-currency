@@ -99,6 +99,12 @@ public final class Bills {
         return total;
     }
 
+    public static int[] missing(int[] required, int[] available) {
+        int[] missing = none();
+        for (int i = 0; i < DENOMINATIONS.length; i++) missing[i] = Math.max(0, required[i] - available[i]);
+        return missing;
+    }
+
     public static boolean isEmpty(int[] counts) {
         for (int c : counts) if (c != 0) return false;
         return true;

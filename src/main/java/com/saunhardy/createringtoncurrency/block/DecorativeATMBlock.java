@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Mirror;
@@ -46,7 +47,9 @@ public class DecorativeATMBlock extends Block {
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
         BlockPos above = ctx.getClickedPos().above();
         Level level = ctx.getLevel();
-        if (!level.getBlockState(above).canBeReplaced(ctx) || !level.getWorldBorder().isWithinBounds(above)) {
+        if (above.getY() >= level.getMaxBuildHeight()
+                || !level.getBlockState(above).canBeReplaced(ctx)
+                || !level.getWorldBorder().isWithinBounds(above)) {
             return null;
         }
         return this.defaultBlockState()
@@ -60,16 +63,28 @@ public class DecorativeATMBlock extends Block {
     }
 
     @Override
-    public @NotNull BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+    protected @NotNull BlockState updateShape(BlockState state, @NotNull Direction direction, @NotNull BlockState neighborState,
+                                              @NotNull LevelAccessor level, @NotNull BlockPos pos, @NotNull BlockPos neighborPos) {
         DoubleBlockHalf half = state.getValue(HALF);
-        BlockPos otherPos = half == DoubleBlockHalf.LOWER ? pos.above() : pos.below();
-        BlockState otherState = level.getBlockState(otherPos);
-
-        if (otherState.is(this) && otherState.getValue(HALF) != half) {
-            level.setBlock(otherPos, Blocks.AIR.defaultBlockState(), 35);
-            level.levelEvent(player, 2001, otherPos, Block.getId(otherState));
+        if (direction.getAxis() == Direction.Axis.Y && (half == DoubleBlockHalf.LOWER) == (direction == Direction.UP)) {
+            return neighborState.is(this) && neighborState.getValue(HALF) != half
+                    ? state
+                    : Blocks.AIR.defaultBlockState();
         }
+        return super.updateShape(state, direction, neighborState, level, pos, neighborPos);
+    }
 
+    @Override
+    public @NotNull BlockState playerWillDestroy(@NotNull Level level, @NotNull BlockPos pos, @NotNull BlockState state, @NotNull Player player) {
+        if (!level.isClientSide && (player.isCreative() || !player.hasCorrectToolForDrops(state))
+                && state.getValue(HALF) == DoubleBlockHalf.UPPER) {
+            BlockPos below = pos.below();
+            BlockState belowState = level.getBlockState(below);
+            if (belowState.is(this) && belowState.getValue(HALF) == DoubleBlockHalf.LOWER) {
+                level.setBlock(below, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL | Block.UPDATE_SUPPRESS_DROPS);
+                level.levelEvent(player, 2001, below, Block.getId(belowState));
+            }
+        }
         return super.playerWillDestroy(level, pos, state, player);
     }
 
