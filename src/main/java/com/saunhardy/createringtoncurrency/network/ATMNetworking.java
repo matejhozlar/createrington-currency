@@ -3,28 +3,26 @@ package com.saunhardy.createringtoncurrency.network;
 import com.google.gson.Gson;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createrington.api.currency.HistoryResponse;
-import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
+import com.saunhardy.createringtoncurrency.util.Deposits;
+import com.saunhardy.createringtoncurrency.util.Withdrawals;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 public final class ATMNetworking {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
 
+    private static final int KIND_INFO = 0;
+    private static final int KIND_SUCCESS = 1;
+    private static final int KIND_ERROR = 2;
+
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar reg = event.registrar("1");
+        PayloadRegistrar reg = event.registrar("2");
 
         reg.playToServer(ATMDepositPayload.TYPE, ATMDepositPayload.STREAM_CODEC, ATMNetworking::handleDeposit);
         reg.playToServer(ATMWithdrawPayload.TYPE, ATMWithdrawPayload.STREAM_CODEC, ATMNetworking::handleWithdraw);
@@ -75,169 +73,37 @@ public final class ATMNetworking {
 
     private static void handleDeposit(final ATMDepositPayload pkt, final IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
-
-        Map<net.minecraft.world.item.Item, Integer> values = Map.of(
-                CreateringtonCurrency.BILL_1.get(), 1,
-                CreateringtonCurrency.BILL_5.get(), 5,
-                CreateringtonCurrency.BILL_10.get(), 10,
-                CreateringtonCurrency.BILL_20.get(), 20,
-                CreateringtonCurrency.BILL_50.get(), 50,
-                CreateringtonCurrency.BILL_100.get(), 100,
-                CreateringtonCurrency.BILL_500.get(), 500,
-                CreateringtonCurrency.BILL_1000.get(), 1000
-        );
-
-        Map<Integer, List<Integer>> slotsByDenom = new HashMap<>();
-        int total = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack st = player.getInventory().getItem(i);
-            if (!st.isEmpty() && values.containsKey(st.getItem())) {
-                int val = values.get(st.getItem());
-                total += val * st.getCount();
-                slotsByDenom.computeIfAbsent(val, k -> new ArrayList<>()).add(i);
+        Deposits.depositAll(player, "atm", new Deposits.Reporter() {
+            @Override
+            public void started(int amount) {
+                sendResult(player, KIND_INFO, "Depositing $" + amount + "...");
             }
-        }
 
-        if (total <= 0) {
-            sendResult(player, 2, "No bills to deposit.");
-            return;
-        }
-
-        final int totalAmount = total;
-        CurrencyApi.deposit(player.getUUID(), totalAmount)
-                .thenAccept(resp -> {
-                    if (resp.isSuccess()) {
-                        player.server.execute(() -> {
-                            for (var entry : slotsByDenom.entrySet()) {
-                                for (int slot : entry.getValue()) {
-                                    player.getInventory().setItem(slot, ItemStack.EMPTY);
-                                }
-                            }
-                            player.inventoryMenu.sendAllDataToRemote();
-                            sendResult(player, 1, "Deposited $" + totalAmount);
-                        });
-                        LOGGER.info("[ATM DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), totalAmount);
-                    } else {
-                        sendResult(player, 2, errorText(resp, "Deposit failed. Please try again."));
-                    }
-                })
-                .exceptionally(ex -> {
-                    LOGGER.error("ATM deposit failed for {}: {}", player.getName().getString(), ex.getMessage());
-                    sendResult(player, 2, "Something went wrong. Please try again.");
-                    return null;
-                });
-    }
-
-    private static void handleWithdraw(final ATMWithdrawPayload pkt, final IPayloadContext ctx) {
-        if (!(ctx.player() instanceof ServerPlayer player)) return;
-
-        if (pkt.a() <= 0 || (pkt.mode() == 0 && pkt.b() <= 0)) {
-            sendResult(player, 2, "Invalid amount.");
-            return;
-        }
-
-        if (pkt.mode() == 0) {
-            singleWithdraw(player, pkt.a(), pkt.b());
-            return;
-        }
-
-        int total = pkt.a();
-        int[] denoms = CreateringtonCurrency.DENOMINATIONS;
-        Map<Integer, Integer> bundle = new LinkedHashMap<>();
-        for (int d : denoms) {
-            int cnt = total / d;
-            if (cnt > 0) {
-                bundle.put(d, cnt);
-                total -= d * cnt;
+            @Override
+            public void succeeded(int amount, String playerMessage) {
+                sendResult(player, KIND_SUCCESS, "Deposited $" + amount);
             }
-        }
-        if (total != 0) {
-            sendResult(player, 2, "Cannot make exact change.");
-            return;
-        }
-        optimizedWithdraw(player, bundle, pkt.a());
-    }
 
-    private static void singleWithdraw(ServerPlayer player, int denomination, int count) {
-        CurrencyApi.withdraw(player.getUUID(), denomination, count)
-                .thenAccept(resp -> {
-                    if (resp.isSuccess()) {
-                        giveBill(player, denomination, count);
-                        long amount = (long) denomination * count;
-                        sendResult(player, 1, "Withdrew $" + amount);
-                        LOGGER.info("[ATM WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), player.getUUID(), amount, count, denomination);
-                    } else {
-                        sendResult(player, 2, errorText(resp, "Withdraw failed. Please try again."));
-                    }
-                })
-                .exceptionally(ex -> {
-                    LOGGER.error("ATM withdraw failed for {}: {}", player.getName().getString(), ex.getMessage());
-                    sendResult(player, 2, "Something went wrong. Please try again.");
-                    return null;
-                });
-    }
-
-    private static void optimizedWithdraw(ServerPlayer player, Map<Integer, Integer> bundle, int totalRequested) {
-        final int totalSteps = bundle.size();
-        var completedSteps = new java.util.concurrent.atomic.AtomicInteger(0);
-        var overall = java.util.concurrent.CompletableFuture.completedFuture(true);
-        var failed = new java.util.concurrent.atomic.AtomicBoolean(false);
-        for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
-            int denom = entry.getKey();
-            int count = entry.getValue();
-            overall = overall.thenCompose(prevOk -> {
-                if (failed.get()) return java.util.concurrent.CompletableFuture.completedFuture(false);
-                return CurrencyApi.withdraw(player.getUUID(), denom, count).thenApply(resp -> {
-                    if (resp.isSuccess()) {
-                        giveBill(player, denom, count);
-                        completedSteps.incrementAndGet();
-                        return true;
-                    }
-                    failed.set(true);
-                    sendResult(player, 2, errorText(resp, "Withdraw failed. Please try again."));
-                    return false;
-                });
-            });
-        }
-        overall.whenComplete((ignored, ex) -> {
-            if (ex != null) {
-                LOGGER.error("ATM optimized withdraw failed for {}: {}", player.getName().getString(), ex.getMessage());
-                sendResult(player, 2, "Something went wrong. Please try again.");
-                return;
-            }
-            if (failed.get() && completedSteps.get() > 0) {
-                LOGGER.warn("[ATM WITHDRAW] Partial optimized bundle for {} ({}): {}/{} denominations completed before failure; player kept those bills",
-                        player.getName().getString(), player.getUUID(), completedSteps.get(), totalSteps);
-                return;
-            }
-            if (!failed.get()) {
-                sendResult(player, 1, "Withdrawal complete");
-                LOGGER.info("[ATM WITHDRAW] {} ({}): ${} (optimized)", player.getName().getString(), player.getUUID(), totalRequested);
+            @Override
+            public void failed(String text) {
+                sendResult(player, KIND_ERROR, text);
             }
         });
     }
 
-    private static void giveBill(ServerPlayer player, int denom, int count) {
-        var item = switch (denom) {
-            case 1 -> CreateringtonCurrency.BILL_1.get();
-            case 5 -> CreateringtonCurrency.BILL_5.get();
-            case 10 -> CreateringtonCurrency.BILL_10.get();
-            case 20 -> CreateringtonCurrency.BILL_20.get();
-            case 50 -> CreateringtonCurrency.BILL_50.get();
-            case 100 -> CreateringtonCurrency.BILL_100.get();
-            case 500 -> CreateringtonCurrency.BILL_500.get();
-            case 1000 -> CreateringtonCurrency.BILL_1000.get();
-            default -> null;
-        };
-        if (item == null) return;
-        ItemStack stack = new ItemStack(item, count);
-        player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-    }
+    private static void handleWithdraw(final ATMWithdrawPayload pkt, final IPayloadContext ctx) {
+        if (!(ctx.player() instanceof ServerPlayer player)) return;
+        Withdrawals.withdraw(player, pkt.toArray(), "atm", new Withdrawals.Reporter() {
+            @Override
+            public void succeeded(long amount) {
+                sendResult(player, KIND_SUCCESS, "Withdrew $" + amount);
+            }
 
-    private static String errorText(com.saunhardy.crnet.http.ApiResponse<?> resp, String fallback) {
-        if (resp.getPlayerMessage() != null) return resp.getPlayerMessage();
-        if (resp.getMessage() != null) return resp.getMessage();
-        return fallback;
+            @Override
+            public void failed(String text) {
+                sendResult(player, KIND_ERROR, text);
+            }
+        });
     }
 
     // ---- Client-side handlers ---------------------------------------------
@@ -265,8 +131,8 @@ public final class ATMNetworking {
         mc.execute(() -> {
             if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
                 int color = switch (pkt.kind()) {
-                    case 1 -> 0x2ECC71;
-                    case 2 -> 0xE74C3C;
+                    case KIND_SUCCESS -> 0x2ECC71;
+                    case KIND_ERROR -> 0xE74C3C;
                     default -> 0xFFFFFF;
                 };
                 scr.showStatus(pkt.message(), color);

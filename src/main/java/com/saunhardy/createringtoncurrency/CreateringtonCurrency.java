@@ -14,6 +14,7 @@ import com.saunhardy.createringtoncurrency.menu.DepositorMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
 import com.saunhardy.createringtoncurrency.network.DepositorNetworking;
+import com.saunhardy.createringtoncurrency.util.BillDelivery;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -192,6 +193,7 @@ public class CreateringtonCurrency {
             }
         });
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
+        NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);

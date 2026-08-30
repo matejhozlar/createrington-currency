@@ -6,8 +6,8 @@ import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlock;
 import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlockEntity;
+import com.saunhardy.createringtoncurrency.util.BillDelivery;
 import com.saunhardy.createringtoncurrency.util.Bills;
-import com.saunhardy.crnet.http.ApiResponse;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -221,7 +221,7 @@ public final class DepositorNetworking {
                 return;
             }
             if (!resp.isSuccess()) {
-                actionBar(player, KIND_ERROR, errorText(resp, "Card payment failed. Please try again."));
+                actionBar(player, KIND_ERROR, CurrencyApi.errorText(resp, "Card payment failed. Please try again."));
                 return;
             }
             player.server.execute(() -> finishCardPayment(player, level, pos, owner, denomIndex, count));
@@ -232,8 +232,7 @@ public final class DepositorNetworking {
         int[] bills = Bills.only(denomIndex, count);
         DepositorTerminalBlockEntity be = level.getBlockEntity(pos) instanceof DepositorTerminalBlockEntity found ? found : null;
         if (be == null || !Bills.fits(be.getStorage(), bills)) {
-            Bills.give(player, bills);
-            player.inventoryMenu.sendAllDataToRemote();
+            BillDelivery.deliver(player.server, player.getUUID(), bills, "the refund of a card payment");
             actionBar(player, KIND_ERROR, be == null
                     ? "The terminal is gone — the withdrawn bills were handed to you."
                     : "The terminal filled up — the withdrawn bills were handed to you.");
@@ -272,12 +271,6 @@ public final class DepositorNetworking {
     private static DepositorTerminalBlockEntity terminalNear(ServerPlayer player, BlockPos pos) {
         if (player.distanceToSqr(pos.getCenter()) > DepositorTerminalBlock.MAX_USE_DISTANCE_SQ) return null;
         return player.level().getBlockEntity(pos) instanceof DepositorTerminalBlockEntity be ? be : null;
-    }
-
-    private static String errorText(ApiResponse<?> resp, String fallback) {
-        if (resp.getPlayerMessage() != null) return resp.getPlayerMessage();
-        if (resp.getMessage() != null) return resp.getMessage();
-        return fallback;
     }
 
     private static String fmt(int amount) {

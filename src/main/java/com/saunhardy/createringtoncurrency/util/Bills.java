@@ -8,6 +8,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper;
 
 public final class Bills {
     public static final int[] DENOMINATIONS = CreateringtonCurrency.DENOMINATIONS;
@@ -54,6 +55,16 @@ public final class Bills {
     public static int[] only(int index, int count) {
         int[] counts = none();
         counts[index] = count;
+        return counts;
+    }
+
+    public static int[] breakdown(int total) {
+        int[] counts = none();
+        int remaining = total;
+        for (int i = 0; i < DENOMINATIONS.length; i++) {
+            counts[i] = remaining / DENOMINATIONS[i];
+            remaining %= DENOMINATIONS[i];
+        }
         return counts;
     }
 
@@ -122,6 +133,10 @@ public final class Bills {
         ItemStackHandler sim = new ItemStackHandler(handler.getSlots());
         for (int slot = 0; slot < handler.getSlots(); slot++) sim.setStackInSlot(slot, handler.getStackInSlot(slot).copy());
         return isEmpty(insert(sim, counts));
+    }
+
+    public static boolean fitsInventory(Player player, int[] counts) {
+        return fits(new PlayerMainInvWrapper(player.getInventory()), counts);
     }
 
     public static void give(Player player, int[] counts) {
