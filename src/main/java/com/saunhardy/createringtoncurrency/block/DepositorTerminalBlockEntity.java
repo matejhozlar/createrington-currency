@@ -1,5 +1,6 @@
 package com.saunhardy.createringtoncurrency.block;
 
+import com.saunhardy.createringtoncurrency.AdminMode;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
 import com.saunhardy.createringtoncurrency.util.Bills;
@@ -85,7 +86,7 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
     }
 
     public boolean canConfigure(Player player) {
-        return isOwner(player) || player.hasPermissions(2);
+        return isOwner(player) || AdminMode.isActive(player);
     }
 
     public void setOwner(Player player) {

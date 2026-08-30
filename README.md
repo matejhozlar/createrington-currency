@@ -79,6 +79,12 @@ Any command can be turned off in the config, see [Disabling commands](#disabling
 
 If you are the only player online the vote passes immediately.
 
+### Admin Commands
+
+| Command                             | Description                                                                                                                                                                                                                                         |
+|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself: while it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills); while it is off you pay like any other customer. Admin mode switches off again when you log out |
+
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
 - **PIN & authentication:** The GUI guides players through a simple login flow; once authenticated it displays their balance, deposit buttons and withdraw options. The screen class organises the UI into views for deposit, withdraw total, withdraw single bills and withdraw bundles.
