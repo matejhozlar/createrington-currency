@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "createringtoncurrency:bill_500"
+    }
+  ],
+  "result": {
+    "count": 5,
+    "id": "createringtoncurrency:bill_100"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_bill_1": {
+      "conditions": {
+        "items": [
+          {
+            "items": "createringtoncurrency:bill_1"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "createringtoncurrency:bill_5_from_5x1"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_bill_1"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "createringtoncurrency:bill_5_from_5x1"
+    ]
+  }
+}
