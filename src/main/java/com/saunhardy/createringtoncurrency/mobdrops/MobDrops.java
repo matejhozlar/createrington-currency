@@ -1,43 +1,36 @@
 package com.saunhardy.createringtoncurrency.mobdrops;
 
-import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantments;
-import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.util.Bills;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.ChatFormatting;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.common.util.FakePlayer;
-import net.minecraft.world.entity.EntityType;
 import org.slf4j.Logger;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MobDrops {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Set<UUID> warnedToday = new HashSet<>();
-    private static final int PRUNE_INTERVAL_TICKS = 24000; // 20 minutes
-    private static final Set<EntityType<?>> ALLOWED_MOB_TYPES = Set.of(
-            EntityType.ZOMBIE,
-            EntityType.CREEPER,
-            EntityType.SPIDER,
-            EntityType.SKELETON,
-            EntityType.WITHER_SKELETON,
-            EntityType.BLAZE
-    );
+    private static final int PRUNE_INTERVAL_TICKS = 24000;
 
     private static MobEarningsData earningsData;
     private static LocalDate cachedToday = LocalDate.now();
@@ -98,17 +91,8 @@ public class MobDrops {
         if (dailyLimit <= 0) return;
 
         LivingEntity dead = event.getEntity();
-        EntityType<?> type = dead.getType();
-        if (!ALLOWED_MOB_TYPES.contains(type)) return;
-
-        ItemStack stack = player.getMainHandItem();
-        int enchantmentLevel = 0;
-        if (!stack.isEmpty()) {
-            enchantmentLevel = player.level().registryAccess().registryOrThrow(Registries.ENCHANTMENT)
-                    .getHolder(ModEnchantments.CAPITALIST_GREED)
-                    .map(stack::getEnchantmentLevel)
-                    .orElse(0);
-        }
+        List<MobDropTable.Entry> drops = MobDropTable.entriesFor(dead.getType());
+        if (drops.isEmpty()) return;
 
         UUID uuid = player.getUUID();
         LocalDate today = cachedToday;
@@ -121,64 +105,48 @@ public class MobDrops {
             return;
         }
 
+        double bonus = MobDropTable.bonusFor(greedLevel(player));
         int earned = 0;
-        Item billToDrop = null;
-
-        double baseChance = 0.0;
-
-        if (type == EntityType.ZOMBIE || type == EntityType.CREEPER || type == EntityType.SPIDER) {
-            baseChance = Config.ZOM_SPI_CRE_DROP.get();
-        } else if (type == EntityType.SKELETON) {
-            baseChance = Config.SKELETON_DROP.get();
-        } else if (type == EntityType.WITHER_SKELETON) {
-            baseChance = Config.WITHER_SKELETON_DROP.get();
-        } else if (type == EntityType.BLAZE) {
-            baseChance = Config.BLAZE_DROP.get();
+        for (MobDropTable.Entry drop : drops) {
+            if (ThreadLocalRandom.current().nextDouble() * 100.0 < drop.chance() + bonus) {
+                earned += drop.denomination();
+            }
         }
+        if (earned <= 0) return;
 
-        int effectiveLevel = Math.min(enchantmentLevel, 3);
-        switch (effectiveLevel) {
-            case 1 -> baseChance += 5.0;
-            case 2 -> baseChance += 8.0;
-            case 3 -> baseChance += 10.0;
+        int allowed = Math.min(earned, dailyLimit - earnedSoFar);
+        earningsData.addEarnings(uuid, allowed, today);
+        dropBills(dead, Bills.breakdown(allowed));
+
+        if (earnedSoFar + allowed >= dailyLimit) {
+            player.sendSystemMessage(message(dailyLimit));
+            warnedToday.add(uuid);
         }
+    }
 
-        if (ThreadLocalRandom.current().nextDouble() < (baseChance / 100.0)) {
-            earned = 1;
-            billToDrop = CreateringtonCurrency.BILL_1.get();
-        }
+    private static int greedLevel(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        if (stack.isEmpty()) return 0;
+        return player.level().registryAccess().registryOrThrow(Registries.ENCHANTMENT)
+                .getHolder(ModEnchantments.CAPITALIST_GREED)
+                .map(stack::getEnchantmentLevel)
+                .orElse(0);
+    }
 
-        final boolean isFiveDollarMob =
-                type == EntityType.SKELETON ||
-                        type == EntityType.WITHER_SKELETON ||
-                        type == EntityType.BLAZE;
-
-        if (isFiveDollarMob && ThreadLocalRandom.current().nextDouble() < 0.02) {
-            earned = 5;
-            billToDrop = CreateringtonCurrency.BILL_5.get();
-        }
-
-        if (earned > 0) {
-            int allowed = Math.min(earned, dailyLimit - earnedSoFar);
-            if (allowed > 0) {
-                earningsData.addEarnings(uuid, allowed, today);
-                dropBill(dead, billToDrop);
-
-                if (earnedSoFar + allowed >= dailyLimit) {
-                    player.sendSystemMessage(message(dailyLimit));
-                    warnedToday.add(uuid);
-                }
+    private static void dropBills(LivingEntity dead, int[] counts) {
+        for (int i = 0; i < counts.length; i++) {
+            int remaining = counts[i];
+            while (remaining > 0) {
+                ItemStack stack = new ItemStack(Bills.itemFor(Bills.DENOMINATIONS[i]));
+                int size = Math.min(remaining, stack.getMaxStackSize());
+                stack.setCount(size);
+                dead.spawnAtLocation(stack);
+                remaining -= size;
             }
         }
     }
 
-    private static void dropBill(LivingEntity dead, Item bill) {
-        if (bill != null) {
-            dead.spawnAtLocation(new ItemStack(bill, 1));
-        }
-    }
-
     private static Component message(int limit) {
-        return Component.literal("\u26A0 You've reached today's mob farming limit ($" + limit + ").").withStyle(ChatFormatting.RED);
+        return Component.literal("⚠ You've reached today's mob farming limit ($" + limit + ").").withStyle(ChatFormatting.RED);
     }
 }
