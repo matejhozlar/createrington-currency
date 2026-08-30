@@ -30,6 +30,7 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -82,6 +83,7 @@ public class CreateringtonCurrency {
             .sound(SoundType.METAL)
             .requiresCorrectToolForDrops()
             .noOcclusion()
+            .pushReaction(PushReaction.BLOCK)
             .lightLevel(state -> state.getValue(DecorativeATMBlock.HALF) == DoubleBlockHalf.UPPER ? 8 : 0);
 
     public static final DeferredBlock<DecorativeATMBlock> ATM_BLUE_BLOCK = BLOCKS.register("atm_blue", () ->

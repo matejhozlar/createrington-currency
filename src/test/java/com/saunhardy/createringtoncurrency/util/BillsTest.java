@@ -32,6 +32,19 @@ class BillsTest {
     }
 
     @Test
+    void missingIsTheShortfallPerDenominationAndNeverNegative() {
+        int[] required = Bills.breakdown(1234);
+        int[] available = Bills.only(2, 5);
+        available[7] = 1;
+
+        int[] missing = Bills.missing(required, available);
+
+        assertArrayEquals(new int[]{1, 0, 0, 0, 1, 1, 0, 3}, missing);
+        assertTrue(Bills.isEmpty(Bills.missing(required, required)));
+        assertTrue(Bills.isEmpty(Bills.missing(Bills.none(), available)));
+    }
+
+    @Test
     void onlyPlacesTheCountAtTheDenominationIndex() {
         int[] counts = Bills.only(Bills.indexOfDenomination(50), 3);
         assertEquals(150, Bills.value(counts));
