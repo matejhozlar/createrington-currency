@@ -196,6 +196,8 @@ public class CreateringtonCurrency {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);
             modEventBus.addListener(ClientOnlyHooks::registerKeyMappings);
+            modEventBus.addListener(ClientOnlyHooks::registerBlockColors);
+            modEventBus.addListener(ClientOnlyHooks::registerItemColors);
             NeoForge.EVENT_BUS.register(ClientOnlyHooks.class);
 
             if (ModList.get().isLoaded("create")) {

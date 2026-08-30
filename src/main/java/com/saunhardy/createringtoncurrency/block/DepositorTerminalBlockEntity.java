@@ -44,6 +44,8 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
     private long poweredUntil;
     /** A payment landed while a pulse was still running: the signal was dropped for one tick and must be raised again. */
     private boolean raisePending;
+    /** The LED must be re-evaluated on the next tick: the price or the storage changed, or the terminal was just loaded. */
+    private boolean lightDirty = true;
 
     private final ItemStackHandler storage = new ItemStackHandler(STORAGE_SLOTS) {
         @Override
@@ -54,6 +56,7 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
         @Override
         protected void onContentsChanged(int slot) {
             setChanged();
+            lightDirty = true;
         }
     };
     private final IItemHandler extractOnly = new ExtractOnly(storage);
@@ -95,6 +98,7 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
     public void setPrice(int denomination, int count) {
         this.priceDenomination = denomination;
         this.priceCount = Math.max(0, count);
+        lightDirty = true;
         sync();
     }
 
@@ -135,6 +139,20 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
         } else if (powered && level.getGameTime() >= poweredUntil) {
             block.setPowered(level, pos, state, false);
         }
+
+        if (lightDirty) {
+            lightDirty = false;
+            // setPowered may just have swapped the state, so read it back instead of reusing the ticker's copy.
+            BlockState current = level.getBlockState(pos);
+            if (current.is(block)) block.setLight(level, pos, current, currentLight());
+        }
+    }
+
+    /** The LED state the price and the storage currently call for. */
+    private DepositorTerminalBlock.Light currentLight() {
+        if (!hasPrice()) return DepositorTerminalBlock.Light.OFF;
+        int[] payment = Bills.only(Bills.indexOfDenomination(priceDenomination), priceCount);
+        return Bills.fits(storage, payment) ? DepositorTerminalBlock.Light.READY : DepositorTerminalBlock.Light.FULL;
     }
 
     private void sync() {

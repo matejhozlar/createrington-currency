@@ -10,6 +10,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.InteractionHand;
@@ -32,6 +33,7 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +42,12 @@ import org.jetbrains.annotations.Nullable;
 public class DepositorTerminalBlock extends Block implements EntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    public static final EnumProperty<Light> LIGHT = EnumProperty.create("light", Light.class);
+
+    /** Tint index of the LED faces in the block model; the colour handlers in {@code ClientOnlyHooks} answer for it. */
+    public static final int LED_TINT_INDEX = 0;
+    /** LED colour while {@link #POWERED}: a sale just went through. Brass, to match the Create palette. */
+    public static final int LED_FLASH_COLOR = 0xDCB05A;
 
     public static final double MAX_USE_DISTANCE_SQ = 64.0;
 
@@ -47,12 +55,13 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any()
                 .setValue(FACING, Direction.NORTH)
-                .setValue(POWERED, false));
+                .setValue(POWERED, false)
+                .setValue(LIGHT, Light.OFF));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, POWERED);
+        builder.add(FACING, POWERED, LIGHT);
     }
 
     @Override
@@ -158,6 +167,12 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         updateNeighbours(level, pos, next);
     }
 
+    /** Sets the LED state; unlike {@link #setPowered} this never touches redstone neighbours. */
+    void setLight(ServerLevel level, BlockPos pos, BlockState state, Light light) {
+        if (state.getValue(LIGHT) == light) return;
+        level.setBlock(pos, state.setValue(LIGHT, light), Block.UPDATE_CLIENTS);
+    }
+
     private void updateNeighbours(Level level, BlockPos pos, BlockState state) {
         level.updateNeighborsAt(pos, this);
         level.updateNeighborsAt(pos.relative(state.getValue(FACING).getOpposite()), this);
@@ -200,5 +215,35 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
     protected @NotNull BlockState mirror(BlockState state, Mirror mirror) {
         Direction facing = state.getValue(FACING);
         return state.setValue(FACING, mirror.getRotation(facing).rotate(facing));
+    }
+
+    /**
+     * What the panel LED reports. {@link DepositorTerminalBlockEntity} re-evaluates it whenever the price or the storage
+     * changes; the colours are plain RGB and get applied client-side through the tint on the LED faces.
+     */
+    public enum Light implements StringRepresentable {
+        /** No price set: the terminal is not selling anything. */
+        OFF("off", 0x141414),
+        /** Priced, and the next payment fits into the storage. */
+        READY("ready", 0x1E9C24),
+        /** Priced, but the next payment would not fit: the owner has to empty the storage. */
+        FULL("full", 0xE03030);
+
+        private final String name;
+        private final int color;
+
+        Light(String name, int color) {
+            this.name = name;
+            this.color = color;
+        }
+
+        @Override
+        public @NotNull String getSerializedName() {
+            return name;
+        }
+
+        public int color() {
+            return color;
+        }
     }
 }
