@@ -44,9 +44,7 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
     public static final EnumProperty<Light> LIGHT = EnumProperty.create("light", Light.class);
 
-    /** Tint index of the LED faces in the block model. */
     public static final int LED_TINT_INDEX = 0;
-    /** LED colour while {@link #POWERED}: a sale just went through. Brass, to match the Create palette. */
     public static final int LED_FLASH_COLOR = 0xDCB05A;
 
     public static final double MAX_USE_DISTANCE_SQ = 64.0;
@@ -167,7 +165,6 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         updateNeighbours(level, pos, next);
     }
 
-    /** Sets the LED state; unlike {@link #setPowered} this never touches redstone neighbours. */
     void setLight(ServerLevel level, BlockPos pos, BlockState state, Light light) {
         if (state.getValue(LIGHT) == light) return;
         level.setBlock(pos, state.setValue(LIGHT, light), Block.UPDATE_CLIENTS);
@@ -217,11 +214,9 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         return state.setValue(FACING, mirror.getRotation(facing).rotate(facing));
     }
 
-    /** What the panel LED shows; the colours are plain RGB. */
     public enum Light implements StringRepresentable {
         OFF("off", 0x141414),
         READY("ready", 0x1E9C24),
-        /** Priced, but the next payment would not fit: the owner has to empty the storage. */
         FULL("full", 0xE03030);
 
         private final String name;

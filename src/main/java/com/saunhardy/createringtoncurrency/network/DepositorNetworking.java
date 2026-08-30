@@ -246,10 +246,6 @@ public final class DepositorNetworking {
         completePayment(player, be, owner, true, Bills.DENOMINATIONS[denomIndex], count);
     }
 
-    /**
-     * The bills that moved are the captured denomination/count, never the terminal's current price: a card payment
-     * resolves asynchronously and the owner may have changed the price in the meantime.
-     */
     private static void completePayment(ServerPlayer payer, DepositorTerminalBlockEntity be, UUID owner, boolean card,
                                         int denomination, int count) {
         int amount = denomination * count;

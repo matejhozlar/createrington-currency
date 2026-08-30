@@ -39,7 +39,6 @@ public final class ClientOnlyHooks {
         e.register(VOTE_NO);
     }
 
-    /** Depositor LED: a brass flash while the redstone pulse runs, otherwise the colour of the {@code LIGHT} state. */
     public static void registerBlockColors(RegisterColorHandlersEvent.Block e) {
         e.register((state, level, pos, tintIndex) -> {
             if (tintIndex != DepositorTerminalBlock.LED_TINT_INDEX) return -1;

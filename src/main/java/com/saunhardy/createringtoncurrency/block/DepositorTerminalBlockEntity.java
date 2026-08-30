@@ -44,7 +44,6 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
     private long poweredUntil;
     /** A payment landed while a pulse was still running: the signal was dropped for one tick and must be raised again. */
     private boolean raisePending;
-    /** The LED must be re-evaluated on the next tick: the price or the storage changed, or the terminal was just loaded. */
     private boolean lightDirty = true;
 
     private final ItemStackHandler storage = new ItemStackHandler(STORAGE_SLOTS) {
@@ -142,7 +141,6 @@ public class DepositorTerminalBlockEntity extends BlockEntity {
 
         if (lightDirty) {
             lightDirty = false;
-            // setPowered may just have swapped the state, so read it back instead of reusing the ticker's copy.
             BlockState current = level.getBlockState(pos);
             if (current.is(block)) block.setLight(level, pos, current, currentLight());
         }
