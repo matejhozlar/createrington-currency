@@ -3,6 +3,7 @@ package com.saunhardy.createringtoncurrency.client;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.network.ATMDepositPayload;
 import com.saunhardy.createringtoncurrency.network.ATMWithdrawPayload;
+import com.saunhardy.createringtoncurrency.util.Bills;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -339,29 +340,40 @@ public class ATMScreen extends AbstractContainerScreen<ATMMenu> {
     }
 
     private void performWithdrawTotal() {
+        int t;
         try {
-            int t = Integer.parseInt(totalBox.getValue().trim());
-            var conn = Minecraft.getInstance().getConnection();
-            if (conn != null) conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(1, t, 0)));
-        } catch (Exception ignored) {}
+            t = Integer.parseInt(totalBox.getValue().trim());
+        } catch (NumberFormatException e) {
+            t = 0;
+        }
+        if (t <= 0) {
+            showStatus("Enter an amount.", 0xE74C3C);
+            return;
+        }
+        sendWithdraw(Bills.breakdown(t));
+        clickSound();
     }
 
     private void performWithdrawBundle() {
-        var conn = Minecraft.getInstance().getConnection();
-        if (conn == null) return;
-
+        int[] counts = Bills.none();
         for (int i = 0; i < DENOMS.length; i++) {
             String v = bundleBoxes[i].getValue().trim();
-            if (!v.isEmpty()) {
-                try {
-                    int count = Integer.parseInt(v);
-                    if (count > 0) {
-                        conn.send(new ServerboundCustomPayloadPacket(new ATMWithdrawPayload(0, DENOMS[i], count)));
-                    }
-                } catch (Exception ignored) {}
-            }
+            if (v.isEmpty()) continue;
+            try {
+                counts[i] = Integer.parseInt(v);
+            } catch (Exception ignored) {}
         }
+        if (Bills.isEmpty(counts)) {
+            showStatus("Enter at least one bill count.", 0xE74C3C);
+            return;
+        }
+        sendWithdraw(counts);
         clickSound();
+    }
+
+    private void sendWithdraw(int[] counts) {
+        var conn = Minecraft.getInstance().getConnection();
+        if (conn != null) conn.send(new ServerboundCustomPayloadPacket(ATMWithdrawPayload.of(counts)));
     }
 
     @Override

@@ -139,6 +139,16 @@ public final class CurrencyApi {
         return c == null ? unavailable() : c.postAsync(Endpoints.TRAINS_CRASH, GSON.toJson(req), authUuid);
     }
 
+    public static boolean isAvailable() {
+        return client != null;
+    }
+
+    public static String errorText(ApiResponse<?> resp, String fallback) {
+        if (resp.getPlayerMessage() != null) return resp.getPlayerMessage();
+        if (resp.getMessage() != null) return resp.getMessage();
+        return fallback;
+    }
+
     // ---- Internals ---------------------------------------------------------
 
     /**

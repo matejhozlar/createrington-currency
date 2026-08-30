@@ -4,8 +4,6 @@ import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.crnet.http.ApiResponse;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
 
 public class WithdrawalHelper {
@@ -43,12 +41,15 @@ public class WithdrawalHelper {
      * call returns -- callers that cannot tolerate a network-latency stall
      * should schedule their own async wrapper.
      */
-    public static WithdrawalResponse withdrawBills(ServerPlayer player, Item billItem, int count, int denomination) {
+    public static WithdrawalResponse withdrawBills(ServerPlayer player, int count, int denomination) {
+        int index = Bills.indexOfDenomination(denomination);
+        if (index < 0 || count <= 0) {
+            return WithdrawalResponse.failed(WithdrawalResult.FAILED_API);
+        }
         try {
             ApiResponse<?> resp = CurrencyApi.withdraw(player.getUUID(), denomination, count).join();
             if (resp.isSuccess()) {
-                ItemStack billStack = new ItemStack(billItem, count);
-                player.getInventory().add(billStack);
+                BillDelivery.deliver(player.server, player.getUUID(), Bills.only(index, count), "a Stock Ticker purchase");
                 return WithdrawalResponse.success();
             }
             LOGGER.error("Withdrawal API failed: uuid={}, denomination={}, count={}, message={}",
@@ -76,11 +77,11 @@ public class WithdrawalHelper {
         return freeSlots >= slotsNeeded;
     }
 
-    public static WithdrawalResponse withdrawBillsWithSpaceCheck(ServerPlayer player, Item billItem, int count, int denomination) {
+    public static WithdrawalResponse withdrawBillsWithSpaceCheck(ServerPlayer player, int count, int denomination) {
         int slotsNeeded = calculateSlotsNeeded(count, 64);
         if (!hasInventorySpace(player, slotsNeeded)) {
             return WithdrawalResponse.failed(WithdrawalResult.FAILED_INVENTORY);
         }
-        return withdrawBills(player, billItem, count, denomination);
+        return withdrawBills(player, count, denomination);
     }
 }

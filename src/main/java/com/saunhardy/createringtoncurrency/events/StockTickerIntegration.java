@@ -109,7 +109,7 @@ public class StockTickerIntegration {
                     
                     // Use the withdrawal helper
                     WithdrawalHelper.WithdrawalResponse response = WithdrawalHelper.withdrawBills(
-                        serverPlayer, billItem, count, denomination);
+                        serverPlayer, count, denomination);
                     
                     if (!response.success) {
                         allWithdrawalsSucceeded = false;

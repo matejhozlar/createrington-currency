@@ -5,6 +5,9 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
+import com.saunhardy.createringtoncurrency.util.Bills;
+import com.saunhardy.createringtoncurrency.util.Deposits;
+import com.saunhardy.createringtoncurrency.util.Withdrawals;
 import com.saunhardy.crnet.http.ApiResponse;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -12,8 +15,6 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -21,7 +22,6 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
 
 import java.text.NumberFormat;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -274,36 +274,17 @@ public class MoneyCommands {
     // ---- Withdraw variants -------------------------------------------------
 
     private static int withdrawFixed(ServerPlayer player, int denomination, int count) {
-        Item billItem = getBillItem(denomination);
-        if (billItem == null) {
+        int index = Bills.indexOfDenomination(denomination);
+        if (index < 0) {
             player.sendSystemMessage(message("[ERROR]", "Invalid denomination.", ChatFormatting.RED));
             return 0;
         }
-        if (isInventoryFullFor(player, billItem, count)) {
-            String formatted = NumberFormat.getInstance().format(count);
-            player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
-            return 0;
-        }
-        CurrencyApi.withdraw(player.getUUID(), denomination, count)
-                .thenAccept(resp -> {
-                    if (resp.isSuccess()) {
-                        ItemStack stack = new ItemStack(billItem, count);
-                        player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-                        long amount = (long) denomination * count;
-                        String formatted = NumberFormat.getInstance().format(amount);
-                        player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
-                        LOGGER.info("[WITHDRAW] {} ({}): ${} ({}x${})", player.getName().getString(), player.getUUID(), formatted, count, denomination);
-                    } else {
-                        sendApiError(player, "Withdraw", resp);
-                    }
-                })
-                .exceptionally(ex -> { sendException(player, "Withdraw", ex); return null; });
-        return 1;
+        return submitWithdrawal(player, Bills.only(index, count));
     }
 
     private static int withdrawCustomBundle(ServerPlayer player, String input) {
-        Map<Integer, Integer> bundle = new LinkedHashMap<>();
-        long totalAmount = 0;
+        long[] totals = new long[Bills.DENOMINATIONS.length];
+        long bills = 0;
         for (String part : input.split(" ")) {
             String[] pair = part.split(":");
             if (pair.length != 2) {
@@ -322,185 +303,72 @@ public class MoneyCommands {
                 player.sendSystemMessage(message("[ERROR]", "Invalid denomination or count: " + part, ChatFormatting.RED));
                 return 0;
             }
-            Item item = getBillItem(denom);
-            if (item == null) {
+            int index = Bills.indexOfDenomination(denom);
+            if (index < 0) {
                 player.sendSystemMessage(message("[ERROR]", "Unsupported denomination: $" + denom, ChatFormatting.RED));
                 return 0;
             }
-            if (isInventoryFullFor(player, item, count)) {
-                player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for $" + denom + " x " + count, ChatFormatting.RED));
+            if (count > Withdrawals.MAX_BILLS) {
+                player.sendSystemMessage(message("[ERROR]", "Too many bills in " + part + " (at most " + Bills.fmt(Withdrawals.MAX_BILLS) + " per withdrawal).", ChatFormatting.RED));
                 return 0;
             }
-            bundle.put(denom, count);
-            totalAmount += (long) denom * count;
+            totals[index] += count;
+            bills += count;
         }
-        submitBundleWithdrawals(player, bundle, totalAmount, "bundle");
-        return 1;
+        if (bills > Withdrawals.MAX_BILLS) {
+            player.sendSystemMessage(message("[ERROR]", "Too many bills: at most " + Bills.fmt(Withdrawals.MAX_BILLS) + " per withdrawal.", ChatFormatting.RED));
+            return 0;
+        }
+        int[] counts = Bills.none();
+        for (int i = 0; i < counts.length; i++) counts[i] = (int) totals[i];
+        return submitWithdrawal(player, counts);
     }
 
     private static int withdrawOptimized(ServerPlayer player, int totalAmount) {
-        int[] denominations = CreateringtonCurrency.DENOMINATIONS;
-        Map<Integer, Integer> result = new LinkedHashMap<>();
-        int remaining = totalAmount;
-        for (int denom : denominations) {
-            int count = remaining / denom;
-            if (count > 0) {
-                result.put(denom, count);
-                remaining -= denom * count;
+        return submitWithdrawal(player, Bills.breakdown(totalAmount));
+    }
+
+    private static int submitWithdrawal(ServerPlayer player, int[] counts) {
+        Withdrawals.withdraw(player, counts, "command", new Withdrawals.Reporter() {
+            @Override
+            public void succeeded(ServerPlayer recipient, long amount) {
+                recipient.sendSystemMessage(message("✅", "Successfully withdrew $" + Bills.fmt(amount), ChatFormatting.GREEN));
             }
-        }
-        if (remaining > 0) {
-            player.sendSystemMessage(message("[ERROR]", "Cannot make exact change.", ChatFormatting.RED));
-            return 0;
-        }
-        for (Map.Entry<Integer, Integer> entry : result.entrySet()) {
-            Item billItem = getBillItem(entry.getKey());
-            if (billItem == null) {
-                player.sendSystemMessage(message("[ERROR]", "Invalid denomination: $" + entry.getKey(), ChatFormatting.RED));
-                return 0;
+
+            @Override
+            public void failed(ServerPlayer recipient, String text) {
+                recipient.sendSystemMessage(message("❌", text, ChatFormatting.RED));
             }
-            if (isInventoryFullFor(player, billItem, entry.getValue())) {
-                String formatted = NumberFormat.getInstance().format(entry.getValue());
-                player.sendSystemMessage(message("[ERROR]", "Not enough inventory space for " + formatted + " bills.", ChatFormatting.RED));
-                return 0;
-            }
-        }
-        submitBundleWithdrawals(player, result, totalAmount, "optimized");
+        });
         return 1;
     }
 
-    private static void submitBundleWithdrawals(ServerPlayer player, Map<Integer, Integer> bundle, long total, String tag) {
-        final int totalSteps = bundle.size();
-        var completedSteps = new java.util.concurrent.atomic.AtomicInteger(0);
-        var overall = java.util.concurrent.CompletableFuture.completedFuture((ApiResponse<com.saunhardy.createrington.api.currency.WithdrawResponse>) null);
-        var failed = new java.util.concurrent.atomic.AtomicBoolean(false);
-        for (Map.Entry<Integer, Integer> entry : bundle.entrySet()) {
-            int denom = entry.getKey();
-            int count = entry.getValue();
-            overall = overall.thenCompose(ignored -> {
-                if (failed.get()) return java.util.concurrent.CompletableFuture.completedFuture(null);
-                return CurrencyApi.withdraw(player.getUUID(), denom, count).thenApply(resp -> {
-                    if (resp.isSuccess()) {
-                        Item billItem = getBillItem(denom);
-                        if (billItem != null) {
-                            ItemStack stack = new ItemStack(billItem, count);
-                            player.server.execute(() -> player.getInventory().placeItemBackInInventory(stack));
-                        }
-                        completedSteps.incrementAndGet();
-                    } else {
-                        failed.set(true);
-                        sendApiError(player, "Withdraw", resp);
-                    }
-                    return resp;
-                });
-            });
-        }
-        overall.whenComplete((ignored, ex) -> {
-            if (ex != null) {
-                sendException(player, "Withdraw", ex);
-                return;
+    private static void handleDepositAll(ServerPlayer player) {
+        Deposits.depositAll(player, "command", new Deposits.Reporter() {
+            @Override
+            public void started(ServerPlayer recipient, long amount) {
+                recipient.sendSystemMessage(message("Processing deposit of", "$" + Bills.fmt(amount) + "...", ChatFormatting.YELLOW));
             }
-            if (failed.get() && completedSteps.get() > 0) {
-                LOGGER.warn("[WITHDRAW] Partial {} bundle for {} ({}): {}/{} denominations completed before failure; player kept those bills",
-                        tag, player.getName().getString(), player.getUUID(), completedSteps.get(), totalSteps);
-                return;
+
+            @Override
+            public void succeeded(ServerPlayer recipient, long amount, String playerMessage) {
+                String text = playerMessage != null
+                        ? playerMessage
+                        : "Deposited $" + Bills.fmt(amount) + " into your account!";
+                recipient.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
             }
-            if (!failed.get()) {
-                String formatted = NumberFormat.getInstance().format(total);
-                player.sendSystemMessage(message("✅", "Successfully withdrew $" + formatted, ChatFormatting.GREEN));
-                LOGGER.info("[WITHDRAW] {} ({}): ${} ({})", player.getName().getString(), player.getUUID(), formatted, tag);
+
+            @Override
+            public void failed(ServerPlayer recipient, String text) {
+                recipient.sendSystemMessage(message("❌", text, ChatFormatting.RED));
             }
         });
-    }
-
-    public static void handleDepositAll(ServerPlayer player) {
-        Map<Item, Integer> billValues = Map.of(
-                CreateringtonCurrency.BILL_1.get(), 1,
-                CreateringtonCurrency.BILL_5.get(), 5,
-                CreateringtonCurrency.BILL_10.get(), 10,
-                CreateringtonCurrency.BILL_20.get(), 20,
-                CreateringtonCurrency.BILL_50.get(), 50,
-                CreateringtonCurrency.BILL_100.get(), 100,
-                CreateringtonCurrency.BILL_500.get(), 500,
-                CreateringtonCurrency.BILL_1000.get(), 1000
-        );
-
-        Map<Integer, java.util.List<Integer>> slotsByDenom = new java.util.HashMap<>();
-        int computedTotal = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (!stack.isEmpty() && billValues.containsKey(stack.getItem())) {
-                int value = billValues.get(stack.getItem());
-                computedTotal += value * stack.getCount();
-                slotsByDenom.computeIfAbsent(value, k -> new java.util.ArrayList<>()).add(i);
-            }
-        }
-
-        if (computedTotal == 0) {
-            player.sendSystemMessage(message("[ERROR]", "No bills to deposit.", ChatFormatting.RED));
-            return;
-        }
-
-        final int totalAmount = computedTotal;
-        String formatted = NumberFormat.getInstance().format(totalAmount);
-        player.sendSystemMessage(message("Processing deposit of", "$" + formatted + "...", ChatFormatting.YELLOW));
-
-        CurrencyApi.deposit(player.getUUID(), totalAmount)
-                .thenAccept(resp -> {
-                    if (resp.isSuccess()) {
-                        player.server.execute(() -> {
-                            for (Map.Entry<Integer, java.util.List<Integer>> e : slotsByDenom.entrySet()) {
-                                for (int slot : e.getValue()) {
-                                    player.getInventory().setItem(slot, ItemStack.EMPTY);
-                                }
-                            }
-                            player.inventoryMenu.broadcastChanges();
-                        });
-                        String text = resp.getPlayerMessage() != null
-                                ? resp.getPlayerMessage()
-                                : "Deposited $" + formatted + " into your account!";
-                        player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
-                        LOGGER.info("[DEPOSIT] {} ({}): ${}", player.getName().getString(), player.getUUID(), formatted);
-                    } else {
-                        sendApiError(player, "Deposit", resp);
-                    }
-                })
-                .exceptionally(ex -> { sendException(player, "Deposit", ex); return null; });
     }
 
     // ---- Shared helpers ----------------------------------------------------
 
     public static Component message(String emoji, String text, ChatFormatting color) {
         return Component.literal(emoji + " " + text).withStyle(color);
-    }
-
-    private static Item getBillItem(int denomination) {
-        return switch (denomination) {
-            case 1 -> CreateringtonCurrency.BILL_1.get();
-            case 5 -> CreateringtonCurrency.BILL_5.get();
-            case 10 -> CreateringtonCurrency.BILL_10.get();
-            case 20 -> CreateringtonCurrency.BILL_20.get();
-            case 50 -> CreateringtonCurrency.BILL_50.get();
-            case 100 -> CreateringtonCurrency.BILL_100.get();
-            case 500 -> CreateringtonCurrency.BILL_500.get();
-            case 1000 -> CreateringtonCurrency.BILL_1000.get();
-            default -> null;
-        };
-    }
-
-    private static boolean isInventoryFullFor(ServerPlayer player, Item item, int totalCount) {
-        int maxStackSize = new ItemStack(item).getMaxStackSize();
-        int remaining = totalCount;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack slot = player.getInventory().getItem(i);
-            if (slot.isEmpty()) {
-                remaining -= maxStackSize;
-            } else if (slot.getItem() == item && slot.getCount() < maxStackSize) {
-                remaining -= (maxStackSize - slot.getCount());
-            }
-            if (remaining <= 0) return false;
-        }
-        return true;
     }
 
     private static boolean isOnCooldown(ServerPlayer player) {

@@ -14,6 +14,10 @@ import com.saunhardy.createringtoncurrency.menu.DepositorMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
 import com.saunhardy.createringtoncurrency.network.DepositorNetworking;
+import com.saunhardy.createringtoncurrency.util.BillDelivery;
+import com.saunhardy.createringtoncurrency.util.Bills;
+import com.saunhardy.createringtoncurrency.util.Deposits;
+import com.saunhardy.createringtoncurrency.util.Withdrawals;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -49,7 +53,7 @@ import java.util.List;
 @Mod(CreateringtonCurrency.MODID)
 public class CreateringtonCurrency {
     public static final String MODID = "createringtoncurrency";
-    public static final int[] DENOMINATIONS = {1000, 500, 100, 50, 20, 10, 5, 1};
+    public static final int[] DENOMINATIONS = Bills.DENOMINATIONS;
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
@@ -192,6 +196,9 @@ public class CreateringtonCurrency {
             }
         });
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
+        NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
+        NeoForge.EVENT_BUS.addListener(Deposits::onServerStopped);
+        NeoForge.EVENT_BUS.addListener(Withdrawals::onServerStopped);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);

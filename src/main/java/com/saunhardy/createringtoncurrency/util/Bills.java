@@ -8,9 +8,12 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper;
+
+import java.text.NumberFormat;
 
 public final class Bills {
-    public static final int[] DENOMINATIONS = CreateringtonCurrency.DENOMINATIONS;
+    public static final int[] DENOMINATIONS = {1000, 500, 100, 50, 20, 10, 5, 1};
 
     private Bills() {}
 
@@ -57,6 +60,16 @@ public final class Bills {
         return counts;
     }
 
+    public static int[] breakdown(int total) {
+        int[] counts = none();
+        int remaining = total;
+        for (int i = 0; i < DENOMINATIONS.length; i++) {
+            counts[i] = remaining / DENOMINATIONS[i];
+            remaining %= DENOMINATIONS[i];
+        }
+        return counts;
+    }
+
     public static int[] count(IItemHandler handler) {
         int[] counts = none();
         for (int slot = 0; slot < handler.getSlots(); slot++) add(counts, handler.getStackInSlot(slot));
@@ -74,9 +87,15 @@ public final class Bills {
         if (i >= 0) counts[i] += stack.getCount();
     }
 
-    public static int value(int[] counts) {
-        int total = 0;
-        for (int i = 0; i < DENOMINATIONS.length; i++) total += counts[i] * DENOMINATIONS[i];
+    public static long value(int[] counts) {
+        long total = 0;
+        for (int i = 0; i < DENOMINATIONS.length; i++) total += (long) counts[i] * DENOMINATIONS[i];
+        return total;
+    }
+
+    public static long pieces(int[] counts) {
+        long total = 0;
+        for (int c : counts) total += c;
         return total;
     }
 
@@ -89,7 +108,7 @@ public final class Bills {
         int[] leftover = none();
         for (int i = 0; i < DENOMINATIONS.length; i++) {
             if (counts[i] <= 0) continue;
-            ItemStack rest = ItemHandlerHelper.insertItem(handler, new ItemStack(itemFor(DENOMINATIONS[i]), counts[i]), false);
+            ItemStack rest = ItemHandlerHelper.insertItemStacked(handler, new ItemStack(itemFor(DENOMINATIONS[i]), counts[i]), false);
             leftover[i] = rest.getCount();
         }
         return leftover;
@@ -124,9 +143,11 @@ public final class Bills {
         return isEmpty(insert(sim, counts));
     }
 
-    public static void give(Player player, int[] counts) {
-        for (int i = 0; i < DENOMINATIONS.length; i++) {
-            if (counts[i] > 0) player.getInventory().placeItemBackInInventory(new ItemStack(itemFor(DENOMINATIONS[i]), counts[i]));
-        }
+    public static boolean fitsInventory(Player player, int[] counts) {
+        return fits(new PlayerMainInvWrapper(player.getInventory()), counts);
+    }
+
+    public static String fmt(long amount) {
+        return NumberFormat.getInstance().format(amount);
     }
 }
