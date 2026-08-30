@@ -12,6 +12,7 @@ import com.saunhardy.createringtoncurrency.item.BankCardItem;
 import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.menu.DepositorMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
+import com.saunhardy.createringtoncurrency.mobdrops.MobDropTable;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
 import com.saunhardy.createringtoncurrency.network.DepositorNetworking;
 import com.saunhardy.createringtoncurrency.util.BillDelivery;
@@ -188,6 +189,8 @@ public class CreateringtonCurrency {
         modEventBus.addListener(DepositorNetworking::register);
         modEventBus.addListener(CreateringtonCurrency::registerCapabilities);
         modEventBus.addListener(DataGenerators::gatherData);
+        modEventBus.addListener(MobDropTable::onConfigLoading);
+        modEventBus.addListener(MobDropTable::onConfigReloading);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 
@@ -199,6 +202,7 @@ public class CreateringtonCurrency {
         });
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
         NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
+        NeoForge.EVENT_BUS.addListener(MobDropTable::onTagsUpdated);
         NeoForge.EVENT_BUS.addListener(Deposits::onServerStopped);
         NeoForge.EVENT_BUS.addListener(Withdrawals::onServerStopped);
 

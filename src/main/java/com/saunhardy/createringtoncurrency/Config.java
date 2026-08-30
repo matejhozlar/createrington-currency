@@ -2,6 +2,8 @@ package com.saunhardy.createringtoncurrency;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+
 public class Config {
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -13,16 +15,15 @@ public class Config {
     public static final ModConfigSpec.BooleanValue DISABLE_DAILY_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_LOTTERY_COMMANDS;
     public static final ModConfigSpec.BooleanValue DISABLE_VOTE_COMMAND;
+    public static final ModConfigSpec.BooleanValue DISABLE_BANK_CARD_USE;
     public static final ModConfigSpec.IntValue COMMAND_COOLDOWN_MS;
 
     public static final ModConfigSpec.ConfigValue<String> API_BASE_URL;
     public static final ModConfigSpec.ConfigValue<String> JWT_SECRET;
 
     public static final ModConfigSpec.IntValue MOB_DAILY_LIMIT;
-    public static final ModConfigSpec.ConfigValue<Double> ZOM_SPI_CRE_DROP;
-    public static final ModConfigSpec.ConfigValue<Double> SKELETON_DROP;
-    public static final ModConfigSpec.ConfigValue<Double> WITHER_SKELETON_DROP;
-    public static final ModConfigSpec.ConfigValue<Double> BLAZE_DROP;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> MOB_DROPS;
+    public static final ModConfigSpec.ConfigValue<List<? extends Number>> CAPITALIST_GREED_BONUS;
 
     public static final ModConfigSpec.IntValue LOTTERY_COOLDOWN_MINUTES;
 
@@ -64,6 +65,10 @@ public class Config {
                 .comment("If true, the /vote command will NOT be registered")
                 .define("disableVoteCommand", false);
 
+        DISABLE_BANK_CARD_USE = BUILDER
+                .comment("If true, right-clicking a Bank Card will not show the balance or recent transactions")
+                .define("disableBankCardUse", false);
+
         COMMAND_COOLDOWN_MS = BUILDER
                 .comment("Global cooldown for all currency commands in milliseconds")
                 .defineInRange("commandCooldownMs", 5000, 0, Integer.MAX_VALUE);
@@ -88,21 +93,27 @@ public class Config {
                 .comment("Maximum amount of currency a player can earn from mob kills per day (0 = no mob drops)")
                 .defineInRange("mobDailyLimit", 1000, 0, Integer.MAX_VALUE);
 
-        ZOM_SPI_CRE_DROP = BUILDER
-                .comment("Drop chance of 1$ bills from zombies, spiders, creepers, eg. '50.0' = 50% chance")
-                .define("zomSpiCreDrop", 2.0);
+        MOB_DROPS = BUILDER
+                .comment("Bills dropped when a player kills a mob. One entry per line: '<entity>=<denomination>:<chance>'",
+                        "<entity> is an entity id such as 'minecraft:zombie' or an entity type tag such as '#minecraft:skeletons'",
+                        "<denomination> is one of 1, 5, 10, 20, 50, 100, 500, 1000; <chance> is a percentage, eg. '2.5' = 2.5% chance",
+                        "Every matching entry is rolled on its own, so a mob can drop several bills from one kill")
+                .defineListAllowEmpty("drops", List.of(
+                                "minecraft:zombie=1:2.0",
+                                "minecraft:spider=1:2.0",
+                                "minecraft:creeper=1:2.0",
+                                "minecraft:skeleton=1:3.0",
+                                "minecraft:skeleton=5:2.0",
+                                "minecraft:wither_skeleton=1:3.5",
+                                "minecraft:wither_skeleton=5:2.0",
+                                "minecraft:blaze=1:3.5",
+                                "minecraft:blaze=5:2.0"),
+                        () -> "minecraft:zombie=1:2.0", value -> value instanceof String);
 
-        SKELETON_DROP = BUILDER
-                .comment("Drop chance of 1$ bills from skeletons, eg. '50.0' = 50% chance")
-                .define("skeletonDrop", 3.0);
-
-        WITHER_SKELETON_DROP = BUILDER
-                .comment("Drop chance of 1$ bills from wither skeletons, eg. '50.0' = 50% chance")
-                .define("witherSkeletonDrop", 3.5);
-
-        BLAZE_DROP = BUILDER
-                .comment("Drop chance of 1$ bills from wither blazes, eg. '50.0' = 50% chance")
-                .define("blazeDrop", 3.5);
+        CAPITALIST_GREED_BONUS = BUILDER
+                .comment("Percentage points added to every drop chance per level of Capitalist Greed (first entry = level I)")
+                .<Number>defineListAllowEmpty("capitalistGreedBonus", List.of(5.0, 8.0, 10.0),
+                        () -> 0.0, value -> value instanceof Number n && n.doubleValue() >= 0.0);
 
         BUILDER.pop();
 

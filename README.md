@@ -41,6 +41,12 @@ All planned features have been implemented and the mod is stable for production 
 - **Eight denominations:** `$1`, `$5`, `$10`, `$20`, `$50`, `$100`, `$500`, `$1000`.
 - **Stackable and tradable:** Bills behave like regular items. You can deposit them to your account or withdraw them using commands or the ATM.
 - **Drop behaviour:** Certain hostile mobs can drop small bills when killed. Drop chances are configurable and scale with the `Capitalist Greed` enchantment (see below).
+- **Change-making recipes:** bills craft into the next size up and split back down (5x$1 <-> $5, 2x$5 <-> $10, 2x$10 <-> $20, 5x$10 <-> $50, 2x$50 <-> $100, 5x$100 <-> $500, 2x$500 <-> $1000, plus 2x$20+$10 -> $50 and 5x$20 -> $100), so exact change never needs an ATM.
+
+### Bank Card
+
+- **Right-click:** shows your balance on the action bar. **Sneak + right-click:** lists your last five transactions in chat. Both share the `commandCooldownMs` cooldown (never faster than once a second) and can be switched off with `disableBankCardUse`.
+- **Offhand:** with a Create shopping list in the main hand, the card in the offhand lets the Stock Ticker integration withdraw the bills the list is missing.
 
 ### Player Accounts
 
@@ -81,9 +87,11 @@ If you are the only player online the vote passes immediately.
 
 ### Mob Drops
 
-- Zombies, Skeletons, Spiders, and Creepers can drop $1 or $5 bills.
-- Drop chances increase with the **Capitalist Greed** enchantment.
-- Daily mob drop earnings capped to maintain balance.
+- Every drop is one line in the `mobDrops.drops` config list: `<entity or #tag>=<denomination>:<chance>`, for example `minecraft:zombie=1:2.0`, `#minecraft:skeletons=5:2.0` or `minecraft:warden=100:25.0`. The namespace defaults to `minecraft`.
+- Each matching line is rolled on its own, so one kill can drop several bills; what drops is handed out as the largest bills that fit the amount.
+- By default zombies, spiders, creepers, skeletons, wither skeletons and blazes roll for a $1 bill, and skeletons, wither skeletons and blazes also roll for a $5.
+- Drop chances increase with the **Capitalist Greed** enchantment (`capitalistGreedBonus`, percentage points per level).
+- Daily mob drop earnings are capped (`mobDailyLimit`) to maintain balance.
 
 ### Enchantment: Capitalist Greed
 
@@ -135,7 +143,7 @@ Upon first launch, the mod generates a config file at:
 Inside, you can set:
 
 - API base URL (`http://127.0.0.1:5000/` by default)
-- Mob drop rates
+- Mob drop table (`mobDrops.drops`) and the Capitalist Greed bonus per level
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
 - Per-command `disable*Command` toggles (see below)
@@ -155,6 +163,8 @@ Every chat command can be switched off individually. A disabled command is not r
 | `disableVoteCommand`      | `/vote`                  |
 
 These toggles only affect the chat commands. The ATM block and the Create Stock Ticker integration have their own deposit/withdraw paths and keep working regardless, so for example `disableCashCommands = true` makes the ATM the only way to move bills in and out of an account.
+
+`disableBankCardUse` turns off the Bank Card right-click balance and history in the same way; the Stock Ticker payment path is unaffected.
 
 ---
 
