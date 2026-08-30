@@ -142,6 +142,9 @@ public final class DepositorNetworking {
             return;
         }
         sendResult(player, KIND_SUCCESS, "Took $" + fmt(taken) + (leftBehind ? " — inventory full, the rest stayed inside." : ""));
+        LOGGER.info("[DEPOSITOR] {} ({}) took ${} out of the terminal at {} owned by {} ({})",
+                player.getName().getString(), player.getUUID(), fmt(taken), pkt.pos().toShortString(),
+                be.getOwnerName(), be.getOwner());
     }
 
     public static void hint(ServerPlayer player, DepositorTerminalBlockEntity be) {

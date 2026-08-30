@@ -81,9 +81,9 @@ If you are the only player online the vote passes immediately.
 
 ### Admin Commands
 
-| Command                             | Description                                                                                                                                                                                                                                         |
-|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself: while it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills); while it is off you pay like any other customer. Admin mode switches off again when you log out |
+| Command                             | Description                                                                                                                                                                                                                                                                                                               |
+|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself; `on` / `off` set it explicitly. While it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills) and chat tells you whose terminal you opened; while it is off you pay like any other customer. It switches off again when you log out |
 
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
@@ -158,15 +158,16 @@ Inside, you can set:
 
 Every chat command can be switched off individually. A disabled command is not registered at all, so it won't show up in tab completion:
 
-| Config key                | Disables                 |
-|---------------------------|--------------------------|
-| `disableMoneyCommand`     | `/money`                 |
-| `disablePayCommand`       | `/pay`                   |
-| `disableCashCommands`     | `/deposit`, `/withdraw`  |
-| `disableBaltopCommand`    | `/baltop`                |
-| `disableDailyCommand`     | `/daily`                 |
-| `disableLotteryCommands`  | `/lottery`, `/join`      |
-| `disableVoteCommand`      | `/vote`                  |
+| Config key                | Disables                            |
+|---------------------------|-------------------------------------|
+| `disableMoneyCommand`     | `/money`                            |
+| `disablePayCommand`       | `/pay`                              |
+| `disableCashCommands`     | `/deposit`, `/withdraw`             |
+| `disableBaltopCommand`    | `/baltop`                           |
+| `disableDailyCommand`     | `/daily`                            |
+| `disableLotteryCommands`  | `/lottery`, `/join`                 |
+| `disableVoteCommand`      | `/vote`                             |
+| `disableAdminModeCommand` | `/createringtoncurrency admin-mode` |
 
 These toggles only affect the chat commands. The ATM block and the Create Stock Ticker integration have their own deposit/withdraw paths and keep working regardless, so for example `disableCashCommands = true` makes the ATM the only way to move bills in and out of an account.
 

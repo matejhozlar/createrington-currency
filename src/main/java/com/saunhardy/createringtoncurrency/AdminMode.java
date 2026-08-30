@@ -27,17 +27,27 @@ public class AdminMode {
 
     @SubscribeEvent
     public static void onCommandRegister(RegisterCommandsEvent event) {
+        if (Config.DISABLE_ADMIN_MODE_COMMAND.get()) return;
+
         event.getDispatcher().register(
                 Commands.literal("createringtoncurrency")
                         .requires(source -> source.hasPermission(PERMISSION_LEVEL))
                         .then(Commands.literal("admin-mode")
-                                .executes(ctx -> toggle(ctx.getSource().getPlayerOrException()))));
+                                .executes(ctx -> toggle(ctx.getSource().getPlayerOrException()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> set(ctx.getSource().getPlayerOrException(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> set(ctx.getSource().getPlayerOrException(), false)))));
     }
 
     private static int toggle(ServerPlayer player) {
+        return set(player, !ACTIVE.contains(player.getUUID()));
+    }
+
+    private static int set(ServerPlayer player, boolean enabled) {
         UUID id = player.getUUID();
-        boolean enabled = ACTIVE.add(id);
-        if (!enabled) ACTIVE.remove(id);
+        if (enabled) ACTIVE.add(id);
+        else ACTIVE.remove(id);
 
         if (enabled) {
             player.sendSystemMessage(Component.literal(
