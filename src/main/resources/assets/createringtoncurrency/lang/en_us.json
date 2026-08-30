@@ -27,6 +27,8 @@
   "item.createringtoncurrency.bill_500": "$500 Bill",
   "item.createringtoncurrency.bill_1000": "$1000 Bill",
   "item.createringtoncurrency.bank_card": "Bank Card",
+  "item.createringtoncurrency.bank_card.tooltip.use": "Right-click: check your balance",
+  "item.createringtoncurrency.bank_card.tooltip.sneak_use": "Sneak + right-click: recent transactions",
   "enchantment.createringtoncurrency.capitalist_greed": "Capitalist Greed",
   "item.createringtoncurrency.circuit_board": "Circuit Board",
   "item.createringtoncurrency.card_reader": "Card Reader",
