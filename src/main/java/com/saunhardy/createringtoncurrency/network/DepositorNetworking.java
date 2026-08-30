@@ -199,7 +199,7 @@ public final class DepositorNetworking {
         Bills.insert(be.getStorage(), payment);
         player.inventoryMenu.sendAllDataToRemote();
 
-        completePayment(player, be, owner, "cash", "Paid " + describe(denomination, count) + " in cash");
+        completePayment(player, be, owner, false, denomination, count);
     }
 
     private static void payByCard(ServerPlayer player, DepositorTerminalBlockEntity be, UUID owner, int denomIndex, int count) {
@@ -243,25 +243,28 @@ public final class DepositorNetworking {
         }
 
         Bills.insert(be.getStorage(), bills);
-        completePayment(player, be, owner, "card", "Paid " + describe(Bills.DENOMINATIONS[denomIndex], count) + " by card");
+        completePayment(player, be, owner, true, Bills.DENOMINATIONS[denomIndex], count);
     }
 
-    private static void completePayment(ServerPlayer payer, DepositorTerminalBlockEntity be, UUID owner, String how, String payerMessage) {
+    private static void completePayment(ServerPlayer payer, DepositorTerminalBlockEntity be, UUID owner, boolean card,
+                                        int denomination, int count) {
+        int amount = denomination * count;
+        String how = card ? "card" : "cash";
         LAST_PAYMENT.put(payer.getUUID(), System.currentTimeMillis());
-        actionBar(payer, KIND_SUCCESS, payerMessage);
+        actionBar(payer, KIND_SUCCESS, "Paid $" + fmt(amount) + (card ? " by card" : " in cash"));
 
         // The terminal pulses in its own level; the payer may have changed dimension while a card payment was in flight.
         BlockPos pos = be.getBlockPos();
         be.pulse();
 
-        String priced = describe(be.getPriceDenomination(), be.getPriceCount());
         LOGGER.info("[DEPOSITOR] {} ({}) paid {} by {} at {} (owner {} / {})",
-                payer.getName().getString(), payer.getUUID(), priced, how, pos.toShortString(), be.getOwnerName(), owner);
+                payer.getName().getString(), payer.getUUID(), describe(denomination, count), how, pos.toShortString(),
+                be.getOwnerName(), owner);
 
         ServerPlayer ownerPlayer = payer.server.getPlayerList().getPlayer(owner);
         if (ownerPlayer != null) {
-            ownerPlayer.sendSystemMessage(Component.literal("💸 " + payer.getName().getString() + " paid " + priced
-                    + " by " + how + " at your depositor terminal (" + pos.toShortString() + ")").withStyle(ChatFormatting.GOLD));
+            ownerPlayer.sendSystemMessage(Component.literal("💸 " + payer.getName().getString() + " paid $" + fmt(amount)
+                    + " at your depositor terminal (" + pos.toShortString() + ")").withStyle(ChatFormatting.GOLD));
         }
     }
 

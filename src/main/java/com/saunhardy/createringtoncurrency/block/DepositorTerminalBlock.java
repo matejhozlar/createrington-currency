@@ -10,6 +10,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.InteractionHand;
@@ -32,6 +33,7 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +42,10 @@ import org.jetbrains.annotations.Nullable;
 public class DepositorTerminalBlock extends Block implements EntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    public static final EnumProperty<Light> LIGHT = EnumProperty.create("light", Light.class);
+
+    public static final int LED_TINT_INDEX = 0;
+    public static final int LED_FLASH_COLOR = 0xDCB05A;
 
     public static final double MAX_USE_DISTANCE_SQ = 64.0;
 
@@ -47,12 +53,13 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any()
                 .setValue(FACING, Direction.NORTH)
-                .setValue(POWERED, false));
+                .setValue(POWERED, false)
+                .setValue(LIGHT, Light.OFF));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, POWERED);
+        builder.add(FACING, POWERED, LIGHT);
     }
 
     @Override
@@ -158,6 +165,11 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
         updateNeighbours(level, pos, next);
     }
 
+    void setLight(ServerLevel level, BlockPos pos, BlockState state, Light light) {
+        if (state.getValue(LIGHT) == light) return;
+        level.setBlock(pos, state.setValue(LIGHT, light), Block.UPDATE_CLIENTS);
+    }
+
     private void updateNeighbours(Level level, BlockPos pos, BlockState state) {
         level.updateNeighborsAt(pos, this);
         level.updateNeighborsAt(pos.relative(state.getValue(FACING).getOpposite()), this);
@@ -200,5 +212,28 @@ public class DepositorTerminalBlock extends Block implements EntityBlock {
     protected @NotNull BlockState mirror(BlockState state, Mirror mirror) {
         Direction facing = state.getValue(FACING);
         return state.setValue(FACING, mirror.getRotation(facing).rotate(facing));
+    }
+
+    public enum Light implements StringRepresentable {
+        OFF("off", 0x141414),
+        READY("ready", 0x1E9C24),
+        FULL("full", 0xE03030);
+
+        private final String name;
+        private final int color;
+
+        Light(String name, int color) {
+            this.name = name;
+            this.color = color;
+        }
+
+        @Override
+        public @NotNull String getSerializedName() {
+            return name;
+        }
+
+        public int color() {
+            return color;
+        }
     }
 }
