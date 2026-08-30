@@ -50,14 +50,15 @@ public final class Deposits {
         MinecraftServer server = player.server;
         String name = player.getName().getString();
         String refundReason = "the refund of a failed deposit";
+        String key = CurrencyApi.newIdempotencyKey();
         try {
             Bills.extract(player.getInventory(), bills);
             player.inventoryMenu.sendAllDataToRemote();
             reporter.started(player, amount);
-            CurrencyApi.deposit(uuid, amount).whenComplete((resp, ex) -> {
+            CurrencyApi.deposit(uuid, amount, key).whenComplete((resp, ex) -> {
                 IN_FLIGHT.remove(uuid);
                 if (ex == null && resp.isSuccess()) {
-                    LOGGER.info("[DEPOSIT:{}] {} ({}): ${}", tag, name, uuid, Bills.fmt(amount));
+                    LOGGER.info("[DEPOSIT:{}] {} ({}): ${} key={}", tag, name, uuid, Bills.fmt(amount), key);
                     BillDelivery.whenOnline(server, uuid, p -> reporter.succeeded(p, amount, resp.getPlayerMessage()));
                     return;
                 }
@@ -65,10 +66,10 @@ public final class Deposits {
                 BillDelivery.deliver(server, uuid, bills, refundReason);
                 String text;
                 if (ex != null) {
-                    LOGGER.error("[DEPOSIT:{}] {} ({}): ${} failed, bills returned: {}", tag, name, uuid, Bills.fmt(amount), ex.getMessage());
+                    LOGGER.error("[DEPOSIT:{}] {} ({}): ${} key={} failed, bills returned: {}", tag, name, uuid, Bills.fmt(amount), key, ex.getMessage());
                     text = "Something went wrong. Please try again." + REFUNDED;
                 } else {
-                    LOGGER.warn("[DEPOSIT:{}] {} ({}): ${} rejected, bills returned: {}", tag, name, uuid, Bills.fmt(amount), resp.getMessage());
+                    LOGGER.warn("[DEPOSIT:{}] {} ({}): ${} key={} rejected, bills returned: {}", tag, name, uuid, Bills.fmt(amount), key, resp.getMessage());
                     text = CurrencyApi.errorText(resp, "Deposit failed. Please try again.") + REFUNDED;
                 }
                 BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, text));
@@ -76,7 +77,7 @@ public final class Deposits {
         } catch (RuntimeException e) {
             IN_FLIGHT.remove(uuid);
             BillDelivery.deliver(server, uuid, bills, refundReason);
-            LOGGER.error("[DEPOSIT:{}] {} ({}): ${} could not be submitted, bills returned", tag, name, uuid, Bills.fmt(amount), e);
+            LOGGER.error("[DEPOSIT:{}] {} ({}): ${} key={} could not be submitted, bills returned", tag, name, uuid, Bills.fmt(amount), key, e);
             reporter.failed(player, "Something went wrong. Please try again." + REFUNDED);
         }
     }

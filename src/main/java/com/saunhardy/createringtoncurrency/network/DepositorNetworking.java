@@ -215,11 +215,13 @@ public final class DepositorNetworking {
         final BlockPos pos = be.getBlockPos();
         final ServerLevel level = player.serverLevel();
         final int denomination = Bills.DENOMINATIONS[denomIndex];
+        final String key = CurrencyApi.newIdempotencyKey();
 
-        CurrencyApi.withdraw(player.getUUID(), denomination, count).whenComplete((resp, ex) -> {
+        CurrencyApi.withdraw(player.getUUID(), denomination, count, key).whenComplete((resp, ex) -> {
             IN_FLIGHT.remove(player.getUUID());
             if (ex != null) {
-                LOGGER.error("Depositor card payment failed for {}: {}", player.getName().getString(), ex.getMessage());
+                LOGGER.error("[DEPOSITOR] card payment of {} x ${} by {} ({}) key={} failed: {}",
+                        count, fmt(denomination), player.getName().getString(), player.getUUID(), key, ex.getMessage());
                 actionBar(player, KIND_ERROR, "Something went wrong. Please try again.");
                 return;
             }

@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class Withdrawals {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -81,6 +82,7 @@ public final class Withdrawals {
         long amount = Bills.value(counts);
         AtomicInteger completed = new AtomicInteger();
         AtomicBoolean rejected = new AtomicBoolean();
+        AtomicReference<String> currentKey = new AtomicReference<>();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         int steps = 0;
         for (int i = 0; i < counts.length; i++) {
@@ -91,10 +93,12 @@ public final class Withdrawals {
             final int denomination = Bills.DENOMINATIONS[i];
             chain = chain.thenCompose(ignored -> {
                 if (rejected.get()) return CompletableFuture.completedFuture(null);
-                return CurrencyApi.withdraw(uuid, denomination, count).thenAccept(resp -> {
+                String key = CurrencyApi.newIdempotencyKey();
+                currentKey.set(key);
+                return CurrencyApi.withdraw(uuid, denomination, count, key).thenAccept(resp -> {
                     if (!resp.isSuccess()) {
                         rejected.set(true);
-                        LOGGER.warn("[WITHDRAW:{}] {} ({}): {} x ${} rejected: {}", tag, name, uuid, count, denomination, resp.getMessage());
+                        LOGGER.warn("[WITHDRAW:{}] {} ({}): {} x ${} key={} rejected: {}", tag, name, uuid, count, denomination, key, resp.getMessage());
                         String text = CurrencyApi.errorText(resp, "Withdraw failed. Please try again.");
                         BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, text));
                         return;
@@ -109,8 +113,8 @@ public final class Withdrawals {
         chain.whenComplete((ignored, ex) -> {
             IN_FLIGHT.remove(uuid);
             if (ex != null) {
-                LOGGER.error("[WITHDRAW:{}] {} ({}): ${} failed after {}/{} denominations: {}",
-                        tag, name, uuid, Bills.fmt(amount), completed.get(), totalSteps, ex.getMessage());
+                LOGGER.error("[WITHDRAW:{}] {} ({}): ${} failed after {}/{} denominations, key={}: {}",
+                        tag, name, uuid, Bills.fmt(amount), completed.get(), totalSteps, currentKey.get(), ex.getMessage());
                 BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, "Something went wrong. Please try again."));
                 return;
             }
