@@ -83,7 +83,7 @@ public class CreateringtonCurrency {
             .sound(SoundType.METAL)
             .requiresCorrectToolForDrops()
             .noOcclusion()
-            .pushReaction(PushReaction.BLOCK)
+            .pushReaction(PushReaction.DESTROY)
             .lightLevel(state -> state.getValue(DecorativeATMBlock.HALF) == DoubleBlockHalf.UPPER ? 8 : 0);
 
     public static final DeferredBlock<DecorativeATMBlock> ATM_BLUE_BLOCK = BLOCKS.register("atm_blue", () ->

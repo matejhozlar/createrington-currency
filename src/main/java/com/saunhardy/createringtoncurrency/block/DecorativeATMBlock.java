@@ -47,7 +47,9 @@ public class DecorativeATMBlock extends Block {
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
         BlockPos above = ctx.getClickedPos().above();
         Level level = ctx.getLevel();
-        if (!level.getBlockState(above).canBeReplaced(ctx) || !level.getWorldBorder().isWithinBounds(above)) {
+        if (above.getY() >= level.getMaxBuildHeight()
+                || !level.getBlockState(above).canBeReplaced(ctx)
+                || !level.getWorldBorder().isWithinBounds(above)) {
             return null;
         }
         return this.defaultBlockState()
