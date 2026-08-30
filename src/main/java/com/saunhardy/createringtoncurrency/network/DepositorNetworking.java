@@ -199,7 +199,7 @@ public final class DepositorNetworking {
         Bills.insert(be.getStorage(), payment);
         player.inventoryMenu.sendAllDataToRemote();
 
-        completePayment(player, be, owner, "cash", "Paid " + describe(denomination, count) + " in cash");
+        completePayment(player, be, owner, "cash", "Paid $" + fmt(denomination * count) + " in cash");
     }
 
     private static void payByCard(ServerPlayer player, DepositorTerminalBlockEntity be, UUID owner, int denomIndex, int count) {
@@ -243,7 +243,7 @@ public final class DepositorNetworking {
         }
 
         Bills.insert(be.getStorage(), bills);
-        completePayment(player, be, owner, "card", "Paid " + describe(Bills.DENOMINATIONS[denomIndex], count) + " by card");
+        completePayment(player, be, owner, "card", "Paid $" + fmt(Bills.DENOMINATIONS[denomIndex] * count) + " by card");
     }
 
     private static void completePayment(ServerPlayer payer, DepositorTerminalBlockEntity be, UUID owner, String how, String payerMessage) {
@@ -260,8 +260,8 @@ public final class DepositorNetworking {
 
         ServerPlayer ownerPlayer = payer.server.getPlayerList().getPlayer(owner);
         if (ownerPlayer != null) {
-            ownerPlayer.sendSystemMessage(Component.literal("💸 " + payer.getName().getString() + " paid " + priced
-                    + " by " + how + " at your depositor terminal (" + pos.toShortString() + ")").withStyle(ChatFormatting.GOLD));
+            ownerPlayer.sendSystemMessage(Component.literal("💸 " + payer.getName().getString() + " paid $" + fmt(be.getPrice())
+                    + " at your depositor terminal").withStyle(ChatFormatting.GOLD));
         }
     }
 
