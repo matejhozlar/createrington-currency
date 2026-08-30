@@ -226,6 +226,8 @@ public final class DepositorNetworking {
                 return;
             }
             if (!resp.isSuccess()) {
+                LOGGER.warn("[DEPOSITOR] card payment of {} x ${} by {} ({}) key={} rejected: {}",
+                        count, fmt(denomination), player.getName().getString(), player.getUUID(), key, resp.getMessage());
                 actionBar(player, KIND_ERROR, CurrencyApi.errorText(resp, "Card payment failed. Please try again."));
                 return;
             }

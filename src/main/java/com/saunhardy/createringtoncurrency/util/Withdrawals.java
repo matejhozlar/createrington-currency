@@ -10,13 +10,14 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.Arrays;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class Withdrawals {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -82,7 +83,7 @@ public final class Withdrawals {
         long amount = Bills.value(counts);
         AtomicInteger completed = new AtomicInteger();
         AtomicBoolean rejected = new AtomicBoolean();
-        AtomicReference<String> currentKey = new AtomicReference<>();
+        Queue<String> keys = new ConcurrentLinkedQueue<>();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         int steps = 0;
         for (int i = 0; i < counts.length; i++) {
@@ -94,7 +95,7 @@ public final class Withdrawals {
             chain = chain.thenCompose(ignored -> {
                 if (rejected.get()) return CompletableFuture.completedFuture(null);
                 String key = CurrencyApi.newIdempotencyKey();
-                currentKey.set(key);
+                keys.add(key);
                 return CurrencyApi.withdraw(uuid, denomination, count, key).thenAccept(resp -> {
                     if (!resp.isSuccess()) {
                         rejected.set(true);
@@ -113,19 +114,19 @@ public final class Withdrawals {
         chain.whenComplete((ignored, ex) -> {
             IN_FLIGHT.remove(uuid);
             if (ex != null) {
-                LOGGER.error("[WITHDRAW:{}] {} ({}): ${} failed after {}/{} denominations, key={}: {}",
-                        tag, name, uuid, Bills.fmt(amount), completed.get(), totalSteps, currentKey.get(), ex.getMessage());
+                LOGGER.error("[WITHDRAW:{}] {} ({}): ${} failed after {}/{} denominations, keys in order={} (the last one failed): {}",
+                        tag, name, uuid, Bills.fmt(amount), completed.get(), totalSteps, String.join(",", keys), ex.getMessage());
                 BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, "Something went wrong. Please try again."));
                 return;
             }
             if (rejected.get()) {
                 if (completed.get() > 0) {
-                    LOGGER.warn("[WITHDRAW:{}] {} ({}): partial bundle, {}/{} denominations completed before the rejection; the player kept those bills",
-                            tag, name, uuid, completed.get(), totalSteps);
+                    LOGGER.warn("[WITHDRAW:{}] {} ({}): partial bundle, {}/{} denominations completed before the rejection, keys in order={} (the last one was rejected); the player kept those bills",
+                            tag, name, uuid, completed.get(), totalSteps, String.join(",", keys));
                 }
                 return;
             }
-            LOGGER.info("[WITHDRAW:{}] {} ({}): ${}", tag, name, uuid, Bills.fmt(amount));
+            LOGGER.info("[WITHDRAW:{}] {} ({}): ${} keys={}", tag, name, uuid, Bills.fmt(amount), String.join(",", keys));
             BillDelivery.whenOnline(server, uuid, p -> reporter.succeeded(p, amount));
         });
     }

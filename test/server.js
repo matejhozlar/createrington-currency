@@ -133,9 +133,47 @@ app.post("/api/currency/pay", verifyJWT, (req, res) => {
   });
 });
 
+// uuid -> Map<idempotencyKey, { hash, status, body }>
+const idempotency = new Map();
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
+
+// Mirrors the real backend: same key + same body replays the stored status and
+// body without touching the balance, same key + different body is a 409, and
+// a request without a key runs every time.
+function idempotent(operation, fields, handler) {
+  return (req, res) => {
+    const key = req.body.idempotencyKey;
+    if (key == null) return handler(req, res);
+    if (typeof key !== "string" || !IDEMPOTENCY_KEY.test(key)) {
+      return res.status(400).json({ success: false, message: "idempotencyKey must be 1 to 128 characters of letters, digits, '.', '_', ':' or '-'" });
+    }
+
+    const { uuid } = req.user;
+    if (!idempotency.has(uuid)) idempotency.set(uuid, new Map());
+    const store = idempotency.get(uuid);
+    const hash = JSON.stringify({ operation, body: fields.map((f) => req.body[f]) });
+
+    const stored = store.get(key);
+    if (stored) {
+      if (stored.hash !== hash) {
+        return res.status(409).json({ success: false, message: "idempotencyKey was already used with a different request" });
+      }
+      console.log(`[${operation}] replayed key=${key} (HTTP ${stored.status})`);
+      return res.status(stored.status).json(stored.body);
+    }
+
+    const send = res.json.bind(res);
+    res.json = (body) => {
+      store.set(key, { hash, status: res.statusCode, body });
+      return send(body);
+    };
+    return handler(req, res);
+  };
+}
+
 // POST /api/currency/deposit
-// Body: { amount: number, reason?: string }
-app.post("/api/currency/deposit", verifyJWT, (req, res) => {
+// Body: { amount: number, reason?: string, idempotencyKey?: string }
+app.post("/api/currency/deposit", verifyJWT, idempotent("deposit", ["amount", "reason"], (req, res) => {
   const { uuid, name } = req.user;
   const { amount, reason } = req.body;
   const player = getOrCreatePlayer(uuid, name);
@@ -155,11 +193,11 @@ app.post("/api/currency/deposit", verifyJWT, (req, res) => {
     playerMessage: `Deposited ${fmt(amount)}.`,
     data: { new_balance: player.balance },
   });
-});
+}));
 
 // POST /api/currency/withdraw
-// Body: { denomination: number, count: number }
-app.post("/api/currency/withdraw", verifyJWT, (req, res) => {
+// Body: { denomination: number, count: number, idempotencyKey?: string }
+app.post("/api/currency/withdraw", verifyJWT, idempotent("withdraw", ["denomination", "count"], (req, res) => {
   const { uuid, name } = req.user;
   const { denomination, count } = req.body;
   const player = getOrCreatePlayer(uuid, name);
@@ -187,7 +225,7 @@ app.post("/api/currency/withdraw", verifyJWT, (req, res) => {
     playerMessage: `Withdrew ${count}x ${fmt(denomination)}.`,
     data: { withdrawn: total, new_balance: player.balance, denomination, count },
   });
-});
+}));
 
 // GET /api/currency/top
 app.get("/api/currency/top", verifyJWT, (req, res) => {
@@ -364,8 +402,9 @@ app.listen(PORT, () => {
 Endpoints:
   GET  /api/currency/balance
   POST /api/currency/pay          { toUuid, amount }
-  POST /api/currency/deposit      { amount, reason? }
-  POST /api/currency/withdraw     { denomination, count }
+  POST /api/currency/deposit      { amount, reason?, idempotencyKey? }
+  POST /api/currency/withdraw     { denomination, count, idempotencyKey? }
+                                  (same key + same body replays the stored response, different body -> 409)
   GET  /api/currency/top
   GET  /api/currency/history      ?page=1&limit=10
   POST /api/currency/daily

@@ -97,10 +97,6 @@ public final class CurrencyApi {
         return c.post(Endpoints.CURRENCY_WITHDRAW, GSON.toJson(req), WithdrawResponse.class, playerUuid);
     }
 
-    public static String newIdempotencyKey() {
-        return UUID.randomUUID().toString();
-    }
-
     public static CompletableFuture<ApiResponse<List<TopEntry>>> top(UUID playerUuid) {
         CRNetClient c = client;
         return c == null ? unavailable() : c.getList(Endpoints.CURRENCY_TOP, TopEntry.class, playerUuid);
@@ -151,6 +147,10 @@ public final class CurrencyApi {
         if (resp.getPlayerMessage() != null) return resp.getPlayerMessage();
         if (resp.getMessage() != null) return resp.getMessage();
         return fallback;
+    }
+
+    public static String newIdempotencyKey() {
+        return UUID.randomUUID().toString();
     }
 
     // ---- Internals ---------------------------------------------------------
