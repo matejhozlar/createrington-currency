@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
@@ -16,12 +17,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class MobDropTable {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final Pattern FORMAT = Pattern.compile("^(#?[a-z0-9_.\\-]+:[a-z0-9_./\\-]+)=(\\d+):(\\d+(?:\\.\\d+)?)$");
+    private static final Pattern FORMAT = Pattern.compile("^(#?(?:[a-z0-9_.\\-]+:)?[a-z0-9_./\\-]+)=(\\d+):(\\d+(?:\\.\\d+)?)$");
 
     public record Entry(ResourceLocation id, @Nullable TagKey<EntityType<?>> tag, int denomination, double chance) {
         boolean matches(EntityType<?> type) {
@@ -29,8 +31,21 @@ public final class MobDropTable {
         }
     }
 
-    private static volatile List<Entry> entries;
-    private static final Map<EntityType<?>, List<Entry>> BY_TYPE = new ConcurrentHashMap<>();
+    private record Snapshot(@Nullable List<Entry> entries, Map<EntityType<?>, List<Entry>> byType) {
+        static Snapshot unresolved() {
+            return new Snapshot(null, new ConcurrentHashMap<>());
+        }
+
+        Snapshot withoutLookups() {
+            return new Snapshot(entries, new ConcurrentHashMap<>());
+        }
+
+        List<Entry> lookup(EntityType<?> type) {
+            return byType.computeIfAbsent(type, t -> entries.stream().filter(e -> e.matches(t)).toList());
+        }
+    }
+
+    private static final AtomicReference<Snapshot> SNAPSHOT = new AtomicReference<>(Snapshot.unresolved());
 
     private MobDropTable() {}
 
@@ -42,14 +57,23 @@ public final class MobDropTable {
         invalidate(event);
     }
 
+    public static void onTagsUpdated(TagsUpdatedEvent event) {
+        SNAPSHOT.updateAndGet(Snapshot::withoutLookups);
+    }
+
     private static void invalidate(ModConfigEvent event) {
         if (event.getConfig().getSpec() != Config.SPEC) return;
-        entries = null;
-        BY_TYPE.clear();
+        SNAPSHOT.set(Snapshot.unresolved());
     }
 
     public static List<Entry> entriesFor(EntityType<?> type) {
-        return BY_TYPE.computeIfAbsent(type, t -> entries().stream().filter(e -> e.matches(t)).toList());
+        Snapshot current = SNAPSHOT.get();
+        if (current.entries() == null) {
+            Snapshot resolved = new Snapshot(parseAll(), new ConcurrentHashMap<>());
+            SNAPSHOT.compareAndSet(current, resolved);
+            current = resolved;
+        }
+        return current.lookup(type);
     }
 
     public static double bonusFor(int level) {
@@ -59,9 +83,7 @@ public final class MobDropTable {
         return bonus.get(Math.min(level, bonus.size()) - 1).doubleValue();
     }
 
-    private static List<Entry> entries() {
-        List<Entry> current = entries;
-        if (current != null) return current;
+    private static List<Entry> parseAll() {
         List<Entry> parsed = new ArrayList<>();
         for (String raw : Config.MOB_DROPS.get()) {
             Entry entry = parse(raw);
@@ -74,9 +96,7 @@ public final class MobDropTable {
             }
             parsed.add(entry);
         }
-        current = List.copyOf(parsed);
-        entries = current;
-        return current;
+        return List.copyOf(parsed);
     }
 
     @Nullable

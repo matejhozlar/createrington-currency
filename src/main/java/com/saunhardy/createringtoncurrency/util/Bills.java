@@ -156,4 +156,10 @@ public final class Bills {
     public static String fmt(long amount) {
         return NumberFormat.getInstance().format(amount);
     }
+
+    public static String fmt(double amount) {
+        NumberFormat format = NumberFormat.getInstance();
+        format.setMaximumFractionDigits(2);
+        return format.format(amount);
+    }
 }

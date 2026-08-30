@@ -5,6 +5,7 @@ import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.MoneyCommands;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.createringtoncurrency.util.BillDelivery;
+import com.saunhardy.createringtoncurrency.util.Bills;
 import com.saunhardy.createringtoncurrency.util.TransactionFormat;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -19,12 +20,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 
-import java.text.NumberFormat;
 import java.util.List;
 import java.util.UUID;
 
 public class BankCardItem extends Item {
     private static final int HISTORY_LIMIT = 5;
+    private static final int MIN_COOLDOWN_TICKS = 20;
 
     public BankCardItem(Properties properties) {
         super(properties);
@@ -37,12 +38,15 @@ public class BankCardItem extends Item {
             return InteractionResultHolder.pass(stack);
         }
         if (level.isClientSide) return InteractionResultHolder.sidedSuccess(stack, true);
-        if (!(player instanceof ServerPlayer serverPlayer) || Config.DISABLE_BANK_CARD_USE.get()) {
+        if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResultHolder.pass(stack);
+        if (Config.DISABLE_BANK_CARD_USE.get()) {
+            serverPlayer.displayClientMessage(MoneyCommands.message("💳",
+                    "Bank Card balance checks are disabled on this server.", ChatFormatting.RED), true);
             return InteractionResultHolder.pass(stack);
         }
 
-        int cooldownTicks = (int) Math.min(Integer.MAX_VALUE, Config.COMMAND_COOLDOWN_MS.get() / 50L);
-        if (cooldownTicks > 0) serverPlayer.getCooldowns().addCooldown(this, cooldownTicks);
+        int cooldownTicks = Math.max(MIN_COOLDOWN_TICKS, Config.COMMAND_COOLDOWN_MS.get() / 50);
+        serverPlayer.getCooldowns().addCooldown(this, cooldownTicks);
 
         if (serverPlayer.isShiftKeyDown()) {
             requestHistory(serverPlayer);
@@ -59,7 +63,7 @@ public class BankCardItem extends Item {
                 .thenAccept(resp -> BillDelivery.whenOnline(server, uuid, p -> {
                     if (resp.isSuccess() && resp.getData() != null) {
                         p.displayClientMessage(MoneyCommands.message("💳",
-                                "Balance: $" + formatBalance(resp.getData().balance()), ChatFormatting.GREEN), true);
+                                "Balance: $" + Bills.fmt(resp.getData().balance()), ChatFormatting.GREEN), true);
                     } else {
                         MoneyCommands.sendApiError(p, "Bank card balance", resp);
                     }
@@ -108,12 +112,6 @@ public class BankCardItem extends Item {
             line.append(Component.literal(" — " + t.description()).withStyle(ChatFormatting.DARK_GRAY));
         }
         return line;
-    }
-
-    private static String formatBalance(double balance) {
-        NumberFormat format = NumberFormat.getInstance();
-        format.setMaximumFractionDigits(2);
-        return format.format(balance);
     }
 
     @Override

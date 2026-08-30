@@ -202,6 +202,7 @@ public class CreateringtonCurrency {
         });
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
         NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
+        NeoForge.EVENT_BUS.addListener(MobDropTable::onTagsUpdated);
         NeoForge.EVENT_BUS.addListener(Deposits::onServerStopped);
         NeoForge.EVENT_BUS.addListener(Withdrawals::onServerStopped);
 
