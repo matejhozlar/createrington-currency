@@ -261,7 +261,7 @@ public final class DepositorNetworking {
         ServerPlayer ownerPlayer = payer.server.getPlayerList().getPlayer(owner);
         if (ownerPlayer != null) {
             ownerPlayer.sendSystemMessage(Component.literal("💸 " + payer.getName().getString() + " paid $" + fmt(be.getPrice())
-                    + " at your depositor terminal").withStyle(ChatFormatting.GOLD));
+                    + " at your depositor terminal (" + pos.toShortString() + ")").withStyle(ChatFormatting.GOLD));
         }
     }
 
