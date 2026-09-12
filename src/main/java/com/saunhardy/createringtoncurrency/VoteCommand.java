@@ -3,6 +3,7 @@ package com.saunhardy.createringtoncurrency;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.util.AfkStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -24,8 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class VoteCommand {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int VOTE_DURATION_TICKS = 30 * 20; // 30 seconds
+    private static final int TALLY_INTERVAL_TICKS = 20;
     private static final long COOLDOWN_SUCCESS_MS = 577_100L;
     private static final long COOLDOWN_FAIL_MS = 3 * 60_000L;
+    private static final long COOLDOWN_NO_TURNOUT_MS = 60_000L;
     private static final List<String> VOTE_TYPES = List.of("day", "night", "clear", "thunder", "rain");
 
     private static final Set<String> WEATHER_TYPES = Set.of("clear", "rain", "thunder");
@@ -124,7 +127,8 @@ public class VoteCommand {
         MinecraftServer server = player.getServer();
         if (server == null) return 0;
 
-        if (server.getPlayerList().getPlayers().size() <= 1) {
+        int eligible = eligibleVoters(server, Set.of(player.getUUID())).size();
+        if (eligible <= 1) {
             player.sendSystemMessage(Component.literal("✅ Vote passed!")
                     .withStyle(ChatFormatting.GREEN));
             applyVote(type, durationDays, server);
@@ -132,13 +136,12 @@ public class VoteCommand {
             return 1;
         }
 
-        // Start the vote
         activeVote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString());
-        LOGGER.info("Vote started by {} for '{}'{}", player.getName().getString(), type,
-                durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "");
+        LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed", player.getName().getString(), type,
+                durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
+                requiredYes(eligible), eligible);
 
-        // Broadcast to all players
-        broadcastVoteStart(server, player.getName().getString(), type, durationDays);
+        broadcastVoteStart(server, player.getName().getString(), type, durationDays, requiredYes(eligible), eligible);
 
         return 1;
     }
@@ -167,6 +170,12 @@ public class VoteCommand {
         player.sendSystemMessage(Component.literal("✅ Vote recorded!")
                 .withStyle(ChatFormatting.GREEN));
 
+        MinecraftServer server = player.getServer();
+        if (server != null) {
+            Tally tally = tally(server, vote);
+            if (tally.decided()) finishVote(server, vote, tally);
+        }
+
         return 1;
     }
 
@@ -192,31 +201,87 @@ public class VoteCommand {
         vote.ticksRemaining--;
 
         if (vote.ticksRemaining <= 0) {
-            resolveVote(event.getServer(), vote);
-            activeVote = null;
+            finishVote(event.getServer(), vote, tally(event.getServer(), vote));
+            return;
+        }
+
+        if (vote.ticksRemaining % TALLY_INTERVAL_TICKS == 0) {
+            Tally tally = tally(event.getServer(), vote);
+            if (tally.decided()) finishVote(event.getServer(), vote, tally);
         }
     }
 
-    private static void resolveVote(MinecraftServer server, ActiveVote vote) {
-        int yes = vote.yesVotes.size();
-        int no = vote.noVotes.size();
-        boolean passed = yes > no;
+    private record Tally(int eligible, int needed, int yes, int no, boolean decided, boolean passed) {}
+
+    private static Tally tally(MinecraftServer server, ActiveVote vote) {
+        Set<UUID> voted = new HashSet<>(vote.yesVotes);
+        voted.addAll(vote.noVotes);
+
+        Set<UUID> eligible = eligibleVoters(server, voted);
+        int needed = requiredYes(eligible.size());
+        int yes = countIn(vote.yesVotes, eligible);
+        int no = countIn(vote.noVotes, eligible);
+        int undecided = eligible.size() - yes - no;
+        boolean passed = yes >= needed;
+
+        return new Tally(eligible.size(), needed, yes, no, passed || yes + undecided < needed, passed);
+    }
+
+    private static Set<UUID> eligibleVoters(MinecraftServer server, Set<UUID> voted) {
+        boolean ignoreAfk = Config.VOTE_IGNORE_AFK.get() && AfkStatus.isInstalled();
+        Set<UUID> eligible = new HashSet<>();
+
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            UUID uuid = player.getUUID();
+            if (voted.contains(uuid) || (!player.isSpectator() && !(ignoreAfk && AfkStatus.isAfk(player)))) {
+                eligible.add(uuid);
+            }
+        }
+
+        return eligible;
+    }
+
+    private static int requiredYes(int eligible) {
+        return Math.max(1, Math.min(eligible, eligible * Config.VOTE_APPROVAL_PERCENT.get() / 100 + 1));
+    }
+
+    private static int countIn(Set<UUID> votes, Set<UUID> eligible) {
+        int count = 0;
+        for (UUID uuid : votes) {
+            if (eligible.contains(uuid)) count++;
+        }
+        return count;
+    }
+
+    private static void finishVote(MinecraftServer server, ActiveVote vote, Tally tally) {
+        if (activeVote != vote) return;
+        activeVote = null;
+        resolveVote(server, vote, tally);
+    }
+
+    private static void resolveVote(MinecraftServer server, ActiveVote vote, Tally tally) {
+        boolean passed = tally.passed();
 
         MutableComponent result = Component.literal(passed ? "✅ Vote passed! " : "❌ Vote failed! ")
                 .withStyle(passed ? ChatFormatting.GREEN : ChatFormatting.RED)
-                .append(Component.literal(yes + " Yes").withStyle(ChatFormatting.GREEN))
+                .append(Component.literal(tally.yes() + " Yes").withStyle(ChatFormatting.GREEN))
                 .append(Component.literal(" / ").withStyle(ChatFormatting.GRAY))
-                .append(Component.literal(no + " No").withStyle(ChatFormatting.RED));
+                .append(Component.literal(tally.no() + " No").withStyle(ChatFormatting.RED));
+        if (!passed) {
+            result.append(Component.literal(" — " + tally.needed() + " of " + tally.eligible() + " needed")
+                    .withStyle(ChatFormatting.GRAY));
+        }
         broadcastToAll(server, result);
 
-        setCooldown(vote.type, passed ? COOLDOWN_SUCCESS_MS : COOLDOWN_FAIL_MS);
+        setCooldown(vote.type, passed ? COOLDOWN_SUCCESS_MS : tally.no() > 0 ? COOLDOWN_FAIL_MS : COOLDOWN_NO_TURNOUT_MS);
 
         if (passed) {
             applyVote(vote.type, vote.durationDays, server);
         }
 
-        LOGGER.info("Vote for '{}' by {} {} ({} yes, {} no)",
-                vote.type, vote.initiatorName, passed ? "passed" : "failed", yes, no);
+        LOGGER.info("Vote for '{}' by {} {} ({} yes, {} no, {} of {} needed)",
+                vote.type, vote.initiatorName, passed ? "passed" : "failed",
+                tally.yes(), tally.no(), tally.needed(), tally.eligible());
     }
 
     private static void setCooldown(String type, long durationMs) {
@@ -240,7 +305,7 @@ public class VoteCommand {
         }
     }
 
-    private static void broadcastVoteStart(MinecraftServer server, String playerName, String type, int durationDays) {
+    private static void broadcastVoteStart(MinecraftServer server, String playerName, String type, int durationDays, int needed, int eligible) {
         MutableComponent header = Component.literal("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 .withStyle(ChatFormatting.GOLD);
 
@@ -261,7 +326,7 @@ public class VoteCommand {
                 .append(Component.literal("    ").withStyle(ChatFormatting.RESET))
                 .append(clickableButton("[ ✘ NO ]", "/vote no", ChatFormatting.RED));
 
-        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote!")
+        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote! " + needed + " of " + eligible + " yes votes needed")
                 .withStyle(ChatFormatting.GRAY);
 
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {

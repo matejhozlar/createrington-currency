@@ -77,7 +77,9 @@ Any command can be turned off in the config, see [Disabling commands](#disabling
 | `/vote <type> [days]`    | Start a 30-second server-wide vote to change the time or weather. Types: `day`, `night`, `clear`, `rain`, `thunder`. `days` (1-7) only applies to weather |
 | `/vote yes` / `/vote no` | Cast your vote while one is running (typing `1` or `2` in chat also works)                                                                               |
 
-If you are the only player online the vote passes immediately.
+A vote passes once more than half of the eligible players have voted yes — not simply when yes outnumbers no — so a vote everybody ignores now fails. Spectators never count, and if the [AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus) mod is installed neither do AFK players, unless they vote anyway. The vote ends the moment the result is certain instead of always waiting out the 30 seconds, and if you are the only eligible player it passes immediately.
+
+The share required is `voteApprovalPercent` (50 by default) and the AFK exclusion can be turned off with `voteIgnoreAfk`.
 
 ### Admin Commands
 
@@ -152,6 +154,7 @@ Inside, you can set:
 - Mob drop table (`mobDrops.drops`) and the Capitalist Greed bonus per level
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
+- Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
 - Per-command `disable*Command` toggles (see below)
 
 ### Disabling commands
