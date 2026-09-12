@@ -28,6 +28,9 @@ public class Config {
 
     public static final ModConfigSpec.IntValue LOTTERY_COOLDOWN_MINUTES;
 
+    public static final ModConfigSpec.IntValue VOTE_APPROVAL_PERCENT;
+    public static final ModConfigSpec.BooleanValue VOTE_IGNORE_AFK;
+
     public static final ModConfigSpec.BooleanValue TRAIN_CRASH_REPORTING_ENABLED;
 
     public static final ModConfigSpec.IntValue DEPOSITOR_PULSE_TICKS;
@@ -127,6 +130,19 @@ public class Config {
         LOTTERY_COOLDOWN_MINUTES = BUILDER
                 .comment("Cooldown duration for /lottery in minutes, don't use this if you are not using integrated discord bots")
                 .defineInRange("lotteryCooldownMinutes", 15, 0, 1440);
+
+        BUILDER.pop();
+
+        BUILDER.comment("Vote command settings").push("vote");
+
+        VOTE_APPROVAL_PERCENT = BUILDER
+                .comment("A vote passes once strictly more than this percentage of the eligible players have voted yes",
+                        "Low values can put the needed votes at 1, which lets whoever starts a vote pass it on their own")
+                .defineInRange("voteApprovalPercent", 50, 0, 100);
+
+        VOTE_IGNORE_AFK = BUILDER
+                .comment("If true, AFK players do not count towards the votes needed unless they vote (requires the AFKStatus mod)")
+                .define("voteIgnoreAfk", true);
 
         BUILDER.pop();
 
