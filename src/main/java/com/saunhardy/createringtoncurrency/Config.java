@@ -32,6 +32,7 @@ public class Config {
     public static final ModConfigSpec.BooleanValue VOTE_IGNORE_AFK;
 
     public static final ModConfigSpec.IntValue AUDIT_CHAT_SITES;
+    public static final ModConfigSpec.IntValue AUDIT_THREADS;
 
     public static final ModConfigSpec.BooleanValue TRAIN_CRASH_REPORTING_ENABLED;
 
@@ -153,6 +154,10 @@ public class Config {
         AUDIT_CHAT_SITES = BUILDER
                 .comment("How many locations a cash audit lists in chat; the written report always holds every one")
                 .defineInRange("auditChatSites", 15, 1, 100);
+
+        AUDIT_THREADS = BUILDER
+                .comment("Threads a full audit uses to read region files; 0 uses half the CPU cores, at most 4")
+                .defineInRange("auditThreads", 0, 0, 64);
 
         BUILDER.pop();
 

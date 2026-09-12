@@ -100,7 +100,7 @@ The share required is `voteApprovalPercent` (50 by default) and the AFK exclusio
 
 The chat summary shows the total, a per-source split, the change since the last audit, and the richest locations. Each location comes with a `[go]` button that teleports you there and a `[copy]` button that puts an `/execute in <dimension> run tp @s <x> <y> <z>` command on your clipboard. The number of rows is `audit.auditChatSites`; the full list — every location, with its bill breakdown and teleport command — is written to `createringtoncurrency-audits/audit-<timestamp>.txt` next to the server jar.
 
-A full scan saves the world first so that what is on disk is current, then reads the region files on a background thread. It is read-only and never writes to world data. Expect it to take a while on a large world; progress is reported in chat.
+A full scan saves the world first so that what is on disk is current, then reads the region files of every dimension on background threads. It is read-only and never writes to world data. Chunks are only parsed in full when their raw bytes contain a bill id, so most of a large world is skipped cheaply; progress is reported in chat.
 
 The scan walks container NBT generically rather than looking for known tags, so it finds bills in modded inventories — depositor terminals, Create vaults, anything built on an item handler — as well as vanilla ones, and it follows them into shulker boxes, bundles and container items. It also covers dropped items, chest minecarts, chest boats, pack animals and the crafting grid a player has open. Villager trade offers are skipped, since a bill listed in a trade does not exist yet.
 
@@ -176,7 +176,7 @@ Inside, you can set:
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
 - Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
-- How many audit locations are listed in chat (`audit.auditChatSites`)
+- How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)
 - Per-command `disable*Command` toggles (see below)
 
 ### Disabling commands

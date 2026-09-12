@@ -4,11 +4,18 @@ import com.saunhardy.createringtoncurrency.util.Bills;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import java.util.stream.Stream;
 
@@ -28,51 +35,83 @@ public final class RegionSweep {
         return total;
     }
 
-    public static void sweep(List<Dimension> dimensions, CashCensus census, IntConsumer progress) {
-        int done = 0;
+    public static void sweep(List<Dimension> dimensions, CashCensus census, int threads, IntConsumer progress) {
+        List<Runnable> tasks = new ArrayList<>();
+        AtomicInteger done = new AtomicInteger();
+
         for (Dimension dimension : dimensions) {
-            done = scan(dimension, dimension.region(), true, census, progress, done);
-            done = scan(dimension, dimension.entities(), false, census, progress, done);
+            for (Path file : listRegions(dimension.region(), census)) {
+                tasks.add(() -> {
+                    scan(dimension, file, true, census);
+                    progress.accept(done.incrementAndGet());
+                });
+            }
+            for (Path file : listRegions(dimension.entities(), census)) {
+                tasks.add(() -> {
+                    scan(dimension, file, false, census);
+                    progress.accept(done.incrementAndGet());
+                });
+            }
+        }
+
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, threads), runnable -> {
+            Thread thread = new Thread(runnable, "createringtoncurrency-audit-region");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (Runnable task : tasks) futures.add(pool.submit(task));
+
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException e) {
+                    census.markIncomplete();
+                    census.warn("A region file scan failed: " + e.getCause());
+                } catch (InterruptedException e) {
+                    census.markIncomplete();
+                    census.warn("The scan was interrupted before every region file was read");
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        } finally {
+            pool.shutdownNow();
         }
     }
 
-    private static int scan(Dimension dimension, Path folder, boolean blockEntities,
-                            CashCensus census, IntConsumer progress, int done) {
-        List<Path> files = listRegions(folder, census);
-        if (files.isEmpty()) return done;
+    private static void scan(Dimension dimension, Path file, boolean blockEntities, CashCensus census) {
+        int[] origin = originOf(file);
+        if (origin == null) return;
 
-        for (Path file : files) {
-            int[] origin = originOf(file);
-            if (origin == null) continue;
+        try (RegionReader region = RegionReader.open(file)) {
+            int chunks = 0;
+            for (int index = 0; index < RegionReader.CHUNKS; index++) {
+                if (!region.has(index)) continue;
 
-            try (RegionReader region = RegionReader.open(file)) {
-                int chunks = 0;
-                for (int index = 0; index < RegionReader.CHUNKS; index++) {
-                    if (!region.has(index)) continue;
+                int chunkX = origin[0] + (index & 31);
+                int chunkZ = origin[1] + (index >> 5);
 
-                    int chunkX = origin[0] + (index & 31);
-                    int chunkZ = origin[1] + (index >> 5);
+                try {
+                    byte[] raw = region.readRaw(index, chunkX, chunkZ);
+                    if (raw == null) continue;
 
-                    try {
-                        CompoundTag chunk = region.read(index, chunkX, chunkZ);
-                        if (chunk == null) continue;
+                    chunks++;
+                    if (!NbtCash.mightHoldBills(raw)) continue;
 
-                        chunks++;
-                        if (blockEntities) blockEntities(chunk, dimension, census);
-                        else entities(chunk, dimension, census);
-                    } catch (IOException | RuntimeException e) {
-                        census.warn("Skipped chunk " + chunkX + ", " + chunkZ + " of " + file.getFileName() + ": " + e);
-                    }
+                    CompoundTag chunk = RegionReader.parse(raw);
+                    if (blockEntities) blockEntities(chunk, dimension, census);
+                    else entities(chunk, dimension, census);
+                } catch (IOException | RuntimeException e) {
+                    census.warn("Skipped chunk " + chunkX + ", " + chunkZ + " of " + file.getFileName() + ": " + e.getMessage());
                 }
-                census.countRegion(chunks);
-            } catch (IOException | RuntimeException e) {
-                census.warn("Could not open " + file.getFileName() + ": " + e);
             }
-
-            progress.accept(++done);
+            census.countRegion(chunks);
+        } catch (IOException | RuntimeException e) {
+            census.warn("Could not open " + file.getFileName() + ": " + e);
         }
-
-        return done;
     }
 
     private static void blockEntities(CompoundTag chunk, Dimension dimension, CashCensus census) {
