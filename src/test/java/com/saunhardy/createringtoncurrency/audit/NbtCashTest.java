@@ -5,6 +5,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -230,6 +232,23 @@ class NbtCashTest {
 
         assertTrue(NbtCash.count(nested, counts));
         assertTrue(Bills.isEmpty(counts));
+    }
+
+    @Test
+    void rawBytesRevealWhetherAChunkCanHoldBills() {
+        assertTrue(NbtCash.mightHoldBills(("xx" + NbtCash.BILL_PREFIX + "100yy").getBytes(StandardCharsets.UTF_8)));
+        assertFalse(NbtCash.mightHoldBills("minecraft:chest".getBytes(StandardCharsets.UTF_8)));
+        assertFalse(NbtCash.mightHoldBills(new byte[0]));
+        assertFalse(NbtCash.mightHoldBills(null));
+    }
+
+    @Test
+    void findsANeedleAtEitherEndOfTheHaystack() {
+        byte[] needle = "bill_".getBytes(StandardCharsets.UTF_8);
+        assertTrue(NbtCash.contains("bill_xyz".getBytes(StandardCharsets.UTF_8), needle));
+        assertTrue(NbtCash.contains("xyzbill_".getBytes(StandardCharsets.UTF_8), needle));
+        assertFalse(NbtCash.contains("bill".getBytes(StandardCharsets.UTF_8), needle));
+        assertFalse(NbtCash.contains("bil_bil_".getBytes(StandardCharsets.UTF_8), needle));
     }
 
     private static CompoundTag bill(int denomination, int count) {

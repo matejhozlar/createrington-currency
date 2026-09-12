@@ -176,7 +176,7 @@ Inside, you can set:
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
 - Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
-- How many audit locations are listed in chat (`audit.auditChatSites`)
+- How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)
 - Per-command `disable*Command` toggles (see below)
 
 ### Disabling commands

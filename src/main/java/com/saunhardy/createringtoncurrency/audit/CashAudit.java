@@ -78,11 +78,13 @@ public class CashAudit {
         Set<UUID> online;
         List<RegionSweep.Dimension> dimensions;
         int regionFiles;
+        int threads;
 
         try {
             online = PlayerSweep.online(server, census);
             dimensions = full ? dimensions(server) : List.of();
             regionFiles = full ? RegionSweep.countRegionFiles(dimensions) : 0;
+            threads = full ? threads() : 0;
 
             if (full) {
                 source.sendSystemMessage(Component.literal("Saving the world, then reading " + Bills.fmt(regionFiles)
@@ -97,7 +99,7 @@ public class CashAudit {
         }
 
         try {
-            WORKER.execute(sweep(server, initiator, census, full, online, dimensions, regionFiles));
+            WORKER.execute(sweep(server, initiator, census, full, online, dimensions, regionFiles, threads));
         } catch (RuntimeException e) {
             RUNNING.set(false);
             LOGGER.error("Cash audit could not be queued", e);
@@ -109,13 +111,13 @@ public class CashAudit {
     }
 
     private static Runnable sweep(MinecraftServer server, UUID initiator, CashCensus census, boolean full,
-                                  Set<UUID> online, List<RegionSweep.Dimension> dimensions, int regionFiles) {
+                                  Set<UUID> online, List<RegionSweep.Dimension> dimensions, int regionFiles, int threads) {
         return () -> {
             try {
                 PlayerSweep.offline(server, online, census);
 
                 if (full) {
-                    RegionSweep.sweep(dimensions, census, done -> {
+                    RegionSweep.sweep(dimensions, census, threads, done -> {
                         if (done % PROGRESS_EVERY == 0) {
                             tell(server, initiator, Component.literal("Audit: " + Bills.fmt(done) + " / "
                                     + Bills.fmt(regionFiles) + " region files").withStyle(ChatFormatting.DARK_GRAY));
@@ -124,6 +126,7 @@ public class CashAudit {
                 }
             } catch (RuntimeException e) {
                 LOGGER.error("Cash audit failed", e);
+                census.markIncomplete();
                 census.warn("The scan stopped early: " + e);
             } finally {
                 census.finish();
@@ -137,7 +140,8 @@ public class CashAudit {
             census.setPending(PendingBillsData.get(server).total());
 
             LastAuditData last = LastAuditData.get(server);
-            int[] previousTotals = census.isFull() ? last.totals() : null;
+            boolean baseline = census.isFull() && census.isComplete();
+            int[] previousTotals = baseline ? last.totals() : null;
             long previousAt = last.takenAt();
 
             Path report = AuditReport.write(server, census);
@@ -146,7 +150,7 @@ public class CashAudit {
                 tell(server, initiator, line);
             }
 
-            if (census.isFull()) last.record(census.totals(), System.currentTimeMillis());
+            if (baseline) last.record(census.totals(), System.currentTimeMillis());
             if (initiator != null) {
                 List<CashSite> sites = census.sites();
                 LAST_SITES.put(initiator, List.copyOf(sites.subList(0, Math.min(MAX_GOTO_SITES, sites.size()))));
@@ -199,6 +203,12 @@ public class CashAudit {
     public static void onServerStopped(ServerStoppedEvent event) {
         LAST_SITES.clear();
         RUNNING.set(false);
+    }
+
+    private static int threads() {
+        int configured = Config.AUDIT_THREADS.get();
+        if (configured > 0) return configured;
+        return Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
     }
 
     private static List<RegionSweep.Dimension> dimensions(MinecraftServer server) {

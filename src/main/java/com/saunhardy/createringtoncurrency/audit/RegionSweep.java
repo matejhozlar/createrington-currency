@@ -6,7 +6,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -25,8 +24,6 @@ public final class RegionSweep {
     public static final String SOURCE_ENTITIES = "Entities";
 
     private static final int REGION_CHUNKS = 32;
-    private static final int THREADS = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
-    private static final byte[] BILL_MARKER = NbtCash.BILL_PREFIX.getBytes(StandardCharsets.UTF_8);
 
     public record Dimension(String id, Path region, Path entities) {}
 
@@ -38,7 +35,7 @@ public final class RegionSweep {
         return total;
     }
 
-    public static void sweep(List<Dimension> dimensions, CashCensus census, IntConsumer progress) {
+    public static void sweep(List<Dimension> dimensions, CashCensus census, int threads, IntConsumer progress) {
         List<Runnable> tasks = new ArrayList<>();
         AtomicInteger done = new AtomicInteger();
 
@@ -57,7 +54,7 @@ public final class RegionSweep {
             }
         }
 
-        ExecutorService pool = Executors.newFixedThreadPool(THREADS, runnable -> {
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, threads), runnable -> {
             Thread thread = new Thread(runnable, "createringtoncurrency-audit-region");
             thread.setDaemon(true);
             return thread;
@@ -71,8 +68,11 @@ public final class RegionSweep {
                 try {
                     future.get();
                 } catch (ExecutionException e) {
+                    census.markIncomplete();
                     census.warn("A region file scan failed: " + e.getCause());
                 } catch (InterruptedException e) {
+                    census.markIncomplete();
+                    census.warn("The scan was interrupted before every region file was read");
                     Thread.currentThread().interrupt();
                     return;
                 }
@@ -99,13 +99,13 @@ public final class RegionSweep {
                     if (raw == null) continue;
 
                     chunks++;
-                    if (!RegionReader.contains(raw, BILL_MARKER)) continue;
+                    if (!NbtCash.mightHoldBills(raw)) continue;
 
                     CompoundTag chunk = RegionReader.parse(raw);
                     if (blockEntities) blockEntities(chunk, dimension, census);
                     else entities(chunk, dimension, census);
                 } catch (IOException | RuntimeException e) {
-                    census.warn("Skipped chunk " + chunkX + ", " + chunkZ + " of " + file.getFileName() + ": " + e);
+                    census.warn("Skipped chunk " + chunkX + ", " + chunkZ + " of " + file.getFileName() + ": " + e.getMessage());
                 }
             }
             census.countRegion(chunks);

@@ -32,6 +32,10 @@ public final class AuditReport {
         List<Component> lines = new ArrayList<>();
 
         lines.add(Component.literal("━━━━━━━━━ Cash audit ━━━━━━━━━").withStyle(ChatFormatting.GOLD));
+        if (!census.isComplete()) {
+            lines.add(Component.literal("This audit did not finish. The totals below are partial and were not saved as the baseline.")
+                    .withStyle(ChatFormatting.RED));
+        }
         lines.add(Component.literal("Physical cash: ").withStyle(ChatFormatting.GRAY)
                 .append(Component.literal("$" + Bills.fmt(census.total())).withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD))
                 .append(Component.literal(" across " + Bills.fmt(census.pieces()) + " bills").withStyle(ChatFormatting.GRAY)));
@@ -116,6 +120,7 @@ public final class AuditReport {
         sb.append("Createrington Currency cash audit\n");
         sb.append("Taken ").append(LocalDateTime.now().format(READABLE_STAMP)).append('\n');
         sb.append(census.isFull() ? "Scope: full world scan\n" : "Scope: players only\n");
+        if (!census.isComplete()) sb.append("INCOMPLETE: the scan did not finish, so these totals are partial\n");
         sb.append(coverage(census)).append("\n\n");
 
         sb.append("Total: $").append(Bills.fmt(census.total()))

@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 public final class NbtCash {
@@ -12,6 +13,27 @@ public final class NbtCash {
 
     private static final int MAX_DEPTH = 32;
     private static final Set<String> NOT_PHYSICAL = Set.of("Offers");
+    private static final byte[] BILL_MARKER = BILL_PREFIX.getBytes(StandardCharsets.US_ASCII);
+
+    public static boolean mightHoldBills(byte[] serialized) {
+        return serialized != null && contains(serialized, BILL_MARKER);
+    }
+
+    static boolean contains(byte[] haystack, byte[] needle) {
+        if (haystack == null || needle.length == 0 || haystack.length < needle.length) return false;
+
+        byte first = needle[0];
+        int last = haystack.length - needle.length;
+        outer:
+        for (int i = 0; i <= last; i++) {
+            if (haystack[i] != first) continue;
+            for (int j = 1; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) continue outer;
+            }
+            return true;
+        }
+        return false;
+    }
 
     public static int denominationIndex(String id) {
         if (id == null || !id.startsWith(BILL_PREFIX)) return -1;

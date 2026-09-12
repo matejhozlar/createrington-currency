@@ -22,8 +22,9 @@ public final class RegionReader implements AutoCloseable {
     private static final int SECTOR = 4096;
     private static final int HEADER = 2 * SECTOR;
     private static final int EXTERNAL_FLAG = 0x80;
-    private static final int MAX_CHUNK_BYTES = 64 * 1024 * 1024;
-    private static final int MAX_INFLATED_BYTES = 256 * 1024 * 1024;
+    private static final int MAX_STORED_BYTES = 64 * 1024 * 1024;
+    private static final int MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+    private static final long MAX_TAG_BYTES = 256L * 1024 * 1024;
 
     private final Path folder;
     private final FileChannel channel;
@@ -63,69 +64,65 @@ public final class RegionReader implements AutoCloseable {
 
     public static CompoundTag parse(byte[] raw) throws IOException {
         try (DataInputStream data = new DataInputStream(new ByteArrayInputStream(raw))) {
-            return NbtIo.read(data, NbtAccounter.unlimitedHeap());
+            return NbtIo.read(data, NbtAccounter.create(MAX_TAG_BYTES));
         }
-    }
-
-    public static boolean contains(byte[] haystack, byte[] needle) {
-        if (needle.length == 0 || haystack.length < needle.length) return false;
-
-        byte first = needle[0];
-        int last = haystack.length - needle.length;
-        outer:
-        for (int i = 0; i <= last; i++) {
-            if (haystack[i] != first) continue;
-            for (int j = 1; j < needle.length; j++) {
-                if (haystack[i + j] != needle[j]) continue outer;
-            }
-            return true;
-        }
-        return false;
     }
 
     public byte[] readRaw(int index, int chunkX, int chunkZ) throws IOException {
         int offset = offsets[index];
         if (offset == 0) return null;
 
-        long start = (long) (offset >>> 8) * SECTOR;
+        int sector = offset >>> 8;
         int sectors = offset & 0xFF;
-        if (offset >>> 8 < 2 || sectors == 0 || start + (long) sectors * SECTOR > size) return null;
+        long start = (long) sector * SECTOR;
+        if (sector < 2 || sectors == 0 || start + (long) sectors * SECTOR > size) {
+            throw new IOException(describe(chunkX, chunkZ) + " points outside the file");
+        }
 
         ByteBuffer prefix = ByteBuffer.allocate(5);
-        if (!fill(prefix, start)) return null;
+        if (!fill(prefix, start)) throw new IOException(describe(chunkX, chunkZ) + " is truncated");
         prefix.flip();
 
         int length = prefix.getInt();
         int compression = prefix.get() & 0xFF;
+        int compressionId = compression & ~EXTERNAL_FLAG;
 
-        RegionFileVersion version = RegionFileVersion.fromId(compression & ~EXTERNAL_FLAG);
-        if (version == null) return null;
+        RegionFileVersion version = RegionFileVersion.fromId(compressionId);
+        if (version == null) throw new IOException(describe(chunkX, chunkZ) + " uses unknown compression " + compressionId);
 
-        byte[] payload;
+        byte[] stored;
         if ((compression & EXTERNAL_FLAG) != 0) {
             Path external = folder.resolve("c." + chunkX + "." + chunkZ + ".mcc");
-            if (!Files.isRegularFile(external) || Files.size(external) > MAX_CHUNK_BYTES) return null;
-            payload = Files.readAllBytes(external);
+            if (!Files.isRegularFile(external)) {
+                throw new IOException(describe(chunkX, chunkZ) + " is missing its external file " + external.getFileName());
+            }
+            if (Files.size(external) > MAX_STORED_BYTES) {
+                throw new IOException(external.getFileName() + " is larger than " + MAX_STORED_BYTES + " bytes");
+            }
+            stored = Files.readAllBytes(external);
         } else {
             int bytes = length - 1;
-            if (bytes <= 0 || bytes > MAX_CHUNK_BYTES || start + 5 + bytes > size) return null;
-
+            if (bytes <= 0 || bytes > MAX_STORED_BYTES || start + 5 + bytes > size) {
+                throw new IOException(describe(chunkX, chunkZ) + " has an invalid length " + length);
+            }
             ByteBuffer buffer = ByteBuffer.allocate(bytes);
-            if (!fill(buffer, start + 5)) return null;
-            payload = buffer.array();
+            if (!fill(buffer, start + 5)) throw new IOException(describe(chunkX, chunkZ) + " is truncated");
+            stored = buffer.array();
         }
 
-        try (InputStream stream = version.wrap(new ByteArrayInputStream(payload))) {
-            return inflate(stream);
+        try (InputStream stream = version.wrap(new ByteArrayInputStream(stored))) {
+            return inflate(stream, chunkX, chunkZ);
         }
     }
 
-    private static byte[] inflate(InputStream stream) throws IOException {
+    private static byte[] inflate(InputStream stream, int chunkX, int chunkZ) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream(64 * 1024);
         byte[] buffer = new byte[16 * 1024];
         int read;
-        while ((read = stream.read(buffer)) > 0) {
-            if (out.size() + read > MAX_INFLATED_BYTES) return null;
+        while ((read = stream.read(buffer)) != -1) {
+            if (out.size() + read > MAX_INFLATED_BYTES) {
+                throw new IOException(describe(chunkX, chunkZ) + " inflates past " + MAX_INFLATED_BYTES + " bytes");
+            }
             out.write(buffer, 0, read);
         }
         return out.toByteArray();
@@ -139,6 +136,10 @@ public final class RegionReader implements AutoCloseable {
             at += read;
         }
         return true;
+    }
+
+    private static String describe(int chunkX, int chunkZ) {
+        return "chunk " + chunkX + ", " + chunkZ;
     }
 
     @Override
