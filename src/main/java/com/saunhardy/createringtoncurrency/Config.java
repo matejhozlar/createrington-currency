@@ -31,6 +31,8 @@ public class Config {
     public static final ModConfigSpec.IntValue VOTE_APPROVAL_PERCENT;
     public static final ModConfigSpec.BooleanValue VOTE_IGNORE_AFK;
 
+    public static final ModConfigSpec.IntValue AUDIT_CHAT_SITES;
+
     public static final ModConfigSpec.BooleanValue TRAIN_CRASH_REPORTING_ENABLED;
 
     public static final ModConfigSpec.IntValue DEPOSITOR_PULSE_TICKS;
@@ -143,6 +145,14 @@ public class Config {
         VOTE_IGNORE_AFK = BUILDER
                 .comment("If true, AFK players do not count towards the votes needed unless they vote (requires the AFKStatus mod)")
                 .define("voteIgnoreAfk", true);
+
+        BUILDER.pop();
+
+        BUILDER.comment("Cash audit settings").push("audit");
+
+        AUDIT_CHAT_SITES = BUILDER
+                .comment("How many locations a cash audit lists in chat; the written report always holds every one")
+                .defineInRange("auditChatSites", 15, 1, 100);
 
         BUILDER.pop();
 

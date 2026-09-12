@@ -86,6 +86,27 @@ The share required is `voteApprovalPercent` (50 by default) and the AFK exclusio
 | Command                             | Description                                                                                                                                                                                                                                                                                                               |
 |-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself; `on` / `off` set it explicitly. While it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills) and chat tells you whose terminal you opened; while it is off you pay like any other customer. It switches off again when you log out |
+| `/createringtoncurrency audit`      | Operators only. Counts every bill on the server and reports where it is — see [Cash audit](#cash-audit)                                                                                                                                                                                                                    |
+
+### Cash audit
+
+`/createringtoncurrency audit` takes a census of the physical cash on the server: how much exists, who is holding it, and where it is sitting.
+
+| Command                                   | Description                                                                                       |
+|-------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `/createringtoncurrency audit`            | Full scan: online and offline players, every container and every entity in every dimension        |
+| `/createringtoncurrency audit players`    | Players only. Instant, and does not touch the world files                                          |
+| `/createringtoncurrency audit goto <n>`   | Teleport to location `n` from your last audit                                                      |
+
+The chat summary shows the total, a per-source split, the change since the last audit, and the richest locations. Each location comes with a `[go]` button that teleports you there and a `[copy]` button that puts an `/execute in <dimension> run tp @s <x> <y> <z>` command on your clipboard. The number of rows is `audit.auditChatSites`; the full list — every location, with its bill breakdown and teleport command — is written to `createringtoncurrency-audits/audit-<timestamp>.txt` next to the server jar.
+
+A full scan saves the world first so that what is on disk is current, then reads the region files on a background thread. It is read-only and never writes to world data. Expect it to take a while on a large world; progress is reported in chat.
+
+The scan walks container NBT generically rather than looking for known tags, so it finds bills in modded inventories — depositor terminals, Create vaults, anything built on an item handler — as well as vanilla ones, and it follows them into shulker boxes, bundles and container items. It also covers dropped items, chest minecarts, chest boats, pack animals and the crafting grid a player has open. Villager trade offers are skipped, since a bill listed in a trade does not exist yet.
+
+**Known gaps:** bills riding inside a moving Create contraption or in transit on a belt; a pack animal someone is riding at the moment of the scan, which is saved to neither the entity files nor the rider's player data. Players moving bills around during a long scan can also be counted twice, so run it when the server is quiet. Every report states its own coverage rather than implying a total it cannot back up.
+
+Because the mod's backend is the ledger and bills are ordinary items, comparing successive audits is the cheapest way to notice a duplication bug: a jump in the total with no withdrawals to explain it is the signal to look for. Only a full scan updates that baseline and only a full scan is compared against it, so using `audit players` never disturbs the comparison. Bills the backend has already debited but not yet handed to an offline player are reported separately, since they are a liability with no physical counterpart yet.
 
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
@@ -155,6 +176,7 @@ Inside, you can set:
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
 - Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
+- How many audit locations are listed in chat (`audit.auditChatSites`)
 - Per-command `disable*Command` toggles (see below)
 
 ### Disabling commands

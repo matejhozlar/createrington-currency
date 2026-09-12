@@ -67,4 +67,14 @@ public class PendingBillsData extends SavedData {
         if (counts != null) setDirty();
         return counts;
     }
+
+    public int[] total() {
+        int[] totals = Bills.none();
+        for (int[] counts : pending.values()) {
+            for (int i = 0; i < totals.length; i++) {
+                totals[i] = (int) Math.min((long) totals[i] + counts[i], Integer.MAX_VALUE);
+            }
+        }
+        return totals;
+    }
 }
