@@ -201,6 +201,7 @@ public class CreateringtonCurrency {
             }
         });
         NeoForge.EVENT_BUS.register(AdminMode.class);
+        NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.audit.CashAudit.class);
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
         NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
         NeoForge.EVENT_BUS.addListener(MobDropTable::onTagsUpdated);

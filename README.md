@@ -86,6 +86,25 @@ The share required is `voteApprovalPercent` (50 by default) and the AFK exclusio
 | Command                             | Description                                                                                                                                                                                                                                                                                                               |
 |-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself; `on` / `off` set it explicitly. While it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills) and chat tells you whose terminal you opened; while it is off you pay like any other customer. It switches off again when you log out |
+| `/createringtoncurrency audit`      | Operators only. Counts every bill on the server and reports where it is — see [Cash audit](#cash-audit)                                                                                                                                                                                                                    |
+
+### Cash audit
+
+`/createringtoncurrency audit` takes a census of the physical cash on the server: how much exists, who is holding it, and where it is sitting.
+
+| Command                                   | Description                                                                                       |
+|-------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `/createringtoncurrency audit`            | Full scan: online and offline players, every container and every entity in every dimension        |
+| `/createringtoncurrency audit players`    | Players only. Instant, and does not touch the world files                                          |
+| `/createringtoncurrency audit goto <n>`   | Teleport to location `n` from your last audit                                                      |
+
+The chat summary shows the total, a per-source split, the change since the last audit, and the richest locations. Each location comes with a `[go]` button that teleports you there and a `[copy]` button that puts an `/execute in <dimension> run tp @s <x> <y> <z>` command on your clipboard. The number of rows is `audit.auditChatSites`; the full list — every location, with its bill breakdown and teleport command — is written to `createringtoncurrency-audits/audit-<timestamp>.txt` next to the server jar.
+
+A full scan saves the world first so that what is on disk is current, then reads the region files on a background thread. It is read-only and never writes to world data. Expect it to take a while on a large world; progress is reported in chat.
+
+The scan follows bills into shulker boxes, bundles and container items, and covers dropped items, chest minecarts, chest boats and pack animals. **Known gap:** bills riding inside a moving Create contraption or in transit on a belt are not counted. Every report states its own coverage rather than implying a total it cannot back up.
+
+Because the mod's backend is the ledger and bills are ordinary items, comparing successive audits is the cheapest way to notice a duplication bug: a jump in the total with no withdrawals to explain it is the signal to look for.
 
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
@@ -155,6 +174,7 @@ Inside, you can set:
 - Daily mob earnings cap
 - Cooldowns for commands and lotteries
 - Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
+- How many audit locations are listed in chat (`audit.auditChatSites`)
 - Per-command `disable*Command` toggles (see below)
 
 ### Disabling commands
