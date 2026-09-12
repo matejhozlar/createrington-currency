@@ -4,6 +4,8 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.util.AfkStatus;
+import com.saunhardy.createringtoncurrency.util.VoteQuorum;
+import com.saunhardy.createringtoncurrency.util.VoteQuorum.Tally;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -108,6 +110,12 @@ public class VoteCommand {
             return 0;
         }
 
+        if (player.isSpectator()) {
+            player.sendSystemMessage(Component.literal("❌ Spectators cannot start a vote.")
+                    .withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
         long now = System.currentTimeMillis();
         long cooldownUntil = WEATHER_TYPES.contains(type) ? weatherCooldownUntil : timeCooldownUntil;
         if (now < cooldownUntil) {
@@ -127,21 +135,20 @@ public class VoteCommand {
         MinecraftServer server = player.getServer();
         if (server == null) return 0;
 
-        int eligible = eligibleVoters(server, Set.of(player.getUUID())).size();
-        if (eligible <= 1) {
-            player.sendSystemMessage(Component.literal("✅ Vote passed!")
-                    .withStyle(ChatFormatting.GREEN));
-            applyVote(type, durationDays, server);
-            setCooldown(type, COOLDOWN_SUCCESS_MS);
+        ActiveVote vote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString());
+        Tally tally = tally(server, vote);
+
+        if (tally.decided()) {
+            resolveVote(server, vote, tally);
             return 1;
         }
 
-        activeVote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString());
+        activeVote = vote;
         LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed", player.getName().getString(), type,
                 durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
-                requiredYes(eligible), eligible);
+                tally.needed(), tally.eligible());
 
-        broadcastVoteStart(server, player.getName().getString(), type, durationDays, requiredYes(eligible), eligible);
+        broadcastVoteStart(server, player.getName().getString(), type, durationDays, tally.needed(), tally.eligible());
 
         return 1;
     }
@@ -150,6 +157,12 @@ public class VoteCommand {
         ActiveVote vote = activeVote;
         if (vote == null) {
             player.sendSystemMessage(Component.literal("❌ No vote is currently active. Start one with /vote <type>")
+                    .withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
+        if (player.isSpectator()) {
+            player.sendSystemMessage(Component.literal("❌ Spectators cannot vote.")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -211,20 +224,13 @@ public class VoteCommand {
         }
     }
 
-    private record Tally(int eligible, int needed, int yes, int no, boolean decided, boolean passed) {}
-
     private static Tally tally(MinecraftServer server, ActiveVote vote) {
         Set<UUID> voted = new HashSet<>(vote.yesVotes);
         voted.addAll(vote.noVotes);
 
         Set<UUID> eligible = eligibleVoters(server, voted);
-        int needed = requiredYes(eligible.size());
-        int yes = countIn(vote.yesVotes, eligible);
-        int no = countIn(vote.noVotes, eligible);
-        int undecided = eligible.size() - yes - no;
-        boolean passed = yes >= needed;
-
-        return new Tally(eligible.size(), needed, yes, no, passed || yes + undecided < needed, passed);
+        return VoteQuorum.tally(eligible.size(), countIn(vote.yesVotes, eligible), countIn(vote.noVotes, eligible),
+                Config.VOTE_APPROVAL_PERCENT.get());
     }
 
     private static Set<UUID> eligibleVoters(MinecraftServer server, Set<UUID> voted) {
@@ -232,17 +238,15 @@ public class VoteCommand {
         Set<UUID> eligible = new HashSet<>();
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.isSpectator()) continue;
+
             UUID uuid = player.getUUID();
-            if (voted.contains(uuid) || (!player.isSpectator() && !(ignoreAfk && AfkStatus.isAfk(player)))) {
+            if (voted.contains(uuid) || !(ignoreAfk && AfkStatus.isAfk(player))) {
                 eligible.add(uuid);
             }
         }
 
         return eligible;
-    }
-
-    private static int requiredYes(int eligible) {
-        return Math.max(1, Math.min(eligible, eligible * Config.VOTE_APPROVAL_PERCENT.get() / 100 + 1));
     }
 
     private static int countIn(Set<UUID> votes, Set<UUID> eligible) {
@@ -273,7 +277,15 @@ public class VoteCommand {
         }
         broadcastToAll(server, result);
 
-        setCooldown(vote.type, passed ? COOLDOWN_SUCCESS_MS : tally.no() > 0 ? COOLDOWN_FAIL_MS : COOLDOWN_NO_TURNOUT_MS);
+        long cooldown;
+        if (passed) {
+            cooldown = COOLDOWN_SUCCESS_MS;
+        } else if (VoteQuorum.rejected(tally)) {
+            cooldown = COOLDOWN_FAIL_MS;
+        } else {
+            cooldown = COOLDOWN_NO_TURNOUT_MS;
+        }
+        setCooldown(vote.type, cooldown);
 
         if (passed) {
             applyVote(vote.type, vote.durationDays, server);

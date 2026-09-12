@@ -172,6 +172,8 @@ tasks.withType(ProcessResources).configureEach {
             create_version_range   : create_version_range,
             crnet_version          : crnet_version,
             crnet_version_range    : crnet_version_range,
+            afkstatus_version      : afkstatus_version,
+            afkstatus_version_range: afkstatus_version_range,
     ]
     inputs.properties replaceProperties
 

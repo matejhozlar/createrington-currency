@@ -14,16 +14,14 @@ public final class AfkStatus {
     private static final String MOD_ID = "afkstatus";
     private static final String AFK_TEAM = "afkstatus";
 
-    private static Method isAfkMethod;
-    private static boolean resolved;
+    private static volatile Method isAfkMethod;
+    private static volatile boolean resolved;
 
     public static boolean isInstalled() {
         return ModList.get().isLoaded(MOD_ID);
     }
 
     public static boolean isAfk(ServerPlayer player) {
-        if (!isInstalled()) return false;
-
         Method method = resolve();
         if (method != null) {
             try {
@@ -44,7 +42,10 @@ public final class AfkStatus {
             try {
                 isAfkMethod = Class.forName("com.saunhardy.afkstatus.AFKManager").getMethod("isAFK", UUID.class);
             } catch (ReflectiveOperationException | RuntimeException e) {
-                LOGGER.warn("AFKStatus is installed but its AFK lookup could not be resolved, using the scoreboard team instead: {}", e.toString());
+                if (isInstalled()) {
+                    LOGGER.warn("AFKStatus is installed but its AFK lookup could not be resolved, falling back to the '{}' scoreboard team: {}",
+                            AFK_TEAM, e.toString());
+                }
             }
         }
         return isAfkMethod;

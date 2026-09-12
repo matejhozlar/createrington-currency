@@ -136,7 +136,8 @@ public class Config {
         BUILDER.comment("Vote command settings").push("vote");
 
         VOTE_APPROVAL_PERCENT = BUILDER
-                .comment("A vote passes once strictly more than this percentage of the eligible players have voted yes")
+                .comment("A vote passes once strictly more than this percentage of the eligible players have voted yes",
+                        "Low values can put the needed votes at 1, which lets whoever starts a vote pass it on their own")
                 .defineInRange("voteApprovalPercent", 50, 0, 100);
 
         VOTE_IGNORE_AFK = BUILDER
