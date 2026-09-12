@@ -11,6 +11,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -58,6 +59,34 @@ class RegionReaderTest {
         try (RegionReader reader = RegionReader.open(file)) {
             assertEquals("external", reader.read(INDEX, 5, 3).getString("marker"));
         }
+    }
+
+    @Test
+    void rawBytesRevealWhetherAChunkCanHoldBills() throws IOException {
+        byte[] needle = NbtCash.BILL_PREFIX.getBytes(StandardCharsets.UTF_8);
+
+        CompoundTag withBill = chunk("hello");
+        withBill.putString("SomeItemId", NbtCash.BILL_PREFIX + "100");
+        Path file = write(INDEX, payload(withBill, RegionFileVersion.VERSION_DEFLATE, false), null);
+        try (RegionReader reader = RegionReader.open(file)) {
+            byte[] raw = reader.readRaw(INDEX, 5, 3);
+            assertTrue(RegionReader.contains(raw, needle));
+            assertEquals("hello", RegionReader.parse(raw).getString("marker"));
+        }
+
+        file = write(INDEX, payload(chunk("hello"), RegionFileVersion.VERSION_DEFLATE, false), null);
+        try (RegionReader reader = RegionReader.open(file)) {
+            assertFalse(RegionReader.contains(reader.readRaw(INDEX, 5, 3), needle));
+        }
+    }
+
+    @Test
+    void findsANeedleAtEitherEndOfTheHaystack() {
+        byte[] needle = "bill_".getBytes(StandardCharsets.UTF_8);
+        assertTrue(RegionReader.contains("bill_xyz".getBytes(StandardCharsets.UTF_8), needle));
+        assertTrue(RegionReader.contains("xyzbill_".getBytes(StandardCharsets.UTF_8), needle));
+        assertFalse(RegionReader.contains("bill".getBytes(StandardCharsets.UTF_8), needle));
+        assertFalse(RegionReader.contains("bil_bil_".getBytes(StandardCharsets.UTF_8), needle));
     }
 
     @Test
