@@ -10,12 +10,17 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.GameProfileCache;
+import net.minecraft.world.Container;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.level.storage.LevelResource;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -34,9 +39,12 @@ public final class PlayerSweep {
             census.countPlayer();
 
             int[] counts = Bills.none();
-            LiveCash.count(player.getInventory(), counts);
-            LiveCash.count(player.getEnderChestInventory(), counts);
-            if (player.containerMenu != null) LiveCash.count(player.containerMenu.getCarried(), counts);
+            boolean truncated = LiveCash.count(player.getInventory(), counts);
+            truncated |= LiveCash.count(player.getEnderChestInventory(), counts);
+            truncated |= craftingGrids(player, counts);
+            if (player.containerMenu != null) truncated |= LiveCash.count(player.containerMenu.getCarried(), counts);
+
+            if (truncated) census.warn("Stopped at the nesting limit inside " + player.getName().getString() + "'s items");
 
             census.add(SOURCE_ONLINE, new CashSite(
                     "Player " + player.getName().getString(),
@@ -69,7 +77,7 @@ public final class PlayerSweep {
                 census.countPlayer();
 
                 int[] counts = Bills.none();
-                NbtCash.countHolder(tag, counts);
+                if (NbtCash.count(tag, counts)) census.warn("Stopped at the nesting limit inside " + file.getFileName());
                 if (Bills.isEmpty(counts)) continue;
 
                 ListTag pos = tag.getList("Pos", Tag.TAG_DOUBLE);
@@ -84,6 +92,25 @@ public final class PlayerSweep {
                 census.warn("Could not read " + file.getFileName() + ": " + e);
             }
         }
+    }
+
+    private static boolean craftingGrids(ServerPlayer player, int[] counts) {
+        Set<Container> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        boolean truncated = false;
+
+        if (seen.add(player.inventoryMenu.getCraftSlots())) {
+            truncated |= LiveCash.count(player.inventoryMenu.getCraftSlots(), counts);
+        }
+
+        if (player.containerMenu != null) {
+            for (Slot slot : player.containerMenu.slots) {
+                if (slot.container instanceof TransientCraftingContainer grid && seen.add(grid)) {
+                    truncated |= LiveCash.count(grid, counts);
+                }
+            }
+        }
+
+        return truncated;
     }
 
     private static UUID uuidOf(Path file) {

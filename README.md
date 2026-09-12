@@ -102,9 +102,11 @@ The chat summary shows the total, a per-source split, the change since the last 
 
 A full scan saves the world first so that what is on disk is current, then reads the region files on a background thread. It is read-only and never writes to world data. Expect it to take a while on a large world; progress is reported in chat.
 
-The scan follows bills into shulker boxes, bundles and container items, and covers dropped items, chest minecarts, chest boats and pack animals. **Known gap:** bills riding inside a moving Create contraption or in transit on a belt are not counted. Every report states its own coverage rather than implying a total it cannot back up.
+The scan walks container NBT generically rather than looking for known tags, so it finds bills in modded inventories — depositor terminals, Create vaults, anything built on an item handler — as well as vanilla ones, and it follows them into shulker boxes, bundles and container items. It also covers dropped items, chest minecarts, chest boats, pack animals and the crafting grid a player has open. Villager trade offers are skipped, since a bill listed in a trade does not exist yet.
 
-Because the mod's backend is the ledger and bills are ordinary items, comparing successive audits is the cheapest way to notice a duplication bug: a jump in the total with no withdrawals to explain it is the signal to look for.
+**Known gaps:** bills riding inside a moving Create contraption or in transit on a belt; a pack animal someone is riding at the moment of the scan, which is saved to neither the entity files nor the rider's player data. Players moving bills around during a long scan can also be counted twice, so run it when the server is quiet. Every report states its own coverage rather than implying a total it cannot back up.
+
+Because the mod's backend is the ledger and bills are ordinary items, comparing successive audits is the cheapest way to notice a duplication bug: a jump in the total with no withdrawals to explain it is the signal to look for. Only a full scan updates that baseline and only a full scan is compared against it, so using `audit players` never disturbs the comparison. Bills the backend has already debited but not yet handed to an offline player are reported separately, since they are a liability with no physical counterpart yet.
 
 ### ATM Block & GUI
 - **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.

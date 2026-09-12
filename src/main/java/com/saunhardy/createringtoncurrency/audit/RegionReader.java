@@ -39,8 +39,8 @@ public final class RegionReader implements AutoCloseable {
         try {
             RegionReader reader = new RegionReader(file.getParent(), channel, channel.size());
             ByteBuffer header = ByteBuffer.allocate(HEADER);
-            if (channel.read(header, 0L) >= SECTOR) {
-                header.flip();
+            reader.fill(header, 0L);
+            if (header.position() >= SECTOR) {
                 for (int i = 0; i < CHUNKS; i++) reader.offsets[i] = header.getInt(i * 4);
             }
             return reader;
@@ -63,7 +63,7 @@ public final class RegionReader implements AutoCloseable {
         if (offset >>> 8 < 2 || sectors == 0 || start + (long) sectors * SECTOR > size) return null;
 
         ByteBuffer prefix = ByteBuffer.allocate(5);
-        if (channel.read(prefix, start) != 5) return null;
+        if (!fill(prefix, start)) return null;
         prefix.flip();
 
         int length = prefix.getInt();
@@ -82,7 +82,7 @@ public final class RegionReader implements AutoCloseable {
             if (bytes <= 0 || bytes > MAX_CHUNK_BYTES || start + 5 + bytes > size) return null;
 
             ByteBuffer buffer = ByteBuffer.allocate(bytes);
-            if (channel.read(buffer, start + 5) != bytes) return null;
+            if (!fill(buffer, start + 5)) return null;
             payload = buffer.array();
         }
 
@@ -90,6 +90,16 @@ public final class RegionReader implements AutoCloseable {
              DataInputStream data = new DataInputStream(stream)) {
             return NbtIo.read(data, NbtAccounter.unlimitedHeap());
         }
+    }
+
+    private boolean fill(ByteBuffer buffer, long position) throws IOException {
+        long at = position;
+        while (buffer.hasRemaining()) {
+            int read = channel.read(buffer, at);
+            if (read < 0) return false;
+            at += read;
+        }
+        return true;
     }
 
     @Override

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NbtCashTest {
@@ -27,7 +28,7 @@ class NbtCashTest {
         chest.put("Items", items(bill(100, 3), stack("minecraft:cobblestone", 64), bill(1, 7)));
 
         int[] counts = Bills.none();
-        NbtCash.countHolder(chest, counts);
+        NbtCash.count(chest, counts);
 
         assertEquals(3, counts[Bills.indexOfDenomination(100)]);
         assertEquals(7, counts[Bills.indexOfDenomination(1)]);
@@ -40,7 +41,7 @@ class NbtCashTest {
         bill.putString("id", NbtCash.BILL_PREFIX + "500");
 
         int[] counts = Bills.none();
-        NbtCash.countStack(bill, counts);
+        NbtCash.count(bill, counts);
 
         assertEquals(500, Bills.value(counts));
     }
@@ -61,7 +62,7 @@ class NbtCashTest {
         chest.put("Items", items(shulker, bill(50, 1)));
 
         int[] counts = Bills.none();
-        NbtCash.countHolder(chest, counts);
+        NbtCash.count(chest, counts);
 
         assertEquals(2 * 1000 + 50, Bills.value(counts));
     }
@@ -74,7 +75,7 @@ class NbtCashTest {
         bundle.put("components", components);
 
         int[] counts = Bills.none();
-        NbtCash.countStack(bundle, counts);
+        NbtCash.count(bundle, counts);
 
         assertEquals(80, Bills.value(counts));
     }
@@ -89,7 +90,7 @@ class NbtCashTest {
         barrelItem.put("components", components);
 
         int[] counts = Bills.none();
-        NbtCash.countStack(barrelItem, counts);
+        NbtCash.count(barrelItem, counts);
 
         assertEquals(60, Bills.value(counts));
     }
@@ -101,7 +102,7 @@ class NbtCashTest {
         player.put("EnderItems", items(bill(1000, 1)));
 
         int[] counts = Bills.none();
-        NbtCash.countHolder(player, counts);
+        NbtCash.count(player, counts);
 
         assertEquals(1100, Bills.value(counts));
     }
@@ -113,7 +114,7 @@ class NbtCashTest {
         item.put("Item", bill(500, 2));
 
         int[] counts = Bills.none();
-        NbtCash.countHolder(item, counts);
+        NbtCash.count(item, counts);
 
         assertEquals(1000, Bills.value(counts));
     }
@@ -129,7 +130,7 @@ class NbtCashTest {
         boat.put("Passengers", passengers);
 
         int[] counts = Bills.none();
-        NbtCash.countHolder(boat, counts);
+        NbtCash.count(boat, counts);
 
         assertEquals(5, Bills.value(counts));
     }
@@ -140,10 +141,74 @@ class NbtCashTest {
         chest.put("Items", items(stack("minecraft:diamond", 64), stack("createringtoncurrency:bank_card", 1)));
 
         int[] counts = Bills.none();
-        NbtCash.countHolder(chest, counts);
+        NbtCash.count(chest, counts);
 
         assertArrayEquals(Bills.none(), counts);
         assertTrue(Bills.isEmpty(counts));
+    }
+
+    @Test
+    void countsAnItemStackHandlerNestedUnderItsOwnKey() {
+        CompoundTag handler = new CompoundTag();
+        handler.putInt("Size", 9);
+        handler.put("Items", items(bill(1000, 4)));
+
+        CompoundTag depositor = new CompoundTag();
+        depositor.putString("id", "createringtoncurrency:depositor_terminal");
+        depositor.putInt("PriceDenomination", 100);
+        depositor.put("Storage", handler);
+
+        int[] counts = Bills.none();
+        NbtCash.count(depositor, counts);
+
+        assertEquals(4000, Bills.value(counts));
+    }
+
+    @Test
+    void countsContainersNestedSeveralKeysDeep() {
+        CompoundTag inner = new CompoundTag();
+        inner.put("Items", items(bill(50, 2)));
+
+        CompoundTag middle = new CompoundTag();
+        middle.put("inventory", inner);
+
+        CompoundTag outer = new CompoundTag();
+        outer.putString("id", "somemod:fancy_vault");
+        outer.put("state", middle);
+
+        int[] counts = Bills.none();
+        NbtCash.count(outer, counts);
+
+        assertEquals(100, Bills.value(counts));
+    }
+
+    @Test
+    void ignoresVillagerTradesThatAreNotPhysicalBills() {
+        CompoundTag recipe = new CompoundTag();
+        recipe.put("sell", bill(1000, 8));
+
+        ListTag recipes = new ListTag();
+        recipes.add(recipe);
+        CompoundTag offers = new CompoundTag();
+        offers.put("Recipes", recipes);
+
+        CompoundTag villager = new CompoundTag();
+        villager.putString("id", "minecraft:villager");
+        villager.put("Offers", offers);
+        villager.put("Inventory", items(bill(10, 1)));
+
+        int[] counts = Bills.none();
+        NbtCash.count(villager, counts);
+
+        assertEquals(10, Bills.value(counts));
+    }
+
+    @Test
+    void reportsWhenItStoppedDescending() {
+        CompoundTag shallow = new CompoundTag();
+        shallow.put("Items", items(bill(1, 1)));
+
+        assertFalse(NbtCash.count(shallow, Bills.none()));
     }
 
     @Test
@@ -162,8 +227,8 @@ class NbtCashTest {
         }
 
         int[] counts = Bills.none();
-        NbtCash.countStack(nested, counts);
 
+        assertTrue(NbtCash.count(nested, counts));
         assertTrue(Bills.isEmpty(counts));
     }
 

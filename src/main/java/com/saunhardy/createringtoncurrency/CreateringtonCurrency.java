@@ -2,6 +2,7 @@ package com.saunhardy.createringtoncurrency;
 
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
+import com.saunhardy.createringtoncurrency.audit.CashAudit;
 import com.saunhardy.createringtoncurrency.block.DecorativeATMBlock;
 import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlock;
 import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlockEntity;
@@ -201,7 +202,7 @@ public class CreateringtonCurrency {
             }
         });
         NeoForge.EVENT_BUS.register(AdminMode.class);
-        NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.audit.CashAudit.class);
+        NeoForge.EVENT_BUS.register(CashAudit.class);
         NeoForge.EVENT_BUS.addListener(DepositorNetworking::onPlayerLogout);
         NeoForge.EVENT_BUS.addListener(BillDelivery::onPlayerLogin);
         NeoForge.EVENT_BUS.addListener(MobDropTable::onTagsUpdated);

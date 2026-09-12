@@ -18,6 +18,7 @@ public class CashCensus {
     private final long startedAt = System.currentTimeMillis();
     private long finishedAt;
 
+    private int[] pending = Bills.none();
     private int playersScanned;
     private int regionsScanned;
     private int chunksScanned;
@@ -53,6 +54,14 @@ public class CashCensus {
     public synchronized void finish() {
         finishedAt = System.currentTimeMillis();
         sites.sort(Comparator.comparingLong(CashSite::value).reversed());
+    }
+
+    public synchronized void setPending(int[] counts) {
+        pending = counts.clone();
+    }
+
+    public int[] pending() {
+        return pending;
     }
 
     public boolean isFull() {

@@ -41,7 +41,12 @@ public final class AuditReport {
                     .append(Component.literal("$" + Bills.fmt(Bills.value(source.getValue()))).withStyle(ChatFormatting.WHITE)));
         }
 
-        if (previousTotals != null) {
+        if (!Bills.isEmpty(census.pending())) {
+            lines.add(Component.literal("Owed to offline players, not yet delivered: ").withStyle(ChatFormatting.GRAY)
+                    .append(Component.literal("$" + Bills.fmt(Bills.value(census.pending()))).withStyle(ChatFormatting.WHITE)));
+        }
+
+        if (previousTotals != null && census.isFull()) {
             long delta = census.total() - Bills.value(previousTotals);
             ChatFormatting colour = delta > 0 ? ChatFormatting.YELLOW : delta < 0 ? ChatFormatting.AQUA : ChatFormatting.GRAY;
             lines.add(Component.literal("Change since " + ago(previousAt) + ": ").withStyle(ChatFormatting.GRAY)
@@ -119,6 +124,11 @@ public final class AuditReport {
             sb.append("  $").append(Bills.DENOMINATIONS[i]).append(" x ").append(Bills.fmt(census.totals()[i])).append('\n');
         }
 
+        if (!Bills.isEmpty(census.pending())) {
+            sb.append("\nOwed to offline players, not yet delivered: $")
+                    .append(Bills.fmt(Bills.value(census.pending()))).append('\n');
+        }
+
         sb.append("\nBy source\n");
         for (Map.Entry<String, int[]> source : census.bySource().entrySet()) {
             sb.append("  ").append(source.getKey()).append(": $").append(Bills.fmt(Bills.value(source.getValue())))
@@ -157,7 +167,8 @@ public final class AuditReport {
                     .append(", ").append(Bills.fmt(census.chunksScanned())).append(" chunks");
         }
         sb.append(" in ").append(Bills.fmt(census.durationMs() / 1000.0)).append("s");
-        if (!census.isFull()) sb.append(" (containers and entities not included)");
+        if (census.isFull()) sb.append(". Players moving bills during the scan can skew the total");
+        else sb.append(" (containers and entities not included)");
         return sb.toString();
     }
 

@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.util.Bills;
+import com.saunhardy.createringtoncurrency.util.PendingBillsData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -18,6 +19,8 @@ import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
@@ -35,6 +38,7 @@ public class CashAudit {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int PERMISSION_LEVEL = 2;
     private static final int PROGRESS_EVERY = 64;
+    private static final int MAX_GOTO_SITES = 200;
 
     private static final AtomicBoolean RUNNING = new AtomicBoolean();
     private static final Map<UUID, List<CashSite>> LAST_SITES = new ConcurrentHashMap<>();
@@ -51,6 +55,7 @@ public class CashAudit {
                 Commands.literal("createringtoncurrency")
                         .requires(source -> source.hasPermission(PERMISSION_LEVEL))
                         .then(Commands.literal("audit")
+                                .requires(source -> source.hasPermission(PERMISSION_LEVEL))
                                 .executes(ctx -> start(ctx.getSource(), true))
                                 .then(Commands.literal("players")
                                         .executes(ctx -> start(ctx.getSource(), false)))
@@ -70,18 +75,42 @@ public class CashAudit {
         }
 
         CashCensus census = new CashCensus(full);
-        Set<UUID> online = PlayerSweep.online(server, census);
+        Set<UUID> online;
+        List<RegionSweep.Dimension> dimensions;
+        int regionFiles;
 
-        List<RegionSweep.Dimension> dimensions = full ? dimensions(server) : List.of();
-        int regionFiles = full ? RegionSweep.countRegionFiles(dimensions) : 0;
+        try {
+            online = PlayerSweep.online(server, census);
+            dimensions = full ? dimensions(server) : List.of();
+            regionFiles = full ? RegionSweep.countRegionFiles(dimensions) : 0;
 
-        if (full) {
-            tell(server, initiator, Component.literal("Saving the world, then reading " + Bills.fmt(regionFiles)
-                    + " region files. This can take a while.").withStyle(ChatFormatting.GRAY));
-            server.saveEverything(true, true, true);
+            if (full) {
+                source.sendSystemMessage(Component.literal("Saving the world, then reading " + Bills.fmt(regionFiles)
+                        + " region files. This can take a while.").withStyle(ChatFormatting.GRAY));
+                server.saveEverything(true, true, true);
+            }
+        } catch (RuntimeException e) {
+            RUNNING.set(false);
+            LOGGER.error("Cash audit could not start", e);
+            source.sendFailure(Component.literal("The audit could not start: " + e));
+            return 0;
         }
 
-        WORKER.execute(() -> {
+        try {
+            WORKER.execute(sweep(server, initiator, census, full, online, dimensions, regionFiles));
+        } catch (RuntimeException e) {
+            RUNNING.set(false);
+            LOGGER.error("Cash audit could not be queued", e);
+            source.sendFailure(Component.literal("The audit could not start: " + e));
+            return 0;
+        }
+
+        return 1;
+    }
+
+    private static Runnable sweep(MinecraftServer server, UUID initiator, CashCensus census, boolean full,
+                                  Set<UUID> online, List<RegionSweep.Dimension> dimensions, int regionFiles) {
+        return () -> {
             try {
                 PlayerSweep.offline(server, online, census);
 
@@ -100,15 +129,15 @@ public class CashAudit {
                 census.finish();
                 server.execute(() -> finish(server, initiator, census));
             }
-        });
-
-        return 1;
+        };
     }
 
     private static void finish(MinecraftServer server, UUID initiator, CashCensus census) {
         try {
+            census.setPending(PendingBillsData.get(server).total());
+
             LastAuditData last = LastAuditData.get(server);
-            int[] previousTotals = last.totals();
+            int[] previousTotals = census.isFull() ? last.totals() : null;
             long previousAt = last.takenAt();
 
             Path report = AuditReport.write(server, census);
@@ -117,8 +146,11 @@ public class CashAudit {
                 tell(server, initiator, line);
             }
 
-            last.record(census.totals(), System.currentTimeMillis());
-            if (initiator != null) LAST_SITES.put(initiator, census.sites());
+            if (census.isFull()) last.record(census.totals(), System.currentTimeMillis());
+            if (initiator != null) {
+                List<CashSite> sites = census.sites();
+                LAST_SITES.put(initiator, List.copyOf(sites.subList(0, Math.min(MAX_GOTO_SITES, sites.size()))));
+            }
 
             LOGGER.info("Cash audit ({}): ${} across {} bills in {} sites, {} players, {} chunks",
                     census.isFull() ? "full" : "players", Bills.fmt(census.total()), Bills.fmt(census.pieces()),
@@ -137,7 +169,8 @@ public class CashAudit {
         }
 
         if (index > sites.size()) {
-            player.sendSystemMessage(Component.literal("Your last audit only found " + sites.size() + " locations.")
+            player.sendSystemMessage(Component.literal("Your last audit kept only " + sites.size()
+                    + " locations for teleporting; the rest are in the written report.")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -155,6 +188,17 @@ public class CashAudit {
         player.sendSystemMessage(Component.literal("Teleported to " + site.label() + " holding $"
                 + Bills.fmt(site.value())).withStyle(ChatFormatting.GREEN));
         return 1;
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        LAST_SITES.remove(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        LAST_SITES.clear();
+        RUNNING.set(false);
     }
 
     private static List<RegionSweep.Dimension> dimensions(MinecraftServer server) {

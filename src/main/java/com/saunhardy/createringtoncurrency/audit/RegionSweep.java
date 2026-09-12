@@ -42,7 +42,7 @@ public final class RegionSweep {
         if (files.isEmpty()) return done;
 
         for (Path file : files) {
-            long[] origin = originOf(file);
+            int[] origin = originOf(file);
             if (origin == null) continue;
 
             try (RegionReader region = RegionReader.open(file)) {
@@ -50,19 +50,23 @@ public final class RegionSweep {
                 for (int index = 0; index < RegionReader.CHUNKS; index++) {
                     if (!region.has(index)) continue;
 
-                    int chunkX = (int) origin[0] + (index & 31);
-                    int chunkZ = (int) origin[1] + (index >> 5);
+                    int chunkX = origin[0] + (index & 31);
+                    int chunkZ = origin[1] + (index >> 5);
 
-                    CompoundTag chunk = region.read(index, chunkX, chunkZ);
-                    if (chunk == null) continue;
+                    try {
+                        CompoundTag chunk = region.read(index, chunkX, chunkZ);
+                        if (chunk == null) continue;
 
-                    chunks++;
-                    if (blockEntities) blockEntities(chunk, dimension, census);
-                    else entities(chunk, dimension, census);
+                        chunks++;
+                        if (blockEntities) blockEntities(chunk, dimension, census);
+                        else entities(chunk, dimension, census);
+                    } catch (IOException | RuntimeException e) {
+                        census.warn("Skipped chunk " + chunkX + ", " + chunkZ + " of " + file.getFileName() + ": " + e);
+                    }
                 }
                 census.countRegion(chunks);
             } catch (IOException | RuntimeException e) {
-                census.warn("Could not read " + file.getFileName() + ": " + e);
+                census.warn("Could not open " + file.getFileName() + ": " + e);
             }
 
             progress.accept(++done);
@@ -77,11 +81,13 @@ public final class RegionSweep {
             CompoundTag entry = list.getCompound(i);
 
             int[] counts = Bills.none();
-            NbtCash.countHolder(entry, counts);
+            boolean truncated = NbtCash.count(entry, counts);
             if (Bills.isEmpty(counts)) continue;
 
-            census.add(SOURCE_CONTAINERS, new CashSite(prettyId(entry.getString("id")), dimension.id(),
-                    entry.getInt("x"), entry.getInt("y"), entry.getInt("z"), counts));
+            CashSite site = new CashSite(prettyId(entry.getString("id")), dimension.id(),
+                    entry.getInt("x"), entry.getInt("y"), entry.getInt("z"), counts);
+            if (truncated) census.warn("Stopped at the nesting limit inside " + site.label() + " at " + site.coords());
+            census.add(SOURCE_CONTAINERS, site);
         }
     }
 
@@ -91,8 +97,10 @@ public final class RegionSweep {
             CompoundTag entry = list.getCompound(i);
 
             int[] counts = Bills.none();
-            NbtCash.countHolder(entry, counts);
+            boolean truncated = NbtCash.count(entry, counts);
             if (Bills.isEmpty(counts)) continue;
+
+            if (truncated) census.warn("Stopped at the nesting limit inside " + prettyId(entry.getString("id")));
 
             ListTag pos = entry.getList("Pos", Tag.TAG_DOUBLE);
             int x = pos.size() == 3 ? (int) Math.floor(pos.getDouble(0)) : 0;
@@ -114,12 +122,12 @@ public final class RegionSweep {
         }
     }
 
-    private static long[] originOf(Path file) {
+    private static int[] originOf(Path file) {
         String[] parts = file.getFileName().toString().split("\\.");
         if (parts.length != 4) return null;
 
         try {
-            return new long[]{Long.parseLong(parts[1]) * REGION_CHUNKS, Long.parseLong(parts[2]) * REGION_CHUNKS};
+            return new int[]{Integer.parseInt(parts[1]) * REGION_CHUNKS, Integer.parseInt(parts[2]) * REGION_CHUNKS};
         } catch (NumberFormatException e) {
             return null;
         }
