@@ -10,7 +10,6 @@ import java.util.Set;
 
 public class CreateMixinPlugin implements IMixinConfigPlugin {
     private static final boolean CREATE_LOADED;
-    private static final Set<String> CREATE_MIXINS = Set.of("com.saunhardy.createringtoncurrency.mixin.TrainCrashMixin");
 
     static {
         CREATE_LOADED = LoadingModList.get().getModFileById("create") != null;
@@ -18,7 +17,7 @@ public class CreateMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return CREATE_LOADED || !CREATE_MIXINS.contains(mixinClassName);
+        return CREATE_LOADED || !targetClassName.startsWith("com.simibubi.create.");
     }
 
     @Override public void onLoad(String mixinPackage) {}
