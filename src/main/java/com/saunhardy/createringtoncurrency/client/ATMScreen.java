@@ -12,6 +12,7 @@ import com.saunhardy.createringtoncurrency.network.ATMResultPayload;
 import com.saunhardy.createringtoncurrency.network.ATMWithdrawPayload;
 import com.saunhardy.createringtoncurrency.util.Bills;
 import com.saunhardy.createringtoncurrency.util.TransactionFormat;
+import com.sighs.apricityui.element.AbstractText;
 import com.sighs.apricityui.event.KeyEvent;
 import com.sighs.apricityui.init.Document;
 import com.sighs.apricityui.init.Element;
@@ -225,7 +226,7 @@ public class ATMScreen extends ApricityScreen {
             if (input == null) continue;
             input.addEventListener("input", e -> {
                 String digits = digitsOnly(input.getValue(), MAX_BILL_DIGITS);
-                if (!digits.equals(input.getValue())) input.setValue(digits);
+                setInputValue(input, digits);
                 billCounts[index] = Math.min(MAX_BILL_COUNT, parseIntOrZero(digits));
                 refreshBillTotal();
             });
@@ -268,7 +269,7 @@ public class ATMScreen extends ApricityScreen {
         if (input == null) return;
         input.addEventListener("input", e -> {
             String digits = digitsOnly(input.getValue(), MAX_AMOUNT_DIGITS);
-            if (!digits.equals(input.getValue())) input.setValue(digits);
+            setInputValue(input, digits);
             onChange.accept(digits);
         });
         input.addEventListener("keydown", e -> {
@@ -389,7 +390,7 @@ public class ATMScreen extends ApricityScreen {
         Element input = doc.querySelector(".amount-control[data-denomination=\"" + DENOMS[index] + "\"] .amount");
         if (input == null) return;
         String value = billCounts[index] == 0 ? "" : String.valueOf(billCounts[index]);
-        if (!value.equals(input.getValue())) input.setValue(value);
+        setInputValue(input, value);
     }
 
     private void refreshBillTotal() {
@@ -552,7 +553,19 @@ public class ATMScreen extends ApricityScreen {
 
     private void setValue(String id, String value) {
         Element element = doc.getElementById(id);
-        if (element != null && !value.equals(element.getValue())) element.setValue(value);
+        if (element != null) setInputValue(element, value);
+    }
+
+    private static void setInputValue(Element input, String value) {
+        String previous = input.getValue();
+        if (value.equals(previous)) return;
+        int caret = input instanceof AbstractText text ? text.getCursor() : 0;
+        input.setValue(value);
+        if (input instanceof AbstractText text) {
+            int removed = (previous == null ? 0 : previous.length()) - value.length();
+            int next = Math.max(0, Math.min(value.length(), caret - removed));
+            text.setSelectionRange(next, next);
+        }
     }
 
     private void setDisabled(String id, boolean disabled) {
