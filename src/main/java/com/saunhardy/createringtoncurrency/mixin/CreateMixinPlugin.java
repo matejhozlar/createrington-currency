@@ -17,7 +17,7 @@ public class CreateMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return CREATE_LOADED;
+        return CREATE_LOADED || !targetClassName.startsWith("com.simibubi.create.");
     }
 
     @Override public void onLoad(String mixinPackage) {}

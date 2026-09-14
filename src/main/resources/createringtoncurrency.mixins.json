@@ -4,6 +4,7 @@
     "compatibilityLevel": "JAVA_21",
     "plugin": "com.saunhardy.createringtoncurrency.mixin.CreateMixinPlugin",
     "mixins": [
+        "RconSayMixin",
         "TrainCrashMixin"
     ],
     "minVersion": "0.8"
