@@ -23,7 +23,7 @@ public final class ATMNetworking {
     private static final int KIND_ERROR = ATMResultPayload.KIND_ERROR;
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar reg = event.registrar("4");
+        PayloadRegistrar reg = event.registrar("5");
 
         reg.playToClient(ATMOpenPayload.TYPE, ATMOpenPayload.STREAM_CODEC, ATMNetworking::handleOpenClient);
         reg.playToServer(ATMDepositPayload.TYPE, ATMDepositPayload.STREAM_CODEC, ATMNetworking::handleDeposit);
@@ -39,14 +39,10 @@ public final class ATMNetworking {
 
     private static void handleQueryBalance(final ATMQueryBalancePayload pkt, final IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
-        if (!CurrencyApi.isAvailable()) {
-            player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable()));
-            return;
-        }
         CurrencyApi.balance(player.getUUID())
                 .thenAccept(resp -> {
                     if (!resp.isSuccess() || resp.getData() == null) {
-                        LOGGER.warn("ATM balance query rejected for {}: {}", player.getName().getString(), resp.getMessage());
+                        LOGGER.debug("ATM balance query rejected for {}: {}", player.getName().getString(), resp.getMessage());
                         player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable()));
                         return;
                     }
@@ -87,17 +83,18 @@ public final class ATMNetworking {
         Deposits.Reporter reporter = new Deposits.Reporter() {
             @Override
             public void started(ServerPlayer recipient, long amount) {
-                sendResult(recipient, KIND_INFO, "Depositing $" + Bills.fmt(amount) + "...");
+                sendResult(recipient, KIND_INFO, ATMResultPayload.OP_DEPOSIT, "Depositing $" + Bills.fmt(amount) + "...");
             }
 
             @Override
             public void succeeded(ServerPlayer recipient, long amount, String playerMessage) {
-                sendResult(recipient, KIND_SUCCESS, playerMessage != null ? playerMessage : "Deposited $" + Bills.fmt(amount));
+                sendResult(recipient, KIND_SUCCESS, ATMResultPayload.OP_DEPOSIT,
+                        playerMessage != null ? playerMessage : "Deposited $" + Bills.fmt(amount));
             }
 
             @Override
             public void failed(ServerPlayer recipient, String text) {
-                sendResult(recipient, KIND_ERROR, text);
+                sendResult(recipient, KIND_ERROR, ATMResultPayload.OP_DEPOSIT, text);
             }
         };
         if (pkt.isAll()) {
@@ -112,12 +109,12 @@ public final class ATMNetworking {
         Withdrawals.withdraw(player, pkt.toArray(), "atm", new Withdrawals.Reporter() {
             @Override
             public void succeeded(ServerPlayer recipient, long amount) {
-                sendResult(recipient, KIND_SUCCESS, "Withdrew $" + Bills.fmt(amount));
+                sendResult(recipient, KIND_SUCCESS, ATMResultPayload.OP_WITHDRAW, "Withdrew $" + Bills.fmt(amount));
             }
 
             @Override
             public void failed(ServerPlayer recipient, String text) {
-                sendResult(recipient, KIND_ERROR, text);
+                sendResult(recipient, KIND_ERROR, ATMResultPayload.OP_WITHDRAW, text);
             }
         });
     }
@@ -150,14 +147,14 @@ public final class ATMNetworking {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         mc.execute(() -> {
             if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
-                scr.showResult(pkt.kind(), pkt.message());
+                scr.showResult(pkt.kind(), pkt.op(), pkt.message());
             } else if (mc.player != null) {
                 mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal(pkt.message()), false);
             }
         });
     }
 
-    private static void sendResult(ServerPlayer player, int kind, String msg) {
-        player.connection.send(new ClientboundCustomPayloadPacket(new ATMResultPayload(kind, msg)));
+    private static void sendResult(ServerPlayer player, int kind, int op, String msg) {
+        player.connection.send(new ClientboundCustomPayloadPacket(new ATMResultPayload(kind, op, msg)));
     }
 }

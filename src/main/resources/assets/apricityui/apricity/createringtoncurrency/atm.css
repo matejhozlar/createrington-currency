@@ -27,7 +27,7 @@
   height: 325px;
   left: 220px;
   top: 137px;
-  background: transparent url("img/black-crt-test.png") center / 520px 325px no-repeat;
+  background: transparent url("img/crt-glass.png") center / 520px 325px no-repeat;
   box-shadow: 0 0 5px #000000;
   pointer-events: none;
 }
@@ -40,7 +40,7 @@
   height: 380px;
   left: 200px;
   top: 104px;
-  background: transparent url("img/black-border-scaled-2.png") center / 560px 350px no-repeat;
+  background: transparent url("img/screen-bezel.png") center / 560px 350px no-repeat;
   pointer-events: none;
 }
 
@@ -533,6 +533,15 @@
   justify-content: center;
   background-color: rgba(0, 0, 0, 0.6);
   cursor: pointer;
+}
+
+.status-popup.is-info {
+  box-sizing: border-box;
+  align-items: flex-end;
+  padding-bottom: 155px;
+  background-color: transparent;
+  pointer-events: none;
+  cursor: default;
 }
 
 .status-popup:not(.is-active) {

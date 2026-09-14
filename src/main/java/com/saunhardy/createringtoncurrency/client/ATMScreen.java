@@ -65,9 +65,11 @@ public class ATMScreen extends ApricityScreen {
 
     private String statusText = "";
     private String statusColor = "#ffffff";
+    private boolean statusInfo = false;
     private int statusTicks = 0;
 
     private Document doc;
+    private Document boundDoc;
     private long boundGeneration = -1;
     private int holdIndex = -1;
     private int holdDelta = 0;
@@ -94,8 +96,7 @@ public class ATMScreen extends ApricityScreen {
             LOGGER.error("ATM page {} could not be loaded; check the [AUI HTML] log lines", PAGE);
             return;
         }
-        bind();
-        applyState();
+        ensureBound();
         if (!probeStarted) {
             probeStarted = true;
             probe();
@@ -109,11 +110,7 @@ public class ATMScreen extends ApricityScreen {
             onClose();
             return;
         }
-        if (doc.getRefreshGeneration() != boundGeneration) {
-            holdIndex = -1;
-            bind();
-            applyState();
-        }
+        ensureBound();
         if (statusTicks > 0 && --statusTicks == 0) refreshStatus();
         if (holdIndex >= 0 && ++holdTicks >= HOLD_DELAY_TICKS) {
             holdRepeated = true;
@@ -132,7 +129,7 @@ public class ATMScreen extends ApricityScreen {
 
     public void updateBalance(int value, boolean available) {
         balance = available ? value : -1;
-        if (probing) {
+        if (probing || (view == View.OUT_OF_SERVICE && available)) {
             probing = false;
             enterView(available ? View.HOME : View.OUT_OF_SERVICE);
             return;
@@ -148,32 +145,47 @@ public class ATMScreen extends ApricityScreen {
         if (doc != null) refreshHistory();
     }
 
-    public void showResult(int kind, String message) {
+    public void showResult(int kind, int op, String message) {
+        showStatus(kind, message);
+        if (kind != ATMResultPayload.KIND_SUCCESS) return;
+        if (op == ATMResultPayload.OP_DEPOSIT) {
+            depositAmount = "";
+            if (doc != null) setValue("deposit-amount", "");
+        } else if (op == ATMResultPayload.OP_WITHDRAW) {
+            Arrays.fill(billCounts, 0);
+            withdrawAmount = "";
+            if (doc != null) {
+                refreshBillInputs();
+                setValue("withdraw-amount", "");
+                refreshWithdrawBreakdown();
+            }
+        }
+        if (doc != null) refreshDepositBreakdown();
+        requestBalance();
+    }
+
+    private void showStatus(int kind, String message) {
         statusText = message == null ? "" : message;
+        statusInfo = kind == ATMResultPayload.KIND_INFO;
         statusColor = switch (kind) {
             case ATMResultPayload.KIND_SUCCESS -> "#2ecc71";
             case ATMResultPayload.KIND_ERROR -> "#e74c3c";
             default -> "#ffffff";
         };
         statusTicks = STATUS_TICKS;
-        if (kind == ATMResultPayload.KIND_SUCCESS) {
-            Arrays.fill(billCounts, 0);
-            withdrawAmount = "";
-            depositAmount = "";
-            if (doc != null) {
-                refreshBillInputs();
-                setValue("deposit-amount", "");
-                setValue("withdraw-amount", "");
-                refreshDepositBreakdown();
-                refreshWithdrawBreakdown();
-            }
-            requestBalance();
-        }
         if (doc != null) refreshStatus();
     }
 
-    private void bind() {
+    private void ensureBound() {
+        if (doc == boundDoc && doc.getRefreshGeneration() == boundGeneration) return;
+        boundDoc = doc;
         boundGeneration = doc.getRefreshGeneration();
+        holdIndex = -1;
+        bind();
+        applyState();
+    }
+
+    private void bind() {
         for (Element button : doc.querySelectorAll(".atm-button")) {
             button.addEventListener("mouseenter", e -> swapClass(button, "is-unhovering", "is-hovering"));
             button.addEventListener("mouseleave", e -> swapClass(button, "is-hovering", "is-unhovering"));
@@ -443,6 +455,8 @@ public class ATMScreen extends ApricityScreen {
     private void refreshStatus() {
         boolean showing = statusTicks > 0 && !statusText.isEmpty();
         setActive("status-popup", showing);
+        Element popup = doc.getElementById("status-popup");
+        if (popup != null) popup.getClassList().toggle("is-info", statusInfo);
         Element text = doc.getElementById("status-text");
         if (text != null) {
             text.setTextContent(statusText);
@@ -457,7 +471,7 @@ public class ATMScreen extends ApricityScreen {
     private void performDepositAmount() {
         int amount = parseIntOrZero(depositAmount);
         if (amount <= 0) {
-            showResult(ATMResultPayload.KIND_ERROR, "Enter an amount.");
+            showStatus(ATMResultPayload.KIND_ERROR, "Enter an amount.");
             return;
         }
         send(new ATMDepositPayload(amount));
@@ -465,7 +479,7 @@ public class ATMScreen extends ApricityScreen {
 
     private void performWithdrawBills() {
         if (Bills.isEmpty(billCounts)) {
-            showResult(ATMResultPayload.KIND_ERROR, "Enter at least one bill count.");
+            showStatus(ATMResultPayload.KIND_ERROR, "Enter at least one bill count.");
             return;
         }
         send(ATMWithdrawPayload.of(billCounts));
@@ -474,15 +488,13 @@ public class ATMScreen extends ApricityScreen {
     private void performWithdrawAmount() {
         int amount = parseIntOrZero(withdrawAmount);
         if (amount <= 0) {
-            showResult(ATMResultPayload.KIND_ERROR, "Enter an amount.");
+            showStatus(ATMResultPayload.KIND_ERROR, "Enter an amount.");
             return;
         }
         send(ATMWithdrawPayload.of(Bills.breakdown(amount)));
     }
 
     private void requestBalance() {
-        balance = -1;
-        if (doc != null) refreshBalance();
         send(new ATMQueryBalancePayload());
     }
 
