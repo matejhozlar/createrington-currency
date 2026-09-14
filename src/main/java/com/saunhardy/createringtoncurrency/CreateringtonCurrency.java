@@ -10,7 +10,6 @@ import com.saunhardy.createringtoncurrency.client.ClientOnlyHooks;
 import com.saunhardy.createringtoncurrency.datagen.DataGenerators;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantmentEffects;
 import com.saunhardy.createringtoncurrency.item.BankCardItem;
-import com.saunhardy.createringtoncurrency.menu.ATMMenu;
 import com.saunhardy.createringtoncurrency.menu.DepositorMenu;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDropTable;
@@ -23,7 +22,6 @@ import com.saunhardy.createringtoncurrency.util.Withdrawals;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -145,8 +143,6 @@ public class CreateringtonCurrency {
             BLOCK_ENTITIES.register("depositor_terminal", () ->
                     BlockEntityType.Builder.of(DepositorTerminalBlockEntity::new, DEPOSITOR_TERMINAL_BLOCK.get()).build(null));
 
-    public static final DeferredHolder<MenuType<?>, MenuType<ATMMenu>> ATM_MENU =
-            MENUS.register("atm", () -> new MenuType<>(ATMMenu::new, FeatureFlags.VANILLA_SET));
     public static final DeferredHolder<MenuType<?>, MenuType<DepositorMenu>> DEPOSITOR_MENU =
             MENUS.register("depositor_terminal", () -> IMenuTypeExtension.create(DepositorMenu::fromBuf));
 

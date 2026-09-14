@@ -8,6 +8,10 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
 public record ATMResultPayload(int kind, String message) implements CustomPacketPayload {
+    public static final int KIND_INFO = 0;
+    public static final int KIND_SUCCESS = 1;
+    public static final int KIND_ERROR = 2;
+
     public static final Type<ATMResultPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("createringtoncurrency", "atm_result"));
 

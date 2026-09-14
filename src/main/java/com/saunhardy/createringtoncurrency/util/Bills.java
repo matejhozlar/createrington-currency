@@ -11,6 +11,8 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper;
 
 import java.text.NumberFormat;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class Bills {
     public static final int[] DENOMINATIONS = {1000, 500, 100, 50, 20, 10, 5, 1};
@@ -68,6 +70,34 @@ public final class Bills {
             remaining %= DENOMINATIONS[i];
         }
         return counts;
+    }
+
+    public static int[] exactChange(int[] available, long amount) {
+        if (amount < 0) return null;
+        long[] reachableBelow = new long[DENOMINATIONS.length + 1];
+        for (int i = DENOMINATIONS.length - 1; i >= 0; i--) {
+            reachableBelow[i] = reachableBelow[i + 1] + (long) available[i] * DENOMINATIONS[i];
+        }
+        int[] counts = none();
+        return pick(available, reachableBelow, amount, 0, counts, new HashSet<>()) ? counts : null;
+    }
+
+    private static boolean pick(int[] available, long[] reachableBelow, long remaining, int i,
+                                int[] counts, Set<Long> deadEnds) {
+        if (remaining == 0) return true;
+        if (i >= DENOMINATIONS.length || remaining > reachableBelow[i]) return false;
+        long state = remaining * DENOMINATIONS.length + i;
+        if (deadEnds.contains(state)) return false;
+        long denomination = DENOMINATIONS[i];
+        long most = Math.min(available[i], remaining / denomination);
+        long fewest = Math.max(0, (remaining - reachableBelow[i + 1] + denomination - 1) / denomination);
+        for (long n = most; n >= fewest; n--) {
+            counts[i] = (int) n;
+            if (pick(available, reachableBelow, remaining - n * denomination, i + 1, counts, deadEnds)) return true;
+        }
+        counts[i] = 0;
+        deadEnds.add(state);
+        return false;
     }
 
     public static int[] count(IItemHandler handler) {

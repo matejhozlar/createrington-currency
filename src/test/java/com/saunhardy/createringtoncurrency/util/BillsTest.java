@@ -4,9 +4,62 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BillsTest {
+
+    private static int[] held(int... denominationCountPairs) {
+        int[] counts = Bills.none();
+        for (int i = 0; i < denominationCountPairs.length; i += 2) {
+            counts[Bills.indexOfDenomination(denominationCountPairs[i])] = denominationCountPairs[i + 1];
+        }
+        return counts;
+    }
+
+    @Test
+    void exactChangePrefersTheLargestBillsWhenTheyFit() {
+        int[] held = held(100, 1, 50, 2, 20, 5, 1, 3);
+        assertArrayEquals(held(100, 1), Bills.exactChange(held, 100));
+        assertArrayEquals(held(100, 1, 50, 1), Bills.exactChange(held, 150));
+        assertArrayEquals(held(100, 1, 50, 2, 20, 5, 1, 3), Bills.exactChange(held, 303));
+    }
+
+    @Test
+    void exactChangeBacktracksWhereGreedyWouldGetStuck() {
+        int[] held = held(50, 1, 20, 3);
+        assertArrayEquals(held(20, 3), Bills.exactChange(held, 60));
+        assertArrayEquals(held(50, 1, 20, 1), Bills.exactChange(held, 70));
+        assertArrayEquals(held(50, 1, 20, 3), Bills.exactChange(held(100, 1, 50, 1, 20, 3), 110));
+    }
+
+    @Test
+    void exactChangeIsNullWhenTheBillsCannotMakeTheAmount() {
+        assertNull(Bills.exactChange(held(20, 3), 30));
+        assertNull(Bills.exactChange(held(20, 3), 80));
+        assertNull(Bills.exactChange(held(5, 1, 1, 3), 9));
+        assertNull(Bills.exactChange(Bills.none(), 1));
+        assertNull(Bills.exactChange(held(1, 5), -1));
+    }
+
+    @Test
+    void exactChangeOfZeroTakesNothing() {
+        int[] pick = Bills.exactChange(held(100, 2, 1, 1), 0);
+        assertNotNull(pick);
+        assertTrue(Bills.isEmpty(pick));
+    }
+
+    @Test
+    void exactChangeNeverExceedsWhatIsHeldAndAlwaysSumsToTheAmount() {
+        int[] held = held(1000, 3, 500, 1, 100, 7, 50, 2, 20, 9, 10, 4, 5, 1, 1, 12);
+        for (int amount = 0; amount <= Bills.value(held); amount++) {
+            int[] pick = Bills.exactChange(held, amount);
+            if (pick == null) continue;
+            assertEquals(amount, Bills.value(pick));
+            assertTrue(Bills.isEmpty(Bills.missing(pick, held)));
+        }
+    }
 
     @Test
     void breakdownUsesTheLargestDenominationsFirst() {
