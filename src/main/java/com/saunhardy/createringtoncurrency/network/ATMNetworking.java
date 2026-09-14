@@ -23,7 +23,7 @@ public final class ATMNetworking {
     private static final int KIND_ERROR = ATMResultPayload.KIND_ERROR;
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar reg = event.registrar("5");
+        PayloadRegistrar reg = event.registrar("6");
 
         reg.playToClient(ATMOpenPayload.TYPE, ATMOpenPayload.STREAM_CODEC, ATMNetworking::handleOpenClient);
         reg.playToServer(ATMDepositPayload.TYPE, ATMDepositPayload.STREAM_CODEC, ATMNetworking::handleDeposit);
@@ -43,15 +43,15 @@ public final class ATMNetworking {
                 .thenAccept(resp -> {
                     if (!resp.isSuccess() || resp.getData() == null) {
                         LOGGER.debug("ATM balance query rejected for {}: {}", player.getName().getString(), resp.getMessage());
-                        player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable()));
+                        player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable(pkt.seq())));
                         return;
                     }
                     int balance = Math.max(0, (int) resp.getData().balance());
-                    player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(balance, true)));
+                    player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(pkt.seq(), balance, true)));
                 })
                 .exceptionally(ex -> {
                     LOGGER.error("ATM balance query failed for {}: {}", player.getName().getString(), ex.getMessage());
-                    player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable()));
+                    player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable(pkt.seq())));
                     return null;
                 });
     }
@@ -129,7 +129,7 @@ public final class ATMNetworking {
         var mc = net.minecraft.client.Minecraft.getInstance();
         mc.execute(() -> {
             if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
-                scr.updateBalance(pkt.balance(), pkt.available());
+                scr.updateBalance(pkt.seq(), pkt.balance(), pkt.available());
             }
         });
     }
