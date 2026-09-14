@@ -55,6 +55,7 @@ public class ATMScreen extends ApricityScreen {
     private String withdrawAmount = "";
     private String depositAmount = "";
     private int balance = -1;
+    private static int balanceSeq;
     private boolean probeStarted = false;
     private boolean probing = false;
     private int connectTicks = 0;
@@ -128,7 +129,8 @@ public class ATMScreen extends ApricityScreen {
         }
     }
 
-    public void updateBalance(int value, boolean available) {
+    public void updateBalance(int seq, int value, boolean available) {
+        if (seq != balanceSeq) return;
         balance = available ? value : -1;
         if (probing || (view == View.OUT_OF_SERVICE && available)) {
             probing = false;
@@ -148,17 +150,19 @@ public class ATMScreen extends ApricityScreen {
 
     public void showResult(int kind, int op, String message) {
         showStatus(kind, message);
-        if (kind != ATMResultPayload.KIND_SUCCESS) return;
-        if (op == ATMResultPayload.OP_DEPOSIT) {
-            depositAmount = "";
-            if (doc != null) setValue("deposit-amount", "");
-        } else if (op == ATMResultPayload.OP_WITHDRAW) {
-            Arrays.fill(billCounts, 0);
-            withdrawAmount = "";
-            if (doc != null) {
-                refreshBillInputs();
-                setValue("withdraw-amount", "");
-                refreshWithdrawBreakdown();
+        if (kind == ATMResultPayload.KIND_INFO) return;
+        if (kind == ATMResultPayload.KIND_SUCCESS) {
+            if (op == ATMResultPayload.OP_DEPOSIT) {
+                depositAmount = "";
+                if (doc != null) setValue("deposit-amount", "");
+            } else if (op == ATMResultPayload.OP_WITHDRAW) {
+                Arrays.fill(billCounts, 0);
+                withdrawAmount = "";
+                if (doc != null) {
+                    refreshBillInputs();
+                    setValue("withdraw-amount", "");
+                    refreshWithdrawBreakdown();
+                }
             }
         }
         if (doc != null) refreshDepositBreakdown();
@@ -310,7 +314,7 @@ public class ATMScreen extends ApricityScreen {
         connectTicks = 0;
         balance = -1;
         enterView(View.CONNECTING);
-        send(new ATMQueryBalancePayload());
+        requestBalance();
     }
 
     private void enterView(View next) {
@@ -496,7 +500,7 @@ public class ATMScreen extends ApricityScreen {
     }
 
     private void requestBalance() {
-        send(new ATMQueryBalancePayload());
+        send(new ATMQueryBalancePayload(++balanceSeq));
     }
 
     private void requestHistory(int page) {

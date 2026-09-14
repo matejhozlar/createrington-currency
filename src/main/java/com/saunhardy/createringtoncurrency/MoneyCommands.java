@@ -331,6 +331,11 @@ public class MoneyCommands {
     private static int submitWithdrawal(ServerPlayer player, int[] counts) {
         Withdrawals.withdraw(player, counts, "command", new Withdrawals.Reporter() {
             @Override
+            public void started(ServerPlayer recipient, long amount) {
+                recipient.sendSystemMessage(message("Processing withdrawal of", "$" + Bills.fmt(amount) + "...", ChatFormatting.YELLOW));
+            }
+
+            @Override
             public void succeeded(ServerPlayer recipient, long amount) {
                 recipient.sendSystemMessage(message("✅", "Successfully withdrew $" + Bills.fmt(amount), ChatFormatting.GREEN));
             }

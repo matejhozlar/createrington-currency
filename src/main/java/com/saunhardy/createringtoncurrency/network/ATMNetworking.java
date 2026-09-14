@@ -23,7 +23,7 @@ public final class ATMNetworking {
     private static final int KIND_ERROR = ATMResultPayload.KIND_ERROR;
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar reg = event.registrar("5");
+        PayloadRegistrar reg = event.registrar("6");
 
         reg.playToClient(ATMOpenPayload.TYPE, ATMOpenPayload.STREAM_CODEC, ATMNetworking::handleOpenClient);
         reg.playToServer(ATMDepositPayload.TYPE, ATMDepositPayload.STREAM_CODEC, ATMNetworking::handleDeposit);
@@ -43,15 +43,15 @@ public final class ATMNetworking {
                 .thenAccept(resp -> {
                     if (!resp.isSuccess() || resp.getData() == null) {
                         LOGGER.debug("ATM balance query rejected for {}: {}", player.getName().getString(), resp.getMessage());
-                        player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable()));
+                        player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable(pkt.seq())));
                         return;
                     }
-                    int balance = Math.max(0, (int) resp.getData().balance());
-                    player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(balance, true)));
+                    int balance = (int) Math.min(Integer.MAX_VALUE, Math.max(0, Bills.wholeDollars(resp.getData().balance())));
+                    player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(pkt.seq(), balance, true)));
                 })
                 .exceptionally(ex -> {
                     LOGGER.error("ATM balance query failed for {}: {}", player.getName().getString(), ex.getMessage());
-                    player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable()));
+                    player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable(pkt.seq())));
                     return null;
                 });
     }
@@ -108,6 +108,11 @@ public final class ATMNetworking {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
         Withdrawals.withdraw(player, pkt.toArray(), "atm", new Withdrawals.Reporter() {
             @Override
+            public void started(ServerPlayer recipient, long amount) {
+                sendResult(recipient, KIND_INFO, ATMResultPayload.OP_WITHDRAW, "Withdrawing $" + Bills.fmt(amount) + "...");
+            }
+
+            @Override
             public void succeeded(ServerPlayer recipient, long amount) {
                 sendResult(recipient, KIND_SUCCESS, ATMResultPayload.OP_WITHDRAW, "Withdrew $" + Bills.fmt(amount));
             }
@@ -129,7 +134,7 @@ public final class ATMNetworking {
         var mc = net.minecraft.client.Minecraft.getInstance();
         mc.execute(() -> {
             if (mc.screen instanceof com.saunhardy.createringtoncurrency.client.ATMScreen scr) {
-                scr.updateBalance(pkt.balance(), pkt.available());
+                scr.updateBalance(pkt.seq(), pkt.balance(), pkt.available());
             }
         });
     }

@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class Withdrawals {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -28,6 +29,7 @@ public final class Withdrawals {
     static final String NOTHING = "Invalid amount.";
 
     public interface Reporter {
+        default void started(ServerPlayer player, long amount) {}
         void succeeded(ServerPlayer player, long amount);
         void failed(ServerPlayer player, String text);
     }
@@ -81,7 +83,43 @@ public final class Withdrawals {
 
         MinecraftServer server = player.server;
         long amount = Bills.value(counts);
+        reporter.started(player, amount);
+        CurrencyApi.balance(uuid).handle((resp, ex) -> {
+            if (ex != null || !resp.isSuccess() || resp.getData() == null) {
+                IN_FLIGHT.remove(uuid);
+                LOGGER.warn("[WITHDRAW:{}] {} ({}): ${} not started, balance check failed: {}",
+                        tag, name, uuid, Bills.fmt(amount), ex != null ? ex.getMessage() : resp.getMessage());
+                BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, "Could not check your balance. Please try again."));
+                return null;
+            }
+            long balance = Bills.wholeDollars(resp.getData().balance());
+            if (balance < amount) {
+                IN_FLIGHT.remove(uuid);
+                LOGGER.info("[WITHDRAW:{}] {} ({}): ${} refused, balance is ${}", tag, name, uuid, Bills.fmt(amount), Bills.fmt(balance));
+                BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, insufficient(balance)));
+                return null;
+            }
+            submit(server, uuid, name, counts, amount, tag, reporter);
+            return null;
+        }).exceptionally(ex -> {
+            IN_FLIGHT.remove(uuid);
+            LOGGER.error("[WITHDRAW:{}] {} ({}): ${} could not be submitted", tag, name, uuid, Bills.fmt(amount), ex);
+            BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, "Something went wrong. Please try again."));
+            return null;
+        });
+    }
+
+    static String insufficient(long balance) {
+        return "Insufficient funds: your balance is $" + Bills.fmt(balance) + ".";
+    }
+
+    static String partial(long withdrawn, long amount, String because) {
+        return "Only $" + Bills.fmt(withdrawn) + " of $" + Bills.fmt(amount) + " was withdrawn before " + because + ".";
+    }
+
+    private static void submit(MinecraftServer server, UUID uuid, String name, int[] counts, long amount, String tag, Reporter reporter) {
         AtomicInteger completed = new AtomicInteger();
+        AtomicLong withdrawn = new AtomicLong();
         AtomicBoolean rejected = new AtomicBoolean();
         Queue<String> keys = new ConcurrentLinkedQueue<>();
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
@@ -100,11 +138,15 @@ public final class Withdrawals {
                     if (!resp.isSuccess()) {
                         rejected.set(true);
                         LOGGER.warn("[WITHDRAW:{}] {} ({}): {} x ${} key={} rejected: {}", tag, name, uuid, count, denomination, key, resp.getMessage());
-                        String text = CurrencyApi.errorText(resp, "Withdraw failed. Please try again.");
+                        long got = withdrawn.get();
+                        String text = got > 0
+                                ? partial(got, amount, "the bank refused the rest")
+                                : CurrencyApi.errorText(resp, "Withdraw failed. Please try again.");
                         BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, text));
                         return;
                     }
                     completed.incrementAndGet();
+                    withdrawn.addAndGet((long) count * denomination);
                     BillDelivery.deliver(server, uuid, Bills.only(index, count), "a withdrawal");
                 });
             });
@@ -116,7 +158,9 @@ public final class Withdrawals {
             if (ex != null) {
                 LOGGER.error("[WITHDRAW:{}] {} ({}): ${} failed after {}/{} denominations, keys in order={} (the last one failed): {}",
                         tag, name, uuid, Bills.fmt(amount), completed.get(), totalSteps, String.join(",", keys), ex.getMessage());
-                BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, "Something went wrong. Please try again."));
+                long got = withdrawn.get();
+                String text = got > 0 ? partial(got, amount, "something went wrong") : "Something went wrong. Please try again.";
+                BillDelivery.whenOnline(server, uuid, p -> reporter.failed(p, text));
                 return;
             }
             if (rejected.get()) {
