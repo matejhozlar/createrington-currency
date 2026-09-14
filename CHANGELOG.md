@@ -1,5 +1,5 @@
-## Version 1.13.0
+## Version 1.13.1
 
-### Changed
-- Redesigned the ATM screen using the designer's HTML/CSS layout rendered by ApricityUI, replacing the previous Java-drawn GUI. ApricityUI is now required as a client-only mod. The intro PIN animation and W/S keyboard navigation have been removed.
-- Depositing at the ATM now accepts a dollar amount and automatically finds the exact bill combination from your inventory, rather than selecting individual bill denominations.
+### Fixed
+- Fixed a client crash when typing in the ATM amount fields after the value was changed programmatically (e.g. after a successful deposit, or when non-digit characters were stripped from input)
+- Fixed the ATM deposit and withdraw amount fields showing `$102` as a placeholder instead of `Enter amount`
