@@ -1,5 +1,7 @@
-## Version 1.13.1
+## Version 1.13.2
 
 ### Fixed
-- Fixed a client crash when typing in the ATM amount fields after the value was changed programmatically (e.g. after a successful deposit, or when non-digit characters were stripped from input)
-- Fixed the ATM deposit and withdraw amount fields showing `$102` as a placeholder instead of `Enter amount`
+- Fixed the ATM and `/withdraw` paying out partial bills when asked for more than the available balance instead of refusing the whole request upfront with "Insufficient funds".
+- Fixed the ATM displaying a stale balance after a partial withdrawal or a refunded deposit.
+- Fixed a floating-point rounding edge case that could cause a full-balance ATM withdrawal to be incorrectly rejected as "Insufficient funds".
+- Fixed players being permanently stuck with "A withdrawal is already in progress" after an error occurred during the post-withdrawal balance refresh.
