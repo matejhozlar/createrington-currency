@@ -41,4 +41,18 @@ class WithdrawalsTest {
         assertNull(Withdrawals.validate(Bills.breakdown(1234)));
         assertNull(Withdrawals.validate(Bills.only(7, 1)));
     }
+
+    @Test
+    void refusesAnUnaffordableRequestByQuotingTheBalance() {
+        assertEquals("Insufficient funds: your balance is $150.", Withdrawals.insufficient(150));
+        assertEquals("Insufficient funds: your balance is $0.", Withdrawals.insufficient(0));
+    }
+
+    @Test
+    void reportsAPartialWithdrawalAsWhatActuallyWentOut() {
+        assertEquals("Only $150 of $200 was withdrawn before the bank refused the rest.",
+                Withdrawals.partial(150, 200, "the bank refused the rest"));
+        assertEquals("Only $5 of $999 was withdrawn before something went wrong.",
+                Withdrawals.partial(5, 999, "something went wrong"));
+    }
 }

@@ -55,7 +55,7 @@ public class ATMScreen extends ApricityScreen {
     private String withdrawAmount = "";
     private String depositAmount = "";
     private int balance = -1;
-    private int balanceSeq;
+    private static int balanceSeq;
     private boolean probeStarted = false;
     private boolean probing = false;
     private int connectTicks = 0;

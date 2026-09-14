@@ -46,7 +46,7 @@ public final class ATMNetworking {
                         player.connection.send(new ClientboundCustomPayloadPacket(ATMBalancePayload.unavailable(pkt.seq())));
                         return;
                     }
-                    int balance = Math.max(0, (int) resp.getData().balance());
+                    int balance = (int) Math.min(Integer.MAX_VALUE, Math.max(0, Bills.wholeDollars(resp.getData().balance())));
                     player.connection.send(new ClientboundCustomPayloadPacket(new ATMBalancePayload(pkt.seq(), balance, true)));
                 })
                 .exceptionally(ex -> {
@@ -107,6 +107,11 @@ public final class ATMNetworking {
     private static void handleWithdraw(final ATMWithdrawPayload pkt, final IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer player)) return;
         Withdrawals.withdraw(player, pkt.toArray(), "atm", new Withdrawals.Reporter() {
+            @Override
+            public void started(ServerPlayer recipient, long amount) {
+                sendResult(recipient, KIND_INFO, ATMResultPayload.OP_WITHDRAW, "Withdrawing $" + Bills.fmt(amount) + "...");
+            }
+
             @Override
             public void succeeded(ServerPlayer recipient, long amount) {
                 sendResult(recipient, KIND_SUCCESS, ATMResultPayload.OP_WITHDRAW, "Withdrew $" + Bills.fmt(amount));

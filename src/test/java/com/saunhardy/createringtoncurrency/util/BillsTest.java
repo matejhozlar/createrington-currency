@@ -19,6 +19,15 @@ class BillsTest {
     }
 
     @Test
+    void wholeDollarsRoundsToTheCentBeforeFlooring() {
+        assertEquals(150L, Bills.wholeDollars(150.0));
+        assertEquals(150L, Bills.wholeDollars(149.999999));
+        assertEquals(149L, Bills.wholeDollars(149.994));
+        assertEquals(149L, Bills.wholeDollars(149.5));
+        assertEquals(0L, Bills.wholeDollars(0.004));
+    }
+
+    @Test
     void exactChangePrefersTheLargestBillsWhenTheyFit() {
         int[] held = held(100, 1, 50, 2, 20, 5, 1, 3);
         assertArrayEquals(held(100, 1), Bills.exactChange(held, 100));

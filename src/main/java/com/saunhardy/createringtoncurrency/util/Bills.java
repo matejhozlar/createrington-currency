@@ -192,4 +192,8 @@ public final class Bills {
         format.setMaximumFractionDigits(2);
         return format.format(amount);
     }
+
+    public static long wholeDollars(double amount) {
+        return (long) Math.floor(Math.round(amount * 100.0) / 100.0);
+    }
 }
