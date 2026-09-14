@@ -7,13 +7,21 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
-public record ATMResultPayload(int kind, String message) implements CustomPacketPayload {
+public record ATMResultPayload(int kind, int op, String message) implements CustomPacketPayload {
+    public static final int KIND_INFO = 0;
+    public static final int KIND_SUCCESS = 1;
+    public static final int KIND_ERROR = 2;
+
+    public static final int OP_DEPOSIT = 0;
+    public static final int OP_WITHDRAW = 1;
+
     public static final Type<ATMResultPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("createringtoncurrency", "atm_result"));
 
     public static final StreamCodec<ByteBuf, ATMResultPayload> STREAM_CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.VAR_INT, ATMResultPayload::kind,
+                    ByteBufCodecs.VAR_INT, ATMResultPayload::op,
                     ByteBufCodecs.STRING_UTF8, ATMResultPayload::message,
                     ATMResultPayload::new
             );

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="aui-viewport" content="mode=fixed,width=640,height=400,scale=fit,user-scalable=false">
+  <meta name="aui-mouse-events" content="intercept">
+  <link rel="stylesheet" href="/apricityui/theme/ore/ore.css">
+  <link rel="stylesheet" href="atm.css">
+</head>
+
+<body class="ore-theme atm-page">
+  <div class="atm-frame">
+
+    <div class="atm-view atm-content is-active" id="view-connecting">
+      <div class="atm-title" id="connecting-title">Connecting</div>
+      <div class="atm-subtitle"><span class="atm-span-small">Contacting the bank, one moment.</span></div>
+    </div>
+
+    <div class="atm-view atm-withdrawpage" id="view-out-of-service">
+      <div class="topbar">
+        <div>
+          <div class="atm-title">Out of service</div>
+          <div class="atm-subtitle"><span class="atm-span-small">The bank is not responding. Please try again later.</span></div>
+        </div>
+        <button class="alt-button" id="leave"><span>X</span></button>
+      </div>
+      <button class="atm-button" id="retry"><span>Retry</span></button>
+    </div>
+
+    <div class="atm-view atm-content" id="view-home">
+      <div class="atm-title" id="welcome">Welcome!</div>
+      <div class="atm-subtitle balance-label">Balance: —</div>
+      <button class="atm-button" id="go-deposit"><span>Deposit</span></button>
+      <button class="atm-button" id="go-withdraw"><span>Withdraw</span></button>
+      <button class="atm-button" id="go-history"><span>History</span></button>
+    </div>
+    <div class="atm-view logo-rotate is-active" id="home-logo">
+      <img src="img/logo-render.gif" alt="">
+    </div>
+
+    <div class="atm-view atm-withdrawpage" id="view-deposit">
+      <div class="topbar">
+        <div>
+          <div class="atm-title">Deposit cash</div>
+          <div class="atm-subtitle"><span class="atm-span-small">Quickly deposit all or choose a specific amount</span></div>
+        </div>
+        <div class="atm-balance atm-subtitle balance-label">Balance: —</div>
+        <button class="alt-button close-view"><span>X</span></button>
+      </div>
+      <div class="deposit-menu">
+        <div>
+          <button class="atm-button" id="deposit-all"><span>Deposit all</span></button>
+        </div>
+        <div class="separator"></div>
+        <div class="totals-deposit">
+          <input type="text" class="amount-input" id="deposit-amount" placeholder="$102" maxlength="9">
+          <div class="breakdown" id="deposit-breakdown"></div>
+          <button class="atm-button" id="deposit-amount-go"><span>Deposit</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="atm-view atm-withdrawpage" id="view-withdraw">
+      <div class="topbar">
+        <div>
+          <div class="atm-title">Withdraw cash</div>
+          <div class="atm-subtitle"><span class="atm-span-small">Choose a quick amount or enter a custom amount</span></div>
+        </div>
+        <div class="atm-balance atm-subtitle balance-label">Balance: —</div>
+        <button class="alt-button close-view"><span>X</span></button>
+      </div>
+      <div class="cash-pages">
+        <div class="cash-tabs">
+          <button class="atm-button cash-tab is-active" data-submenu="choose-bills-menu"><span>Choose bills</span></button>
+          <button class="atm-button cash-tab" data-submenu="custom-amount-menu"><span>Custom amount</span></button>
+        </div>
+        <div class="cash-menu is-active" id="choose-bills-menu">
+          <div>
+            <span class="atm-title">Bill quantity</span>
+            <div class="atm-subtitle"><span class="atm-span-small">Choose the bills you want to withdraw</span></div>
+            <div class="content-grid">
+              <div class="amount-control" data-denomination="1">
+                <texture src="createringtoncurrency:textures/item/bill_1.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="5">
+                <texture src="createringtoncurrency:textures/item/bill_5.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="10">
+                <texture src="createringtoncurrency:textures/item/bill_10.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="20">
+                <texture src="createringtoncurrency:textures/item/bill_20.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="50">
+                <texture src="createringtoncurrency:textures/item/bill_50.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="100">
+                <texture src="createringtoncurrency:textures/item/bill_100.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="500">
+                <texture src="createringtoncurrency:textures/item/bill_500.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+              <div class="amount-control" data-denomination="1000">
+                <texture src="createringtoncurrency:textures/item/bill_1000.png">
+                <button class="minus">-</button>
+                <input type="text" class="amount" maxlength="3" placeholder="0">
+                <button class="plus">+</button>
+              </div>
+            </div>
+            <div class="totals">
+              <span class="atm-span-small" id="bills-total">Total selected: $0</span>
+              <button class="atm-button" id="withdraw-bills"><span>Withdraw</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="cash-menu" id="custom-amount-menu">
+          <div>
+            <span class="atm-title">Custom amount</span>
+            <div class="atm-subtitle"><span class="atm-span-small">Enter any amount and the bill mix is calculated automatically.</span></div>
+            <div class="atm-subtitle"><span class="atm-span-small">Amount:</span></div>
+            <input type="text" class="amount-input" id="withdraw-amount" placeholder="$102" maxlength="9">
+            <div class="total-breakdowns">
+              <div class="breakdown" id="withdraw-breakdown"></div>
+              <button class="atm-button" id="withdraw-amount-go"><span>Withdraw</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="atm-view atm-withdrawpage" id="view-history">
+      <div class="topbar">
+        <div>
+          <div class="atm-title">Transaction history</div>
+          <div class="atm-subtitle"><span class="atm-span-small">Track your spending and earnings</span></div>
+        </div>
+        <div class="atm-balance atm-subtitle balance-label">Balance: —</div>
+        <button class="alt-button close-view"><span>X</span></button>
+      </div>
+      <div class="history-tab">
+        <div class="history-list" id="history-list"></div>
+        <div class="history-pager">
+          <button class="atm-button" id="history-prev"><span>&lt; Prev</span></button>
+          <span class="atm-span-small" id="history-page">Page 1</span>
+          <button class="atm-button" id="history-next"><span>Next &gt;</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-popup" id="status-popup">
+      <div class="status-box" id="status-text"></div>
+    </div>
+
+  </div>
+</body>
+</html>

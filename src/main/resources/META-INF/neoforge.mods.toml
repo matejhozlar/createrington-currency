@@ -111,6 +111,15 @@ config="createringtoncurrency.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# ApricityUI - required on clients only; it renders the ATM screen from HTML/CSS
+[[dependencies.${mod_id}]]
+    modId="apricityui"
+    type="required"
+    reason="The ATM screen is an HTML/CSS page rendered by ApricityUI."
+    versionRange="${apricityui_version_range}"
+    ordering="AFTER"
+    side="CLIENT"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

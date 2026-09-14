@@ -9,7 +9,6 @@
   "block.createringtoncurrency.atm_red": "ATM (Red)",
   "block.createringtoncurrency.atm_pink": "ATM (Pink)",
   "block.createringtoncurrency.depositor_terminal": "Depositor Terminal",
-  "menu.createringtoncurrency.atm": "ATM",
   "menu.createringtoncurrency.depositor_terminal": "Depositor Terminal",
   "gui.createringtoncurrency.depositor.title_owner": "Depositor Terminal • Owner",
   "gui.createringtoncurrency.depositor.price": "Price: %s × $%s = $%s",

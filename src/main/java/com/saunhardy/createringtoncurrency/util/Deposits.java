@@ -36,11 +36,38 @@ public final class Deposits {
             return;
         }
         int[] bills = Bills.count(player.getInventory());
-        long amount = Bills.value(bills);
-        if (amount <= 0) {
+        if (Bills.value(bills) <= 0) {
             reporter.failed(player, "No bills to deposit.");
             return;
         }
+        submit(player, bills, tag, reporter);
+    }
+
+    public static void deposit(ServerPlayer player, long amount, String tag, Reporter reporter) {
+        if (!CurrencyApi.isAvailable()) {
+            reporter.failed(player, "The bank is not available on this server.");
+            return;
+        }
+        if (amount <= 0) {
+            reporter.failed(player, "Enter an amount to deposit.");
+            return;
+        }
+        int[] held = Bills.count(player.getInventory());
+        long carried = Bills.value(held);
+        if (carried < amount) {
+            reporter.failed(player, "You only carry $" + Bills.fmt(carried) + ".");
+            return;
+        }
+        int[] bills = Bills.exactChange(held, amount);
+        if (bills == null) {
+            reporter.failed(player, "Your bills can't make exactly $" + Bills.fmt(amount) + ".");
+            return;
+        }
+        submit(player, bills, tag, reporter);
+    }
+
+    private static void submit(ServerPlayer player, int[] bills, String tag, Reporter reporter) {
+        long amount = Bills.value(bills);
         UUID uuid = player.getUUID();
         if (!IN_FLIGHT.add(uuid)) {
             reporter.failed(player, "A deposit is already in progress.");
