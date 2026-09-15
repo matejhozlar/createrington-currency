@@ -139,7 +139,8 @@ public class Config {
         BUILDER.comment("Vote command settings").push("vote");
 
         VOTE_APPROVAL_PERCENT = BUILDER
-                .comment("A vote passes once strictly more than this percentage of the eligible players have voted yes",
+                .comment("A vote passes once at least this percentage of the eligible players (rounded up) have voted yes; 50 lets a tie pass, 51 needs a strict majority",
+                        "The yes votes needed never rise above what was announced when the vote started, even if more players join",
                         "Low values can put the needed votes at 1, which lets whoever starts a vote pass it on their own")
                 .defineInRange("voteApprovalPercent", 50, 0, 100);
 

@@ -10,14 +10,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VoteQuorumTest {
 
     @Test
-    void halfNeedsStrictlyMoreThanHalf() {
-        assertEquals(2, VoteQuorum.requiredYes(2, 50));
+    void halfNeedsHalfRoundedUp() {
+        assertEquals(1, VoteQuorum.requiredYes(2, 50));
         assertEquals(2, VoteQuorum.requiredYes(3, 50));
-        assertEquals(3, VoteQuorum.requiredYes(4, 50));
+        assertEquals(2, VoteQuorum.requiredYes(4, 50));
         assertEquals(3, VoteQuorum.requiredYes(5, 50));
-        assertEquals(4, VoteQuorum.requiredYes(6, 50));
-        assertEquals(5, VoteQuorum.requiredYes(8, 50));
-        assertEquals(6, VoteQuorum.requiredYes(10, 50));
+        assertEquals(3, VoteQuorum.requiredYes(6, 50));
+        assertEquals(4, VoteQuorum.requiredYes(8, 50));
+        assertEquals(5, VoteQuorum.requiredYes(10, 50));
+    }
+
+    @Test
+    void aStrictMajorityIsOnePercentAway() {
+        assertEquals(2, VoteQuorum.requiredYes(2, 51));
+        assertEquals(3, VoteQuorum.requiredYes(4, 51));
+        assertEquals(4, VoteQuorum.requiredYes(6, 51));
     }
 
     @Test
@@ -54,7 +61,8 @@ class VoteQuorumTest {
 
     @Test
     void failsEarlyOnceTheUndecidedCannotCarryIt() {
-        Tally tally = VoteQuorum.tally(10, 1, 5, 50);
+        assertFalse(VoteQuorum.tally(10, 1, 5, 50).decided());
+        Tally tally = VoteQuorum.tally(10, 1, 6, 50);
         assertFalse(tally.passed());
         assertTrue(tally.decided());
     }
@@ -68,16 +76,32 @@ class VoteQuorumTest {
 
     @Test
     void aShrunkenElectorateCanDecideAnOpenVote() {
-        assertFalse(VoteQuorum.tally(4, 2, 0, 50).passed());
-        assertTrue(VoteQuorum.tally(2, 2, 0, 50).passed());
+        assertFalse(VoteQuorum.tally(6, 2, 0, 50).passed());
+        assertTrue(VoteQuorum.tally(4, 2, 0, 50).passed());
+    }
+
+    @Test
+    void aGrownElectorateCannotRaiseTheAnnouncedThreshold() {
+        Tally tally = VoteQuorum.tally(6, 3, 0, 60, 3);
+        assertEquals(3, tally.needed());
+        assertTrue(tally.passed());
+        assertTrue(tally.decided());
+    }
+
+    @Test
+    void theAnnouncedThresholdStillShrinksWithTheElectorate() {
+        Tally tally = VoteQuorum.tally(2, 1, 0, 50, 3);
+        assertEquals(1, tally.needed());
+        assertTrue(tally.passed());
     }
 
     @Test
     void tellsTurnoutFailuresApartFromRejections() {
         assertFalse(VoteQuorum.rejected(VoteQuorum.tally(10, 1, 1, 50)));
-        assertFalse(VoteQuorum.rejected(VoteQuorum.tally(10, 1, 4, 50)));
-        assertTrue(VoteQuorum.rejected(VoteQuorum.tally(10, 1, 5, 50)));
-        assertTrue(VoteQuorum.rejected(VoteQuorum.tally(4, 0, 2, 50)));
+        assertFalse(VoteQuorum.rejected(VoteQuorum.tally(10, 1, 5, 50)));
+        assertTrue(VoteQuorum.rejected(VoteQuorum.tally(10, 1, 6, 50)));
+        assertFalse(VoteQuorum.rejected(VoteQuorum.tally(4, 0, 2, 50)));
+        assertTrue(VoteQuorum.rejected(VoteQuorum.tally(4, 0, 3, 50)));
     }
 
     @Test

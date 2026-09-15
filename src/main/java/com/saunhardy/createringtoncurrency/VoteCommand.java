@@ -52,6 +52,7 @@ public class VoteCommand {
         final Set<UUID> yesVotes = ConcurrentHashMap.newKeySet();
         final Set<UUID> noVotes = ConcurrentHashMap.newKeySet();
         int ticksRemaining;
+        int maxNeeded = Integer.MAX_VALUE;
 
         ActiveVote(String type, int durationDays, UUID initiator, String initiatorName) {
             this.type = type;
@@ -143,6 +144,7 @@ public class VoteCommand {
             return 1;
         }
 
+        vote.maxNeeded = tally.needed();
         activeVote = vote;
         LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed", player.getName().getString(), type,
                 durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
@@ -230,7 +232,7 @@ public class VoteCommand {
 
         Set<UUID> eligible = eligibleVoters(server, voted);
         return VoteQuorum.tally(eligible.size(), countIn(vote.yesVotes, eligible), countIn(vote.noVotes, eligible),
-                Config.VOTE_APPROVAL_PERCENT.get());
+                Config.VOTE_APPROVAL_PERCENT.get(), vote.maxNeeded);
     }
 
     private static Set<UUID> eligibleVoters(MinecraftServer server, Set<UUID> voted) {
