@@ -52,6 +52,7 @@ public class VoteCommand {
         final Set<UUID> yesVotes = ConcurrentHashMap.newKeySet();
         final Set<UUID> noVotes = ConcurrentHashMap.newKeySet();
         int ticksRemaining;
+        int maxNeeded = Integer.MAX_VALUE;
 
         ActiveVote(String type, int durationDays, UUID initiator, String initiatorName) {
             this.type = type;
@@ -143,6 +144,7 @@ public class VoteCommand {
             return 1;
         }
 
+        vote.maxNeeded = tally.needed();
         activeVote = vote;
         LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed", player.getName().getString(), type,
                 durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
@@ -230,7 +232,7 @@ public class VoteCommand {
 
         Set<UUID> eligible = eligibleVoters(server, voted);
         return VoteQuorum.tally(eligible.size(), countIn(vote.yesVotes, eligible), countIn(vote.noVotes, eligible),
-                Config.VOTE_APPROVAL_PERCENT.get());
+                Config.VOTE_APPROVAL_PERCENT.get(), vote.maxNeeded);
     }
 
     private static Set<UUID> eligibleVoters(MinecraftServer server, Set<UUID> voted) {
@@ -272,8 +274,10 @@ public class VoteCommand {
                 .append(Component.literal(" / ").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal(tally.no() + " No").withStyle(ChatFormatting.RED));
         if (!passed) {
-            result.append(Component.literal(" — " + tally.needed() + " of " + tally.eligible() + " needed")
-                    .withStyle(ChatFormatting.GRAY));
+            String reason = VoteQuorum.outvoted(tally)
+                    ? " — Yes must outnumber No"
+                    : " — " + tally.needed() + " of " + tally.eligible() + " needed";
+            result.append(Component.literal(reason).withStyle(ChatFormatting.GRAY));
         }
         broadcastToAll(server, result);
 
@@ -338,7 +342,7 @@ public class VoteCommand {
                 .append(Component.literal("    ").withStyle(ChatFormatting.RESET))
                 .append(clickableButton("[ ✘ NO ]", "/vote no", ChatFormatting.RED));
 
-        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote! " + needed + " of " + eligible + " yes votes needed")
+        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote! " + needed + " of " + eligible + " yes votes needed, and more Yes than No")
                 .withStyle(ChatFormatting.GRAY);
 
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
