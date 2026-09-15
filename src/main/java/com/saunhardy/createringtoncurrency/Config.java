@@ -141,7 +141,7 @@ public class Config {
         VOTE_APPROVAL_PERCENT = BUILDER
                 .comment("A vote passes once at least this percentage of the eligible players (rounded up) have voted yes; 50 lets a tie pass, 51 needs a strict majority",
                         "The yes votes needed never rise above what was announced when the vote started, even if more players join",
-                        "Low values can put the needed votes at 1, which lets whoever starts a vote pass it on their own")
+                        "Whenever two or more players are eligible at least two yes votes are needed, so nobody can pass a vote on their own")
                 .defineInRange("voteApprovalPercent", 50, 0, 100);
 
         VOTE_IGNORE_AFK = BUILDER
