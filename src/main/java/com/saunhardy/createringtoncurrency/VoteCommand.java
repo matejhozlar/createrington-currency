@@ -274,8 +274,10 @@ public class VoteCommand {
                 .append(Component.literal(" / ").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal(tally.no() + " No").withStyle(ChatFormatting.RED));
         if (!passed) {
-            result.append(Component.literal(" — " + tally.needed() + " of " + tally.eligible() + " needed")
-                    .withStyle(ChatFormatting.GRAY));
+            String reason = VoteQuorum.outvoted(tally)
+                    ? " — Yes must outnumber No"
+                    : " — " + tally.needed() + " of " + tally.eligible() + " needed";
+            result.append(Component.literal(reason).withStyle(ChatFormatting.GRAY));
         }
         broadcastToAll(server, result);
 
@@ -340,7 +342,7 @@ public class VoteCommand {
                 .append(Component.literal("    ").withStyle(ChatFormatting.RESET))
                 .append(clickableButton("[ ✘ NO ]", "/vote no", ChatFormatting.RED));
 
-        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote! " + needed + " of " + eligible + " yes votes needed")
+        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote! " + needed + " of " + eligible + " yes votes needed, and more Yes than No")
                 .withStyle(ChatFormatting.GRAY);
 
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {

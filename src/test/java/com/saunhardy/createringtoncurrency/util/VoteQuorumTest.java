@@ -15,6 +15,7 @@ class VoteQuorumTest {
 
     @Test
     void halfNeedsHalfRoundedUp() {
+        assertEquals(1, VoteQuorum.requiredYes(2, 50));
         assertEquals(2, VoteQuorum.requiredYes(3, 50));
         assertEquals(2, VoteQuorum.requiredYes(4, 50));
         assertEquals(3, VoteQuorum.requiredYes(5, 50));
@@ -24,37 +25,13 @@ class VoteQuorumTest {
     }
 
     @Test
-    void aStrictMajorityIsOnePercentAway() {
-        assertEquals(3, VoteQuorum.requiredYes(4, 51));
-        assertEquals(4, VoteQuorum.requiredYes(6, 51));
-    }
-
-    @Test
     void aLoneVoterCarriesTheirOwnVote() {
         assertEquals(1, VoteQuorum.requiredYes(1, 50));
         assertEquals(1, VoteQuorum.requiredYes(1, 100));
-        assertTrue(uncapped(1, 1, 0, 50).passed());
-    }
 
-    @Test
-    void theInitiatorCannotCarryAVoteAloneOnceSomeoneElseIsEligible() {
-        assertEquals(2, VoteQuorum.requiredYes(2, 50));
-        assertEquals(2, VoteQuorum.requiredYes(2, 0));
-        assertEquals(2, VoteQuorum.requiredYes(10, 0));
-    }
-
-    @Test
-    void twoPlayersBothGetASay() {
-        Tally opened = uncapped(2, 1, 0, 50);
-        assertFalse(opened.decided());
-
-        Tally agreed = uncapped(2, 2, 0, 50);
-        assertTrue(agreed.passed());
-
-        Tally refused = uncapped(2, 1, 1, 50);
-        assertTrue(refused.decided());
-        assertFalse(refused.passed());
-        assertTrue(VoteQuorum.rejected(refused));
+        Tally tally = uncapped(1, 1, 0, 50);
+        assertTrue(tally.passed());
+        assertTrue(tally.decided());
     }
 
     @Test
@@ -65,7 +42,50 @@ class VoteQuorumTest {
 
     @Test
     void alwaysAsksForAtLeastOneVote() {
+        assertEquals(1, VoteQuorum.requiredYes(10, 0));
         assertEquals(1, VoteQuorum.requiredYes(0, 50));
+    }
+
+    @Test
+    void halfPassesWhenTheRestStaySilent() {
+        assertTrue(uncapped(10, 5, 0, 50).passed());
+        assertTrue(uncapped(6, 3, 0, 50).passed());
+    }
+
+    @Test
+    void aTieFailsEvenWithEnoughYesVotes() {
+        Tally tally = uncapped(10, 5, 5, 50);
+        assertFalse(tally.passed());
+        assertTrue(tally.decided());
+        assertTrue(VoteQuorum.outvoted(tally));
+        assertTrue(VoteQuorum.rejected(tally));
+
+        assertFalse(uncapped(6, 3, 3, 50).passed());
+    }
+
+    @Test
+    void tooFewYesVotesIsNotReportedAsOutvoted() {
+        assertFalse(VoteQuorum.outvoted(uncapped(10, 4, 0, 50)));
+        assertFalse(VoteQuorum.outvoted(uncapped(10, 5, 0, 50)));
+    }
+
+    @Test
+    void waitsWhileTheSilentCouldStillForceATie() {
+        assertFalse(uncapped(10, 5, 0, 50).decided());
+        assertTrue(uncapped(10, 6, 0, 50).decided());
+        assertTrue(uncapped(10, 6, 0, 50).passed());
+    }
+
+    @Test
+    void twoPlayersBothGetASay() {
+        Tally opened = uncapped(2, 1, 0, 50);
+        assertFalse(opened.decided());
+        assertTrue(opened.passed());
+
+        Tally refused = uncapped(2, 1, 1, 50);
+        assertTrue(refused.decided());
+        assertFalse(refused.passed());
+        assertTrue(VoteQuorum.rejected(refused));
     }
 
     @Test
@@ -84,8 +104,9 @@ class VoteQuorumTest {
 
     @Test
     void failsEarlyOnceTheUndecidedCannotCarryIt() {
-        assertFalse(uncapped(10, 1, 5, 50).decided());
-        Tally tally = uncapped(10, 1, 6, 50);
+        assertFalse(uncapped(10, 1, 4, 50).decided());
+
+        Tally tally = uncapped(10, 1, 5, 50);
         assertFalse(tally.passed());
         assertTrue(tally.decided());
     }
@@ -100,7 +121,10 @@ class VoteQuorumTest {
     @Test
     void aShrunkenElectorateCanDecideAnOpenVote() {
         assertFalse(uncapped(6, 2, 0, 50).passed());
-        assertTrue(uncapped(4, 2, 0, 50).passed());
+
+        Tally tally = uncapped(3, 2, 0, 50);
+        assertTrue(tally.passed());
+        assertTrue(tally.decided());
     }
 
     @Test
@@ -118,11 +142,15 @@ class VoteQuorumTest {
     }
 
     @Test
+    void playersJoiningCanStillVoteItDown() {
+        assertFalse(VoteQuorum.tally(8, 3, 3, 50, 3).passed());
+    }
+
+    @Test
     void aGrownElectorateCannotRaiseTheAnnouncedThreshold() {
         Tally tally = VoteQuorum.tally(6, 3, 0, 60, 3);
         assertEquals(3, tally.needed());
         assertTrue(tally.passed());
-        assertTrue(tally.decided());
     }
 
     @Test
@@ -134,15 +162,19 @@ class VoteQuorumTest {
 
     @Test
     void tellsTurnoutFailuresApartFromRejections() {
+        assertFalse(VoteQuorum.rejected(uncapped(10, 1, 0, 50)));
         assertFalse(VoteQuorum.rejected(uncapped(10, 1, 1, 50)));
-        assertFalse(VoteQuorum.rejected(uncapped(10, 1, 5, 50)));
-        assertTrue(VoteQuorum.rejected(uncapped(10, 1, 6, 50)));
-        assertFalse(VoteQuorum.rejected(uncapped(4, 1, 2, 50)));
-        assertTrue(VoteQuorum.rejected(uncapped(4, 0, 3, 50)));
+        assertFalse(VoteQuorum.rejected(uncapped(10, 1, 4, 50)));
+        assertTrue(VoteQuorum.rejected(uncapped(10, 1, 5, 50)));
+        assertFalse(VoteQuorum.rejected(uncapped(4, 1, 1, 50)));
+        assertTrue(VoteQuorum.rejected(uncapped(4, 1, 2, 50)));
     }
 
     @Test
     void anEmptyElectorateIsNotARejection() {
-        assertFalse(VoteQuorum.rejected(uncapped(0, 0, 0, 50)));
+        Tally tally = uncapped(0, 0, 0, 50);
+        assertTrue(tally.decided());
+        assertFalse(tally.passed());
+        assertFalse(VoteQuorum.rejected(tally));
     }
 }

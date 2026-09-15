@@ -139,9 +139,9 @@ public class Config {
         BUILDER.comment("Vote command settings").push("vote");
 
         VOTE_APPROVAL_PERCENT = BUILDER
-                .comment("A vote passes once at least this percentage of the eligible players (rounded up) have voted yes; 50 lets a tie pass, 51 needs a strict majority",
+                .comment("A vote passes when at least this percentage of the eligible players (rounded up) have voted yes and yes votes outnumber no votes, so a tie always fails",
                         "The yes votes needed never rise above what was announced when the vote started, even if more players join",
-                        "Whenever two or more players are eligible at least two yes votes are needed, so nobody can pass a vote on their own")
+                        "Low values can put the needed votes at 1, which lets a vote pass on the starter's yes alone when nobody votes no")
                 .defineInRange("voteApprovalPercent", 50, 0, 100);
 
         VOTE_IGNORE_AFK = BUILDER
