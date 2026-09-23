@@ -284,8 +284,7 @@ public final class VotePopup {
         toggleClass("result-card", "is-passed", result.passed());
         toggleClass("result-card", "is-failed", !result.passed());
         setText("result-title", result.passed() ? "VOTE PASSED" : "VOTE FAILED");
-        setText("result-yes", result.yes() + " yes");
-        setText("result-no", result.no() + " no");
+        setText("result-detail", result.yes() + " yes · " + result.no() + " no");
     }
 
     private static String describe(String type, int days) {
