@@ -55,18 +55,20 @@ public class VoteCommand {
         final int durationDays;
         final UUID initiator;
         final String initiatorName;
+        final boolean testMode;
         final Set<UUID> yesVotes = ConcurrentHashMap.newKeySet();
         final Set<UUID> noVotes = ConcurrentHashMap.newKeySet();
         int ticksRemaining;
         int maxNeeded = Integer.MAX_VALUE;
 
-        ActiveVote(String type, int durationDays, UUID initiator, String initiatorName) {
+        ActiveVote(String type, int durationDays, UUID initiator, String initiatorName, boolean testMode) {
             this.type = type;
             this.durationDays = durationDays;
             this.initiator = initiator;
             this.initiatorName = initiatorName;
+            this.testMode = testMode;
             this.ticksRemaining = VOTE_DURATION_TICKS;
-            this.yesVotes.add(initiator);
+            if (!testMode) this.yesVotes.add(initiator);
         }
     }
 
@@ -122,9 +124,11 @@ public class VoteCommand {
             return 0;
         }
 
+        boolean testMode = AdminMode.isActive(player);
+
         long now = System.currentTimeMillis();
         long cooldownUntil = WEATHER_TYPES.contains(type) ? weatherCooldownUntil : timeCooldownUntil;
-        if (now < cooldownUntil) {
+        if (!testMode && now < cooldownUntil) {
             long secsLeft = (cooldownUntil - now) / 1000;
             String category = WEATHER_TYPES.contains(type) ? "Weather" : "Time";
             player.sendSystemMessage(Component.literal("❌ " + category + " vote is on cooldown! " + secsLeft + "s remaining")
@@ -141,7 +145,7 @@ public class VoteCommand {
         MinecraftServer server = player.getServer();
         if (server == null) return 0;
 
-        ActiveVote vote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString());
+        ActiveVote vote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString(), testMode);
         Tally tally = tally(server, vote);
 
         if (tally.decided()) {
@@ -151,9 +155,9 @@ public class VoteCommand {
 
         vote.maxNeeded = tally.needed();
         activeVote = vote;
-        LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed", player.getName().getString(), type,
+        LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed{}", player.getName().getString(), type,
                 durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
-                tally.needed(), tally.eligible());
+                tally.needed(), tally.eligible(), testMode ? " (admin test vote: phantom voter, no cooldown)" : "");
 
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             send(p, openPayload(vote, tally, p));
@@ -238,7 +242,8 @@ public class VoteCommand {
         voted.addAll(vote.noVotes);
 
         Set<UUID> eligible = eligibleVoters(server, voted);
-        return VoteQuorum.tally(eligible.size(), countIn(vote.yesVotes, eligible), countIn(vote.noVotes, eligible),
+        int electorate = eligible.size() + (vote.testMode ? 1 : 0);
+        return VoteQuorum.tally(electorate, countIn(vote.yesVotes, eligible), countIn(vote.noVotes, eligible),
                 Config.VOTE_APPROVAL_PERCENT.get(), vote.maxNeeded);
     }
 
@@ -300,7 +305,7 @@ public class VoteCommand {
         } else {
             cooldown = COOLDOWN_NO_TURNOUT_MS;
         }
-        setCooldown(vote.type, cooldown);
+        if (!vote.testMode) setCooldown(vote.type, cooldown);
 
         if (passed) {
             applyVote(vote.type, vote.durationDays, server);
