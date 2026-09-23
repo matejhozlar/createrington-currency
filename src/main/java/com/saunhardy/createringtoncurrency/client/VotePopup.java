@@ -245,13 +245,8 @@ public final class VotePopup {
 
     private static void refreshVote() {
         setText("vote-subtitle", starter + " wants " + describe(voteType, durationDays));
-        setText("vote-tally", yes + "/" + needed + " yes · " + no + " no");
+        setText("vote-tally", yes + " yes · " + no + " no");
         toggleClass("vote-card", "is-voted", status != VoteTallyPayload.STATUS_OPEN);
-        Element fill = doc.getElementById("vote-progress");
-        if (fill != null) {
-            int percent = needed <= 0 ? 100 : Math.min(100, yes * 100 / needed);
-            fill.setInlineStyleProperty("width", percent + "%");
-        }
         refreshTimer();
     }
 
@@ -266,13 +261,7 @@ public final class VotePopup {
         toggleClass("result-card", "is-passed", result.passed());
         toggleClass("result-card", "is-failed", !result.passed());
         setText("result-title", result.passed() ? "VOTE PASSED" : "VOTE FAILED");
-        String detail = result.yes() + " yes · " + result.no() + " no";
-        if (result.reason() == VoteResultPayload.REASON_OUTVOTED) {
-            detail += " — yes must outnumber no";
-        } else if (result.reason() == VoteResultPayload.REASON_TURNOUT) {
-            detail += " — " + result.needed() + " of " + result.eligible() + " needed";
-        }
-        setText("result-detail", detail);
+        setText("result-detail", result.yes() + " yes · " + result.no() + " no");
     }
 
     private static String describe(String type, int days) {
