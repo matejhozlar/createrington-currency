@@ -13,7 +13,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
@@ -286,15 +285,8 @@ public class VoteCommand {
         }
         VoteResultPayload result = new VoteResultPayload(passed, tally.yes(), tally.no(), tally.needed(), tally.eligible(), reason);
 
-        MutableComponent summary = Component.literal(passed ? "✅ Vote passed! " : "❌ Vote failed! ")
-                .withStyle(passed ? ChatFormatting.GREEN : ChatFormatting.RED)
-                .append(Component.literal(tally.yes() + " Yes").withStyle(ChatFormatting.GREEN))
-                .append(Component.literal(" / ").withStyle(ChatFormatting.GRAY))
-                .append(Component.literal(tally.no() + " No").withStyle(ChatFormatting.RED));
-
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             send(p, result);
-            p.sendSystemMessage(summary);
         }
 
         long cooldown;

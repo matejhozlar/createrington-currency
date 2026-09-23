@@ -101,7 +101,19 @@
 }
 
 .vote-tally {
-  color: #a0a0a0;
+  gap: 3px;
+}
+
+.count-yes {
+  color: #2ecc71;
+}
+
+.count-no {
+  color: #e74c3c;
+}
+
+.vote-dot {
+  color: #55575c;
 }
 
 .vote-timer {
@@ -153,7 +165,7 @@
   justify-content: center;
   min-width: 7px;
   height: 9px;
-  padding: 1px 2px 0px 2px;
+  padding: 1px 2px 0px 3px;
   box-sizing: border-box;
   line-height: 1;
   background-color: #14141a;
@@ -190,7 +202,7 @@
   align-items: center;
   justify-content: center;
   height: 9px;
-  padding: 1px 2px 0px 2px;
+  padding: 1px 2px 0px 3px;
   box-sizing: border-box;
   line-height: 1;
   border: 1px solid #45474c;

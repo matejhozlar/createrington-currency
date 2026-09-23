@@ -15,9 +15,11 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import org.slf4j.Logger;
 
 public final class VotePopup {
@@ -120,7 +122,7 @@ public final class VotePopup {
             if (doc == null) return;
         }
         ensureBound();
-        if (doc.hasAnyActiveSelection()) doc.clearAllTextSelections();
+        clearSelection();
         if (leaveTicks > 0 && --leaveTicks == 0) {
             leaving = false;
             if (result != null) {
@@ -141,6 +143,25 @@ public final class VotePopup {
         if (ticksRemaining > 0) {
             ticksRemaining--;
             if (ticksRemaining % 20 == 0 || ticksRemaining == URGENT_TICKS) refreshTimer();
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onKeyInput(InputEvent.Key event) {
+        clearSelection();
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onMouseInput(InputEvent.MouseButton.Post event) {
+        clearSelection();
+    }
+
+    private static void clearSelection() {
+        if (doc == null || doc.isDisposed()) return;
+        if (doc.hasDocumentSelection()) doc.clearDocumentSelection();
+        if (doc.hasAnyActiveSelection() || doc.hasAnyTextSelection()) {
+            doc.clearAllTextSelections();
+            doc.clearRichTextSelection();
         }
     }
 
@@ -246,7 +267,8 @@ public final class VotePopup {
 
     private static void refreshVote() {
         setText("vote-subtitle", starter + " wants " + describe(voteType, durationDays));
-        setText("vote-tally", yes + " yes · " + no + " no");
+        setText("vote-yes-count", yes + " yes");
+        setText("vote-no-count", no + " no");
         toggleClass("vote-card", "is-voted", status != VoteTallyPayload.STATUS_OPEN);
         refreshTimer();
     }
@@ -262,7 +284,8 @@ public final class VotePopup {
         toggleClass("result-card", "is-passed", result.passed());
         toggleClass("result-card", "is-failed", !result.passed());
         setText("result-title", result.passed() ? "VOTE PASSED" : "VOTE FAILED");
-        setText("result-detail", result.yes() + " yes · " + result.no() + " no");
+        setText("result-yes", result.yes() + " yes");
+        setText("result-no", result.no() + " no");
     }
 
     private static String describe(String type, int days) {
