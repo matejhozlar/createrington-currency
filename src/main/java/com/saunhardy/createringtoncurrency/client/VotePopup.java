@@ -13,22 +13,22 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.slf4j.Logger;
 
-import java.util.Locale;
-
 public final class VotePopup {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String PAGE = "createringtoncurrency/vote.html";
     private static final int KEY_YES = InputConstants.KEY_Y;
     private static final int KEY_NO = InputConstants.KEY_N;
-    private static final int KEY_DISMISS = InputConstants.KEY_BACKSPACE;
+    private static final int KEY_DISMISS = InputConstants.KEY_H;
     private static final int RESULT_TICKS = 100;
     private static final int URGENT_TICKS = 100;
+    private static final int LEAVE_TICKS = 6;
 
     private static Document doc;
     private static long boundGeneration = -1;
@@ -48,6 +48,9 @@ public final class VotePopup {
     private static VoteResultPayload result;
     private static int resultTicks;
 
+    private static boolean leaving;
+    private static int leaveTicks;
+
     private VotePopup() {}
 
     public static void open(VoteOpenPayload pkt) {
@@ -57,6 +60,8 @@ public final class VotePopup {
         applyTally(pkt.tally());
         active = true;
         dismissed = false;
+        leaving = false;
+        leaveTicks = 0;
         result = null;
         resultTicks = 0;
         if (ensureDocument()) {
@@ -79,6 +84,8 @@ public final class VotePopup {
         active = false;
         result = pkt;
         resultTicks = RESULT_TICKS;
+        leaving = false;
+        leaveTicks = 0;
         if (ensureDocument()) {
             applyState();
             if (pkt.passed()) {
@@ -113,8 +120,17 @@ public final class VotePopup {
             if (doc == null) return;
         }
         ensureBound();
+        if (leaveTicks > 0 && --leaveTicks == 0) {
+            leaving = false;
+            if (result != null) {
+                close();
+                return;
+            }
+            dismissed = true;
+            applyState();
+        }
         if (result != null) {
-            if (--resultTicks <= 0) close();
+            if (resultTicks > 0 && --resultTicks == 0) startLeaving();
             return;
         }
         if (!active) {
@@ -134,8 +150,12 @@ public final class VotePopup {
         close();
     }
 
+    private static boolean promptShowing() {
+        return active && !dismissed && result == null;
+    }
+
     private static boolean capturing() {
-        return active && !dismissed && result == null && doc != null && Minecraft.getInstance().screen == null;
+        return promptShowing() && !leaving && doc != null && Minecraft.getInstance().screen == null;
     }
 
     private static void applyTally(VoteTallyPayload tally) {
@@ -154,8 +174,14 @@ public final class VotePopup {
     }
 
     private static void dismiss() {
-        dismissed = true;
+        if (leaving) return;
         sound(SoundEvents.UI_BUTTON_CLICK.value(), 0.8F);
+        startLeaving();
+    }
+
+    private static void startLeaving() {
+        leaving = true;
+        leaveTicks = LEAVE_TICKS;
         if (doc != null) applyState();
     }
 
@@ -181,12 +207,11 @@ public final class VotePopup {
 
     private static void bind() {
         onClick("vote-yes", () -> {
-            if (status == VoteTallyPayload.STATUS_OPEN) cast(true);
+            if (status == VoteTallyPayload.STATUS_OPEN && !leaving) cast(true);
         });
         onClick("vote-no", () -> {
-            if (status == VoteTallyPayload.STATUS_OPEN) cast(false);
+            if (status == VoteTallyPayload.STATUS_OPEN && !leaving) cast(false);
         });
-        onClick("vote-dismiss", VotePopup::dismiss);
         setText("key-yes", keyName(KEY_YES));
         setText("key-no", keyName(KEY_NO));
         setText("key-dismiss", keyName(KEY_DISMISS));
@@ -204,31 +229,24 @@ public final class VotePopup {
         }
         boundGeneration = -1;
         dismissed = false;
+        leaving = false;
+        leaveTicks = 0;
     }
 
     private static void applyState() {
-        boolean showVote = active && !dismissed && result == null;
+        boolean showVote = promptShowing();
         setActive("vote-card", showVote);
         setActive("result-card", result != null);
+        toggleClass("vote-card", "is-leaving", showVote && leaving);
+        toggleClass("result-card", "is-leaving", result != null && leaving);
         if (showVote) refreshVote();
         if (result != null) refreshResult();
     }
 
     private static void refreshVote() {
-        setText("vote-title", capitalize(voteType) + " vote");
-        setText("vote-subtitle", starter + " wants to " + describe(voteType, durationDays) + ".");
-        setText("vote-tally", yes + " of " + needed + " yes needed · " + no + " no");
-        Element card = doc.getElementById("vote-card");
-        if (card != null) {
-            card.getClassList().toggle("is-voted", status != VoteTallyPayload.STATUS_OPEN);
-        }
-        String note = switch (status) {
-            case VoteTallyPayload.STATUS_VOTED_YES -> "You voted Yes.";
-            case VoteTallyPayload.STATUS_VOTED_NO -> "You voted No.";
-            case VoteTallyPayload.STATUS_SPECTATOR -> "Spectators cannot vote.";
-            default -> "";
-        };
-        setText("vote-note", note);
+        setText("vote-subtitle", starter + " wants " + describe(voteType, durationDays));
+        setText("vote-tally", yes + "/" + needed + " yes · " + no + " no");
+        toggleClass("vote-card", "is-voted", status != VoteTallyPayload.STATUS_OPEN);
         Element fill = doc.getElementById("vote-progress");
         if (fill != null) {
             int percent = needed <= 0 ? 100 : Math.min(100, yes * 100 / needed);
@@ -241,17 +259,13 @@ public final class VotePopup {
         if (doc == null) return;
         int seconds = (ticksRemaining + 19) / 20;
         setText("vote-timer", seconds + "s");
-        Element card = doc.getElementById("vote-card");
-        if (card != null) card.getClassList().toggle("is-urgent", ticksRemaining <= URGENT_TICKS);
+        toggleClass("vote-card", "is-urgent", ticksRemaining <= URGENT_TICKS);
     }
 
     private static void refreshResult() {
-        Element card = doc.getElementById("result-card");
-        if (card != null) {
-            card.getClassList().toggle("is-passed", result.passed());
-            card.getClassList().toggle("is-failed", !result.passed());
-        }
-        setText("result-title", result.passed() ? "Vote passed!" : "Vote failed");
+        toggleClass("result-card", "is-passed", result.passed());
+        toggleClass("result-card", "is-failed", !result.passed());
+        setText("result-title", result.passed() ? "VOTE PASSED" : "VOTE FAILED");
         String detail = result.yes() + " yes · " + result.no() + " no";
         if (result.reason() == VoteResultPayload.REASON_OUTVOTED) {
             detail += " — yes must outnumber no";
@@ -263,20 +277,15 @@ public final class VotePopup {
 
     private static String describe(String type, int days) {
         String base = switch (type) {
-            case "day" -> "set the time to day";
-            case "night" -> "set the time to night";
-            case "clear" -> "clear the weather";
-            case "rain" -> "make it rain";
-            case "thunder" -> "start a thunderstorm";
-            default -> "set " + type;
+            case "day" -> "daytime";
+            case "night" -> "night";
+            case "clear" -> "clear skies";
+            case "rain" -> "rain";
+            case "thunder" -> "a thunderstorm";
+            default -> type;
         };
         if (days > 0) base += " for " + days + (days == 1 ? " day" : " days");
         return base;
-    }
-
-    private static String capitalize(String text) {
-        if (text == null || text.isEmpty()) return "";
-        return text.substring(0, 1).toUpperCase(Locale.ROOT) + text.substring(1);
     }
 
     private static String keyName(int key) {
@@ -284,8 +293,12 @@ public final class VotePopup {
     }
 
     private static void setActive(String id, boolean isActive) {
+        toggleClass(id, "is-active", isActive);
+    }
+
+    private static void toggleClass(String id, String className, boolean on) {
         Element element = doc.getElementById(id);
-        if (element != null) element.getClassList().toggle("is-active", isActive);
+        if (element != null) element.getClassList().toggle(className, on);
     }
 
     private static void setText(String id, String text) {
@@ -293,7 +306,7 @@ public final class VotePopup {
         if (element != null) element.setTextContent(text);
     }
 
-    private static void sound(net.minecraft.sounds.SoundEvent event, float pitch) {
+    private static void sound(SoundEvent event, float pitch) {
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(event, pitch));
     }
 }

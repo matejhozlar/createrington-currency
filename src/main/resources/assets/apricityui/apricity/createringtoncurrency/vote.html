@@ -10,25 +10,24 @@
 <body class="vote-page">
   <div class="vote-layer">
 
-    <div class="vote-card" id="vote-card">
-      <div class="vote-header">
-        <span class="vote-title" id="vote-title">Vote</span>
-        <span class="vote-timer" id="vote-timer">30s</span>
-      </div>
-      <div class="vote-subtitle" id="vote-subtitle"></div>
-      <div class="vote-progress"><div class="vote-progress-fill" id="vote-progress"></div></div>
-      <div class="vote-tally" id="vote-tally"></div>
+    <div class="vote-strip" id="vote-card">
+      <span class="vote-tag">VOTE</span>
+      <span class="vote-text" id="vote-subtitle"></span>
+      <span class="vote-sep">|</span>
+      <span class="vote-tally" id="vote-tally"></span>
+      <span class="vote-sep">|</span>
+      <span class="vote-timer" id="vote-timer">30s</span>
       <div class="vote-actions">
         <button class="vote-button yes" id="vote-yes"><span class="key" id="key-yes">Y</span><span class="label">Yes</span></button>
         <button class="vote-button no" id="vote-no"><span class="key" id="key-no">N</span><span class="label">No</span></button>
-        <button class="vote-button dismiss" id="vote-dismiss"><span class="key" id="key-dismiss">Backspace</span><span class="label">Hide</span></button>
       </div>
-      <div class="vote-note" id="vote-note"></div>
+      <span class="vote-hint"><span class="key" id="key-dismiss">H</span><span class="label">hide</span></span>
+      <div class="vote-progress" id="vote-progress"></div>
     </div>
 
-    <div class="vote-card result" id="result-card">
-      <div class="vote-title" id="result-title"></div>
-      <div class="vote-subtitle" id="result-detail"></div>
+    <div class="vote-strip result" id="result-card">
+      <span class="vote-tag" id="result-title"></span>
+      <span class="vote-text" id="result-detail"></span>
     </div>
 
   </div>
