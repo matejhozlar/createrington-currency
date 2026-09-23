@@ -3,30 +3,37 @@ package com.saunhardy.createringtoncurrency;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.network.VoteOpenPayload;
+import com.saunhardy.createringtoncurrency.network.VoteResultPayload;
+import com.saunhardy.createringtoncurrency.network.VoteTallyPayload;
 import com.saunhardy.createringtoncurrency.util.AfkStatus;
 import com.saunhardy.createringtoncurrency.util.VoteQuorum;
 import com.saunhardy.createringtoncurrency.util.VoteQuorum.Tally;
 import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.commands.Commands;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class VoteCommand {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final int VOTE_DURATION_TICKS = 30 * 20; // 30 seconds
+    private static final int VOTE_DURATION_TICKS = 30 * 20;
     private static final int TALLY_INTERVAL_TICKS = 20;
     private static final long COOLDOWN_SUCCESS_MS = 577_100L;
     private static final long COOLDOWN_FAIL_MS = 3 * 60_000L;
@@ -34,7 +41,6 @@ public class VoteCommand {
     private static final List<String> VOTE_TYPES = List.of("day", "night", "clear", "thunder", "rain");
 
     private static final Set<String> WEATHER_TYPES = Set.of("clear", "rain", "thunder");
-    private static final Set<String> TIME_TYPES = Set.of("day", "night");
 
     private static final int MINECRAFT_DAY_TICKS = 24000;
     private static final int DEFAULT_WEATHER_TICKS = 6000;
@@ -46,7 +52,7 @@ public class VoteCommand {
 
     private static class ActiveVote {
         final String type;
-        final int durationDays; // -1 when unspecified (non-weather or default)
+        final int durationDays;
         final UUID initiator;
         final String initiatorName;
         final Set<UUID> yesVotes = ConcurrentHashMap.newKeySet();
@@ -60,7 +66,7 @@ public class VoteCommand {
             this.initiator = initiator;
             this.initiatorName = initiatorName;
             this.ticksRemaining = VOTE_DURATION_TICKS;
-            this.yesVotes.add(initiator); // initiator votes yes automatically
+            this.yesVotes.add(initiator);
         }
     }
 
@@ -79,8 +85,7 @@ public class VoteCommand {
                             return castVote(player, false);
                         }))
                         .then(Commands.argument("type", StringArgumentType.word())
-                                .suggests((ctx, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
-                                        VOTE_TYPES, builder))
+                                .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(VOTE_TYPES, builder))
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
                                     String type = StringArgumentType.getString(context, "type").toLowerCase();
@@ -128,7 +133,7 @@ public class VoteCommand {
         }
 
         if (activeVote != null) {
-            player.sendSystemMessage(Component.literal("❌ A vote is already in progress! Use /vote yes or /vote no")
+            player.sendSystemMessage(Component.literal("❌ A vote is already in progress!")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -150,12 +155,14 @@ public class VoteCommand {
                 durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
                 tally.needed(), tally.eligible());
 
-        broadcastVoteStart(server, player.getName().getString(), type, durationDays, tally.needed(), tally.eligible());
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            send(p, openPayload(vote, tally, p));
+        }
 
         return 1;
     }
 
-    private static int castVote(ServerPlayer player, boolean yes) {
+    public static int castVote(ServerPlayer player, boolean yes) {
         ActiveVote vote = activeVote;
         if (vote == null) {
             player.sendSystemMessage(Component.literal("❌ No vote is currently active. Start one with /vote <type>")
@@ -182,30 +189,26 @@ public class VoteCommand {
             vote.noVotes.add(uuid);
         }
 
-        player.sendSystemMessage(Component.literal("✅ Vote recorded!")
-                .withStyle(ChatFormatting.GREEN));
-
         MinecraftServer server = player.getServer();
         if (server != null) {
             Tally tally = tally(server, vote);
-            if (tally.decided()) finishVote(server, vote, tally);
+            if (tally.decided()) {
+                finishVote(server, vote, tally);
+            } else {
+                broadcastTally(server, vote, tally);
+            }
         }
 
         return 1;
     }
 
     @SubscribeEvent
-    public static void onChat(ServerChatEvent event) {
-        if (activeVote == null) return;
-
-        String msg = event.getRawText();
-        if (msg.equals("1")) {
-            castVote(event.getPlayer(), true);
-            event.setCanceled(true);
-        } else if (msg.equals("2")) {
-            castVote(event.getPlayer(), false);
-            event.setCanceled(true);
-        }
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        ActiveVote vote = activeVote;
+        if (vote == null || !(event.getEntity() instanceof ServerPlayer player)) return;
+        MinecraftServer server = player.getServer();
+        if (server == null) return;
+        send(player, openPayload(vote, tally(server, vote), player));
     }
 
     @SubscribeEvent
@@ -222,7 +225,11 @@ public class VoteCommand {
 
         if (vote.ticksRemaining % TALLY_INTERVAL_TICKS == 0) {
             Tally tally = tally(event.getServer(), vote);
-            if (tally.decided()) finishVote(event.getServer(), vote, tally);
+            if (tally.decided()) {
+                finishVote(event.getServer(), vote, tally);
+            } else {
+                broadcastTally(event.getServer(), vote, tally);
+            }
         }
     }
 
@@ -268,18 +275,22 @@ public class VoteCommand {
     private static void resolveVote(MinecraftServer server, ActiveVote vote, Tally tally) {
         boolean passed = tally.passed();
 
-        MutableComponent result = Component.literal(passed ? "✅ Vote passed! " : "❌ Vote failed! ")
+        int reason = VoteResultPayload.REASON_NONE;
+        if (!passed) {
+            reason = VoteQuorum.outvoted(tally) ? VoteResultPayload.REASON_OUTVOTED : VoteResultPayload.REASON_TURNOUT;
+        }
+        VoteResultPayload result = new VoteResultPayload(passed, tally.yes(), tally.no(), tally.needed(), tally.eligible(), reason);
+
+        MutableComponent summary = Component.literal(passed ? "✅ Vote passed! " : "❌ Vote failed! ")
                 .withStyle(passed ? ChatFormatting.GREEN : ChatFormatting.RED)
                 .append(Component.literal(tally.yes() + " Yes").withStyle(ChatFormatting.GREEN))
                 .append(Component.literal(" / ").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal(tally.no() + " No").withStyle(ChatFormatting.RED));
-        if (!passed) {
-            String reason = VoteQuorum.outvoted(tally)
-                    ? " — Yes must outnumber No"
-                    : " — " + tally.needed() + " of " + tally.eligible() + " needed";
-            result.append(Component.literal(reason).withStyle(ChatFormatting.GRAY));
+
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            send(p, result);
+            p.sendSystemMessage(summary);
         }
-        broadcastToAll(server, result);
 
         long cooldown;
         if (passed) {
@@ -313,60 +324,39 @@ public class VoteCommand {
         ServerLevel overworld = server.overworld();
         int ticks = durationDays > 0 ? durationDays * MINECRAFT_DAY_TICKS : DEFAULT_WEATHER_TICKS;
         switch (type) {
-            case "day" -> overworld.setDayTime(1000); // morning
-            case "night" -> overworld.setDayTime(13000); // night
+            case "day" -> overworld.setDayTime(1000);
+            case "night" -> overworld.setDayTime(13000);
             case "clear" -> overworld.setWeatherParameters(ticks, 0, false, false);
             case "rain" -> overworld.setWeatherParameters(0, ticks, true, false);
             case "thunder" -> overworld.setWeatherParameters(0, ticks, true, true);
         }
     }
 
-    private static void broadcastVoteStart(MinecraftServer server, String playerName, String type, int durationDays, int needed, int eligible) {
-        MutableComponent header = Component.literal("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-                .withStyle(ChatFormatting.GOLD);
+    private static VoteOpenPayload openPayload(ActiveVote vote, Tally tally, ServerPlayer player) {
+        return new VoteOpenPayload(vote.initiatorName, vote.type, vote.durationDays, tallyPayload(vote, tally, player));
+    }
 
-        MutableComponent body = Component.literal("🗳 ")
-                .withStyle(ChatFormatting.GOLD)
-                .append(Component.literal(playerName).withStyle(ChatFormatting.WHITE))
-                .append(Component.literal(" started a vote to set ").withStyle(ChatFormatting.GOLD))
-                .append(Component.literal(type).withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
-        if (durationDays > 0) {
-            body.append(Component.literal(" for ").withStyle(ChatFormatting.GOLD))
-                    .append(Component.literal(durationDays + " day" + (durationDays == 1 ? "" : "s"))
-                            .withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+    private static VoteTallyPayload tallyPayload(ActiveVote vote, Tally tally, ServerPlayer player) {
+        int status;
+        if (player.isSpectator()) {
+            status = VoteTallyPayload.STATUS_SPECTATOR;
+        } else if (vote.yesVotes.contains(player.getUUID())) {
+            status = VoteTallyPayload.STATUS_VOTED_YES;
+        } else if (vote.noVotes.contains(player.getUUID())) {
+            status = VoteTallyPayload.STATUS_VOTED_NO;
+        } else {
+            status = VoteTallyPayload.STATUS_OPEN;
         }
-        body.append(Component.literal("!").withStyle(ChatFormatting.GOLD));
+        return new VoteTallyPayload(tally.yes(), tally.no(), tally.needed(), tally.eligible(), vote.ticksRemaining, status);
+    }
 
-        MutableComponent buttons = Component.literal("   ")
-                .append(clickableButton("[ ✔ YES ]", "/vote yes", ChatFormatting.GREEN))
-                .append(Component.literal("    ").withStyle(ChatFormatting.RESET))
-                .append(clickableButton("[ ✘ NO ]", "/vote no", ChatFormatting.RED));
-
-        MutableComponent timer = Component.literal("⏳ You have 30 seconds to vote! " + needed + " of " + eligible + " yes votes needed, and more Yes than No")
-                .withStyle(ChatFormatting.GRAY);
-
+    private static void broadcastTally(MinecraftServer server, ActiveVote vote, Tally tally) {
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            p.sendSystemMessage(header);
-            p.sendSystemMessage(body);
-            p.sendSystemMessage(buttons);
-            p.sendSystemMessage(timer);
-            p.sendSystemMessage(header);
+            send(p, tallyPayload(vote, tally, p));
         }
     }
 
-    private static MutableComponent clickableButton(String label, String command, ChatFormatting color) {
-        return Component.literal(label)
-                .withStyle(style -> style
-                        .withColor(color)
-                        .withBold(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Component.literal("Click to " + command))));
-    }
-
-    private static void broadcastToAll(MinecraftServer server, Component message) {
-        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            p.sendSystemMessage(message);
-        }
+    private static void send(ServerPlayer player, CustomPacketPayload payload) {
+        player.connection.send(new ClientboundCustomPayloadPacket(payload));
     }
 }

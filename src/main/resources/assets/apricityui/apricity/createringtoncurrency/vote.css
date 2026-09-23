@@ -1,0 +1,184 @@
+.vote-page {
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+  overflow: hidden;
+  pointer-events: none;
+  color: #e0e0e0;
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.vote-layer {
+  position: fixed;
+  top: 10px;
+  left: 0;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.vote-card {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: 220px;
+  padding: 7px 9px 8px 9px;
+  background-color: rgba(28, 28, 34, 0.92);
+  border: 1px solid #55575c;
+  box-shadow: 0px 3px 0px #0f0f13;
+  display: flex;
+  flex-direction: column;
+}
+
+.vote-card:not(.is-active) {
+  display: none;
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  left: -3000px;
+  top: -3000px;
+}
+
+.vote-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.vote-title {
+  font-size: 11px;
+  color: #ffd75e;
+}
+
+.vote-timer {
+  font-size: 11px;
+  color: #a0a0a0;
+}
+
+.vote-card.is-urgent .vote-timer {
+  color: #e74c3c;
+}
+
+.vote-subtitle {
+  color: #c8c8c8;
+  margin-bottom: 5px;
+}
+
+.vote-progress {
+  width: 100%;
+  height: 4px;
+  background-color: #14141a;
+  border: 1px solid #3a3c42;
+  margin-bottom: 4px;
+}
+
+.vote-progress-fill {
+  height: 100%;
+  width: 0%;
+  background-color: #2ecc71;
+}
+
+.vote-tally {
+  color: #a0a0a0;
+  margin-bottom: 6px;
+}
+
+.vote-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+}
+
+.vote-button {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background-color: #2a2a32;
+  border: 1px solid #55575c;
+  color: #e0e0e0;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.vote-button:hover {
+  background-color: #3a3a44;
+  border-color: #8a8c92;
+}
+
+.vote-button .key {
+  padding: 1px 3px;
+  background-color: #14141a;
+  border: 1px solid #6a6c72;
+  color: #ffffff;
+}
+
+.vote-button.yes .label {
+  color: #2ecc71;
+}
+
+.vote-button.no .label {
+  color: #e74c3c;
+}
+
+.vote-button.dismiss {
+  margin-left: auto;
+}
+
+.vote-button.dismiss .label {
+  color: #a0a0a0;
+}
+
+.vote-card.is-voted .vote-button.yes,
+.vote-card.is-voted .vote-button.no {
+  display: none;
+  visibility: hidden;
+  pointer-events: none;
+  position: absolute;
+  left: -3000px;
+  top: -3000px;
+}
+
+.vote-note {
+  margin-top: 5px;
+  color: #ffd75e;
+}
+
+.vote-card:not(.is-voted) .vote-note {
+  display: none;
+  visibility: hidden;
+  position: absolute;
+  left: -3000px;
+  top: -3000px;
+}
+
+.vote-card.result {
+  align-items: center;
+  text-align: center;
+}
+
+.vote-card.result .vote-subtitle {
+  margin-bottom: 0;
+}
+
+.vote-card.result.is-passed {
+  border-color: #2ecc71;
+}
+
+.vote-card.result.is-passed .vote-title {
+  color: #2ecc71;
+}
+
+.vote-card.result.is-failed {
+  border-color: #e74c3c;
+}
+
+.vote-card.result.is-failed .vote-title {
+  color: #e74c3c;
+}
