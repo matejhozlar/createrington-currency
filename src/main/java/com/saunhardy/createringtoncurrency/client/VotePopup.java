@@ -120,6 +120,7 @@ public final class VotePopup {
             if (doc == null) return;
         }
         ensureBound();
+        if (doc.hasAnyActiveSelection()) doc.clearAllTextSelections();
         if (leaveTicks > 0 && --leaveTicks == 0) {
             leaving = false;
             if (result != null) {

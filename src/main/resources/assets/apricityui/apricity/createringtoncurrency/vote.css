@@ -8,6 +8,11 @@
   color: #e0e0e0;
   font-size: 7px;
   line-height: 1.2;
+  user-select: none;
+}
+
+.vote-page * {
+  user-select: none;
 }
 
 .vote-layer {

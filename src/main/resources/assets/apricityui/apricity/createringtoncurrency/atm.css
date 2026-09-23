@@ -1,4 +1,5 @@
 .ore-theme.atm-page {
+  user-select: none;
   background: transparent;
   min-width: 0;
   position: relative;
@@ -9,6 +10,14 @@
   color: #a0a0a0;
   font-size: 14px;
   line-height: 1.2;
+}
+
+.atm-page *:not(input) {
+  user-select: none;
+}
+
+.atm-page input {
+  user-select: text;
 }
 
 .atm-frame {
