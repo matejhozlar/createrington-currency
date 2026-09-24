@@ -15,6 +15,7 @@ import com.saunhardy.createringtoncurrency.mobdrops.MobDrops;
 import com.saunhardy.createringtoncurrency.mobdrops.MobDropTable;
 import com.saunhardy.createringtoncurrency.network.ATMNetworking;
 import com.saunhardy.createringtoncurrency.network.DepositorNetworking;
+import com.saunhardy.createringtoncurrency.network.VoteNetworking;
 import com.saunhardy.createringtoncurrency.util.BillDelivery;
 import com.saunhardy.createringtoncurrency.util.Bills;
 import com.saunhardy.createringtoncurrency.util.Deposits;
@@ -184,6 +185,7 @@ public class CreateringtonCurrency {
 
         modEventBus.addListener(ATMNetworking::register);
         modEventBus.addListener(DepositorNetworking::register);
+        modEventBus.addListener(VoteNetworking::register);
         modEventBus.addListener(CreateringtonCurrency::registerCapabilities);
         modEventBus.addListener(DataGenerators::gatherData);
         modEventBus.addListener(MobDropTable::onConfigLoading);
@@ -207,10 +209,9 @@ public class CreateringtonCurrency {
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);
-            modEventBus.addListener(ClientOnlyHooks::registerKeyMappings);
             modEventBus.addListener(ClientOnlyHooks::registerBlockColors);
             modEventBus.addListener(ClientOnlyHooks::registerItemColors);
-            NeoForge.EVENT_BUS.register(ClientOnlyHooks.class);
+            NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.client.VotePopup.class);
 
             if (ModList.get().isLoaded("create")) {
                 NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.client.DepositorShopOverlay.class);

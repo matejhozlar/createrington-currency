@@ -51,11 +51,11 @@ public class AdminMode {
 
         if (enabled) {
             player.sendSystemMessage(Component.literal(
-                            "Admin mode on: right-clicking any depositor terminal opens its owner menu until you log out.")
+                            "Admin mode on until you log out: right-clicking any depositor terminal opens its owner menu, and any /vote you start is a test vote (no cooldown, your yes is not counted, one phantom voter keeps it open for the full 30 s, and a pass still applies).")
                     .withStyle(ChatFormatting.GOLD));
         } else {
             player.sendSystemMessage(Component.literal(
-                            "Admin mode off: depositor terminals treat you as a customer again.")
+                            "Admin mode off: depositor terminals treat you as a customer again and your votes follow the normal rules.")
                     .withStyle(ChatFormatting.GRAY));
         }
         LOGGER.info("[DEPOSITOR] {} ({}) turned admin mode {}", player.getName().getString(), id, enabled ? "on" : "off");

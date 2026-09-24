@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="aui-viewport" content="mode=gui,user-scalable=false">
+  <meta name="aui-mouse-events" content="intercept">
+  <link rel="stylesheet" href="vote.css">
+</head>
+
+<body class="vote-page">
+  <div class="vote-layer">
+
+    <div class="vote-strip" id="vote-card">
+      <span class="vote-tag">VOTE</span>
+      <span class="vote-text" id="vote-subtitle"></span>
+      <span class="vote-sep">|</span>
+      <span class="vote-tally"><span class="count-yes" id="vote-yes-count"></span><span class="vote-dot">·</span><span class="count-no" id="vote-no-count"></span></span>
+      <span class="vote-sep">|</span>
+      <span class="vote-timer" id="vote-timer">30s</span>
+      <div class="vote-actions">
+        <button class="vote-button yes" id="vote-yes"><span class="key" id="key-yes">Y</span><span class="label">Yes</span></button>
+        <button class="vote-button no" id="vote-no"><span class="key" id="key-no">N</span><span class="label">No</span></button>
+      </div>
+      <span class="vote-hint"><span class="key" id="key-dismiss">H</span><span class="label">hide</span></span>
+    </div>
+
+    <div class="vote-strip result" id="result-card">
+      <span class="vote-tag" id="result-title"></span>
+      <span class="vote-text" id="result-detail"></span>
+    </div>
+
+  </div>
+</body>
+</html>
