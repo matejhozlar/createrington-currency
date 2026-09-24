@@ -165,6 +165,10 @@ public class VoteCommand {
         return 1;
     }
 
+    public static boolean isVoteActive() {
+        return activeVote != null;
+    }
+
     public static int castVote(ServerPlayer player, boolean yes) {
         ActiveVote vote = activeVote;
         if (vote == null) {
@@ -279,11 +283,7 @@ public class VoteCommand {
     private static void resolveVote(MinecraftServer server, ActiveVote vote, Tally tally) {
         boolean passed = tally.passed();
 
-        int reason = VoteResultPayload.REASON_NONE;
-        if (!passed) {
-            reason = VoteQuorum.outvoted(tally) ? VoteResultPayload.REASON_OUTVOTED : VoteResultPayload.REASON_TURNOUT;
-        }
-        VoteResultPayload result = new VoteResultPayload(passed, tally.yes(), tally.no(), tally.needed(), tally.eligible(), reason);
+        VoteResultPayload result = new VoteResultPayload(passed, tally.yes(), tally.no());
 
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             send(p, result);
@@ -344,7 +344,7 @@ public class VoteCommand {
         } else {
             status = VoteTallyPayload.STATUS_OPEN;
         }
-        return new VoteTallyPayload(tally.yes(), tally.no(), tally.needed(), tally.eligible(), vote.ticksRemaining, status);
+        return new VoteTallyPayload(tally.yes(), tally.no(), vote.ticksRemaining, status);
     }
 
     private static void broadcastTally(MinecraftServer server, ActiveVote vote, Tally tally) {

@@ -41,8 +41,6 @@ public final class VotePopup {
     private static int durationDays;
     private static int yes;
     private static int no;
-    private static int needed;
-    private static int eligible;
     private static int ticksRemaining;
     private static int status = VoteTallyPayload.STATUS_OPEN;
     private static boolean dismissed;
@@ -88,13 +86,15 @@ public final class VotePopup {
         resultTicks = RESULT_TICKS;
         leaving = false;
         leaveTicks = 0;
-        if (ensureDocument()) {
-            applyState();
-            if (pkt.passed()) {
-                sound(SoundEvents.PLAYER_LEVELUP, 1.0F);
-            } else {
-                sound(SoundEvents.NOTE_BLOCK_BASS.value(), 0.6F);
-            }
+        if (!ensureDocument()) {
+            result = null;
+            return;
+        }
+        applyState();
+        if (pkt.passed()) {
+            sound(SoundEvents.PLAYER_LEVELUP, 1.0F);
+        } else {
+            sound(SoundEvents.NOTE_BLOCK_BASS.value(), 0.6F);
         }
     }
 
@@ -102,12 +102,13 @@ public final class VotePopup {
         if (!capturing()) return false;
         Minecraft mc = Minecraft.getInstance();
         if (window != mc.getWindow().getWindow()) return false;
-        if (key != KEY_YES && key != KEY_NO && key != KEY_DISMISS) return false;
+        boolean voteKey = (key == KEY_YES || key == KEY_NO) && status == VoteTallyPayload.STATUS_OPEN;
+        if (!voteKey && key != KEY_DISMISS) return false;
         if (action != InputConstants.PRESS) return true;
-        if (key == KEY_DISMISS) {
-            dismiss();
-        } else if (status == VoteTallyPayload.STATUS_OPEN) {
+        if (voteKey) {
             cast(key == KEY_YES);
+        } else {
+            dismiss();
         }
         return true;
     }
@@ -118,7 +119,10 @@ public final class VotePopup {
         if (doc.isDisposed()) {
             doc = null;
             boundGeneration = -1;
-            if (active || result != null) ensureDocument();
+            if ((active || result != null) && !ensureDocument()) {
+                active = false;
+                result = null;
+            }
             if (doc == null) return;
         }
         ensureBound();
@@ -183,8 +187,6 @@ public final class VotePopup {
     private static void applyTally(VoteTallyPayload tally) {
         yes = tally.yes();
         no = tally.no();
-        needed = tally.needed();
-        eligible = tally.eligible();
         ticksRemaining = tally.ticksRemaining();
         status = tally.status();
     }

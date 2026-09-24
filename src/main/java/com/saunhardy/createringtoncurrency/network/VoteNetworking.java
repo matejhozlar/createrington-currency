@@ -19,7 +19,7 @@ public final class VoteNetworking {
     }
 
     private static void handleCast(final VoteCastPayload pkt, final IPayloadContext ctx) {
-        if (!(ctx.player() instanceof ServerPlayer player)) return;
+        if (!(ctx.player() instanceof ServerPlayer player) || !VoteCommand.isVoteActive()) return;
         VoteCommand.castVote(player, pkt.yes());
     }
 

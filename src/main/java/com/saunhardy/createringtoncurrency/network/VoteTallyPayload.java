@@ -7,7 +7,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
-public record VoteTallyPayload(int yes, int no, int needed, int eligible, int ticksRemaining, int status)
+public record VoteTallyPayload(int yes, int no, int ticksRemaining, int status)
         implements CustomPacketPayload {
     public static final int STATUS_OPEN = 0;
     public static final int STATUS_VOTED_YES = 1;
@@ -21,8 +21,6 @@ public record VoteTallyPayload(int yes, int no, int needed, int eligible, int ti
             StreamCodec.composite(
                     ByteBufCodecs.VAR_INT, VoteTallyPayload::yes,
                     ByteBufCodecs.VAR_INT, VoteTallyPayload::no,
-                    ByteBufCodecs.VAR_INT, VoteTallyPayload::needed,
-                    ByteBufCodecs.VAR_INT, VoteTallyPayload::eligible,
                     ByteBufCodecs.VAR_INT, VoteTallyPayload::ticksRemaining,
                     ByteBufCodecs.VAR_INT, VoteTallyPayload::status,
                     VoteTallyPayload::new
