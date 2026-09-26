@@ -102,6 +102,15 @@ config="createringtoncurrency.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# Jade - optional dependency
+[[dependencies.${mod_id}]]
+    modId="jade"
+    type="optional"
+    reason="When present, Jade's tooltip is pushed below the vote strip instead of drawing over it."
+    versionRange="${jade_version_range}"
+    ordering="NONE"
+    side="CLIENT"
+
 # AFKStatus - optional dependency
 [[dependencies.${mod_id}]]
     modId="afkstatus"

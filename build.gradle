@@ -139,6 +139,10 @@ dependencies {
     // Flywheel - required by Create at runtime
     localRuntime "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:1.0.6"
 
+    // Jade - optional dependency
+    compileOnly "maven.modrinth:jade:${jade_version}"
+    localRuntime "maven.modrinth:jade:${jade_version}"
+
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -189,6 +193,8 @@ tasks.withType(ProcessResources).configureEach {
             crnet_version_range    : crnet_version_range,
             afkstatus_version      : afkstatus_version,
             afkstatus_version_range: afkstatus_version_range,
+            jade_version           : jade_version,
+            jade_version_range     : jade_version_range,
             apricityui_version      : apricityui_version,
             apricityui_version_range: apricityui_version_range,
     ]
