@@ -1,3 +1,7 @@
+html {
+  user-select: none;
+}
+
 .vote-page {
   margin: 0;
   width: 100vw;
