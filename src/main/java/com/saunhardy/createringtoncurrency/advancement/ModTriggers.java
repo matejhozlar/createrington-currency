@@ -30,7 +30,7 @@ public class ModTriggers {
     }
 
     public static void onPlayerTick(PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player) || player instanceof FakePlayer) return;
+        if (!(event.getEntity() instanceof ServerPlayer player) || player instanceof FakePlayer || player.isSpectator()) return;
         if (player.tickCount % CARRY_CHECK_TICKS != 0) return;
         economy(player, EconomyTrigger.Event.CARRY, Bills.value(Bills.count(player.getInventory())));
     }

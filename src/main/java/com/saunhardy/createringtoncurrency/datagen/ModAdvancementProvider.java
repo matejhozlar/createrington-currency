@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class ModAdvancementProvider extends AdvancementProvider {
-    public static final int HIGH_ROLLER_AMOUNT = 10_000;
+    private static final int HIGH_ROLLER_AMOUNT = 10_000;
 
     public ModAdvancementProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries,
                                   ExistingFileHelper existingFileHelper) {

@@ -146,6 +146,9 @@ public final class DepositorNetworking {
             else sendResult(player, KIND_INFO, "The storage is empty.");
             return;
         }
+        if (be.isOwner(player)) {
+            ModTriggers.economy(player, EconomyTrigger.Event.SALE, taken);
+        }
         sendResult(player, KIND_SUCCESS, "Took $" + fmt(taken) + (leftBehind ? " — inventory full, the rest stayed inside." : ""));
         LOGGER.info("[DEPOSITOR] {} ({}) took ${} out of the terminal at {} owned by {} ({})",
                 player.getName().getString(), player.getUUID(), fmt(taken), pkt.pos().toShortString(),
