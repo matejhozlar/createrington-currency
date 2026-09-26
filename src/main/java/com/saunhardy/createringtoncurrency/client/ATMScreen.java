@@ -12,12 +12,20 @@ import com.saunhardy.createringtoncurrency.network.ATMResultPayload;
 import com.saunhardy.createringtoncurrency.network.ATMWithdrawPayload;
 import com.saunhardy.createringtoncurrency.util.Bills;
 import com.saunhardy.createringtoncurrency.util.TransactionFormat;
+import com.sighs.apricityui.client.Client;
+import com.sighs.apricityui.dev.resource.ResourcePreviewDialog;
 import com.sighs.apricityui.element.AbstractText;
 import com.sighs.apricityui.event.KeyEvent;
 import com.sighs.apricityui.init.Document;
 import com.sighs.apricityui.init.Element;
+import com.sighs.apricityui.render.Base;
+import com.sighs.apricityui.render.FrameTimingHud;
+import com.sighs.apricityui.render.Mask;
 import com.sighs.apricityui.screen.ApricityScreen;
+import com.sighs.apricityui.style.Cursor;
+import com.sighs.apricityui.viewport.ApricityViewport;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
@@ -72,6 +80,8 @@ public class ATMScreen extends ApricityScreen {
 
     private Document doc;
     private Document boundDoc;
+    private int offsetX;
+    private int offsetY;
     private long boundGeneration = -1;
     private int holdIndex = -1;
     private int holdDelta = 0;
@@ -99,9 +109,60 @@ public class ATMScreen extends ApricityScreen {
             return;
         }
         ensureBound();
+        centreViewport();
         if (!probeStarted) {
             probeStarted = true;
             probe();
+        }
+    }
+
+    @Override
+    public void resize(Minecraft minecraft, int width, int height) {
+        super.resize(minecraft, width, height);
+        centreViewport();
+    }
+
+    private void centreViewport() {
+        if (doc == null) return;
+        ApricityViewport viewport = doc.getViewport();
+        float scale = viewport.renderScale();
+        offsetX = Math.max(0, Math.round((width - viewport.layoutWidth() * scale) / 2f));
+        offsetY = Math.max(0, Math.round((height - viewport.layoutHeight() * scale) / 2f));
+        doc.setViewportTransform(scale, scale, offsetX, offsetY);
+    }
+
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        FrameTimingHud.beginFrame();
+        try {
+            renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+            if (doc != null) {
+                centreViewport();
+                ApricityViewport viewport = doc.getViewport();
+                float scale = viewport.renderScale();
+                Mask.resetDepth();
+                Mask.pushSurfaceClip(guiGraphics.pose(), viewport.layoutWidth(), viewport.layoutHeight(), offsetX, offsetY, scale, scale);
+                guiGraphics.pose().pushPose();
+                try {
+                    guiGraphics.pose().translate(offsetX, offsetY, 0);
+                    guiGraphics.pose().scale(scale, scale, 1.0f);
+                    Mask.pushScissorScale(viewport.scissorScale(), guiGraphics.pose());
+                    Base.drawEmbeddedDocument(guiGraphics.pose(), doc, doc);
+                } finally {
+                    Mask.popScissorScale();
+                    Mask.popSurfaceClip();
+                    guiGraphics.pose().popPose();
+                }
+                Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
+            }
+            ResourcePreviewDialog.draw(guiGraphics.pose(), doc);
+            Client.drawPersistentScreenDocuments(guiGraphics, doc);
+            guiGraphics.flush();
+            Cursor.drawPseudoCursor(guiGraphics.pose());
+            guiGraphics.flush();
+        } finally {
+            FrameTimingHud.endFrame();
+            Client.drawFrameTimingHud(guiGraphics);
         }
     }
 
