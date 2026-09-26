@@ -1,0 +1,33 @@
+{
+  "parent": "createringtoncurrency:economy/grand",
+  "criteria": {
+    "carried": {
+      "conditions": {
+        "amount": {
+          "min": 10000
+        },
+        "event": "carry"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.high_roller.description"
+    },
+    "frame": "challenge",
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:bill_500"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.high_roller.title"
+    }
+  },
+  "requirements": [
+    [
+      "carried"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

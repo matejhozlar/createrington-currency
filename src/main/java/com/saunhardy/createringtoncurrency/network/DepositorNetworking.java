@@ -3,6 +3,8 @@ package com.saunhardy.createringtoncurrency.network;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.Config;
 import com.saunhardy.createringtoncurrency.CreateringtonCurrency;
+import com.saunhardy.createringtoncurrency.advancement.EconomyTrigger;
+import com.saunhardy.createringtoncurrency.advancement.ModTriggers;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlock;
 import com.saunhardy.createringtoncurrency.block.DepositorTerminalBlockEntity;
@@ -102,6 +104,9 @@ public final class DepositorNetworking {
         if (pkt.count() == 0) {
             sendResult(player, KIND_SUCCESS, "Price cleared.");
         } else {
+            if (be.isOwner(player)) {
+                ModTriggers.economy(player, EconomyTrigger.Event.SET_PRICE, (long) pkt.denomination() * pkt.count());
+            }
             sendResult(player, KIND_SUCCESS, "Price set to " + describe(pkt.denomination(), pkt.count()));
         }
         LOGGER.info("[DEPOSITOR] {} ({}) set the price of the terminal at {} to {} x ${}",
@@ -258,6 +263,7 @@ public final class DepositorNetworking {
         String how = card ? "card" : "cash";
         LAST_PAYMENT.put(payer.getUUID(), System.currentTimeMillis());
         actionBar(payer, KIND_SUCCESS, "Paid $" + fmt(amount) + (card ? " by card" : " in cash"));
+        ModTriggers.economy(payer, EconomyTrigger.Event.PAY, amount);
 
         // The terminal pulses in its own level; the payer may have changed dimension while a card payment was in flight.
         BlockPos pos = be.getBlockPos();
@@ -269,6 +275,7 @@ public final class DepositorNetworking {
 
         ServerPlayer ownerPlayer = payer.server.getPlayerList().getPlayer(owner);
         if (ownerPlayer != null) {
+            ModTriggers.economy(ownerPlayer, EconomyTrigger.Event.SALE, amount);
             ownerPlayer.sendSystemMessage(Component.literal("💸 " + payer.getName().getString() + " paid $" + fmt(amount)
                     + " at your depositor terminal (" + pos.toShortString() + ")").withStyle(ChatFormatting.GOLD));
         }

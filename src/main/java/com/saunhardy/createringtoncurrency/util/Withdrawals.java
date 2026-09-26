@@ -1,6 +1,8 @@
 package com.saunhardy.createringtoncurrency.util;
 
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.advancement.EconomyTrigger;
+import com.saunhardy.createringtoncurrency.advancement.ModTriggers;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -171,7 +173,10 @@ public final class Withdrawals {
                 return;
             }
             LOGGER.info("[WITHDRAW:{}] {} ({}): ${} keys={}", tag, name, uuid, Bills.fmt(amount), String.join(",", keys));
-            BillDelivery.whenOnline(server, uuid, p -> reporter.succeeded(p, amount));
+            BillDelivery.whenOnline(server, uuid, p -> {
+                ModTriggers.economy(p, EconomyTrigger.Event.WITHDRAW, amount);
+                reporter.succeeded(p, amount);
+            });
         });
     }
 }

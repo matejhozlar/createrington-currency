@@ -1,0 +1,30 @@
+{
+  "parent": "createringtoncurrency:economy/capitalist_greed",
+  "criteria": {
+    "hit_cap": {
+      "conditions": {
+        "event": "mob_cap"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.mob_cap.description"
+    },
+    "frame": "goal",
+    "icon": {
+      "count": 1,
+      "id": "minecraft:zombie_head"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.mob_cap.title"
+    }
+  },
+  "requirements": [
+    [
+      "hit_cap"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

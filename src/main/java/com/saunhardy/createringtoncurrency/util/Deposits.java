@@ -1,6 +1,8 @@
 package com.saunhardy.createringtoncurrency.util;
 
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.advancement.EconomyTrigger;
+import com.saunhardy.createringtoncurrency.advancement.ModTriggers;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -86,7 +88,10 @@ public final class Deposits {
                 IN_FLIGHT.remove(uuid);
                 if (ex == null && resp.isSuccess()) {
                     LOGGER.info("[DEPOSIT:{}] {} ({}): ${} key={}", tag, name, uuid, Bills.fmt(amount), key);
-                    BillDelivery.whenOnline(server, uuid, p -> reporter.succeeded(p, amount, resp.getPlayerMessage()));
+                    BillDelivery.whenOnline(server, uuid, p -> {
+                        ModTriggers.economy(p, EconomyTrigger.Event.DEPOSIT, amount);
+                        reporter.succeeded(p, amount, resp.getPlayerMessage());
+                    });
                     return;
                 }
 

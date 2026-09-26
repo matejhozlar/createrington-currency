@@ -1,6 +1,7 @@
 package com.saunhardy.createringtoncurrency;
 
 import com.mojang.logging.LogUtils;
+import com.saunhardy.createringtoncurrency.advancement.ModTriggers;
 import com.saunhardy.createringtoncurrency.api.CurrencyApi;
 import com.saunhardy.createringtoncurrency.audit.CashAudit;
 import com.saunhardy.createringtoncurrency.block.DecorativeATMBlock;
@@ -182,6 +183,7 @@ public class CreateringtonCurrency {
         CREATIVE_MODE_TABS.register(modEventBus);
 
         ModEnchantmentEffects.register(modEventBus);
+        ModTriggers.register(modEventBus);
 
         modEventBus.addListener(ATMNetworking::register);
         modEventBus.addListener(DepositorNetworking::register);
@@ -206,6 +208,7 @@ public class CreateringtonCurrency {
         NeoForge.EVENT_BUS.addListener(MobDropTable::onTagsUpdated);
         NeoForge.EVENT_BUS.addListener(Deposits::onServerStopped);
         NeoForge.EVENT_BUS.addListener(Withdrawals::onServerStopped);
+        NeoForge.EVENT_BUS.addListener(ModTriggers::onPlayerTick);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(ClientOnlyHooks::registerScreens);

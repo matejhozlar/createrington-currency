@@ -1,0 +1,44 @@
+{
+  "criteria": {
+    "has_bill": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "createringtoncurrency:bill_1",
+              "createringtoncurrency:bill_5",
+              "createringtoncurrency:bill_10",
+              "createringtoncurrency:bill_20",
+              "createringtoncurrency:bill_50",
+              "createringtoncurrency:bill_100",
+              "createringtoncurrency:bill_500",
+              "createringtoncurrency:bill_1000"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "background": "minecraft:textures/block/dark_oak_planks.png",
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.root.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:bill_100"
+    },
+    "show_toast": false,
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.root.title"
+    }
+  },
+  "requirements": [
+    [
+      "has_bill"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

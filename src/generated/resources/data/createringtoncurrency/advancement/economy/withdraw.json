@@ -1,0 +1,29 @@
+{
+  "parent": "createringtoncurrency:economy/bank_card",
+  "criteria": {
+    "withdrew": {
+      "conditions": {
+        "event": "withdraw"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.withdraw.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:atm_green"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.withdraw.title"
+    }
+  },
+  "requirements": [
+    [
+      "withdrew"
+    ]
+  ],
+  "sends_telemetry_event": true
+}
