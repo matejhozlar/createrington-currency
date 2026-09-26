@@ -13,7 +13,6 @@ public class Config {
     public static final ModConfigSpec.BooleanValue DISABLE_CASH_COMMANDS;
     public static final ModConfigSpec.BooleanValue DISABLE_BALTOP_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_DAILY_COMMAND;
-    public static final ModConfigSpec.BooleanValue DISABLE_LOTTERY_COMMANDS;
     public static final ModConfigSpec.BooleanValue DISABLE_VOTE_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_ADMIN_MODE_COMMAND;
     public static final ModConfigSpec.BooleanValue DISABLE_BANK_CARD_USE;
@@ -25,8 +24,6 @@ public class Config {
     public static final ModConfigSpec.IntValue MOB_DAILY_LIMIT;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> MOB_DROPS;
     public static final ModConfigSpec.ConfigValue<List<? extends Number>> CAPITALIST_GREED_BONUS;
-
-    public static final ModConfigSpec.IntValue LOTTERY_COOLDOWN_MINUTES;
 
     public static final ModConfigSpec.IntValue VOTE_APPROVAL_PERCENT;
     public static final ModConfigSpec.BooleanValue VOTE_IGNORE_AFK;
@@ -63,10 +60,6 @@ public class Config {
         DISABLE_DAILY_COMMAND = BUILDER
                 .comment("If true, the /daily command will NOT be registered")
                 .define("disableDailyCommand", false);
-
-        DISABLE_LOTTERY_COMMANDS = BUILDER
-                .comment("If true, the /lottery and /join commands will NOT be registered")
-                .define("disableLotteryCommands", false);
 
         DISABLE_VOTE_COMMAND = BUILDER
                 .comment("If true, the /vote command will NOT be registered")
@@ -125,14 +118,6 @@ public class Config {
                 .comment("Percentage points added to every drop chance per level of Capitalist Greed (first entry = level I)")
                 .<Number>defineListAllowEmpty("capitalistGreedBonus", List.of(5.0, 8.0, 10.0),
                         () -> 0.0, value -> value instanceof Number n && n.doubleValue() >= 0.0);
-
-        BUILDER.pop();
-
-        BUILDER.comment("Lottery command settings").push("lottery");
-
-        LOTTERY_COOLDOWN_MINUTES = BUILDER
-                .comment("Cooldown duration for /lottery in minutes, don't use this if you are not using integrated discord bots")
-                .defineInRange("lotteryCooldownMinutes", 15, 0, 1440);
 
         BUILDER.pop();
 
