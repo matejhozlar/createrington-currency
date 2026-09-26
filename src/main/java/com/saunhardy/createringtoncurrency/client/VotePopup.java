@@ -180,6 +180,16 @@ public final class VotePopup {
         return active && !dismissed && result == null;
     }
 
+    public static Element.DOMRect overlayRect() {
+        if (doc == null || doc.isDisposed()) return null;
+        String id = promptShowing() ? "vote-card" : result != null ? "result-card" : null;
+        if (id == null) return null;
+        Element element = doc.getElementById(id);
+        if (element == null) return null;
+        Element.DOMRect rect = element.getBoundingClientRect();
+        return rect.height > 0 ? rect : null;
+    }
+
     private static boolean capturing() {
         return promptShowing() && !leaving && doc != null && Minecraft.getInstance().screen == null;
     }
