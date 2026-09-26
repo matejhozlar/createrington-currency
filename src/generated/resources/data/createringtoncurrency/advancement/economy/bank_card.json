@@ -1,0 +1,33 @@
+{
+  "parent": "createringtoncurrency:economy/root",
+  "criteria": {
+    "has_bank_card": {
+      "conditions": {
+        "items": [
+          {
+            "items": "createringtoncurrency:bank_card"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.bank_card.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:bank_card"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.bank_card.title"
+    }
+  },
+  "requirements": [
+    [
+      "has_bank_card"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

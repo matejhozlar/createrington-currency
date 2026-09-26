@@ -1,0 +1,62 @@
+{
+  "parent": "createringtoncurrency:economy/root",
+  "criteria": {
+    "book": {
+      "conditions": {
+        "items": [
+          {
+            "predicates": {
+              "minecraft:stored_enchantments": [
+                {
+                  "enchantments": "createringtoncurrency:capitalist_greed",
+                  "levels": {
+                    "min": 1
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "enchanted": {
+      "conditions": {
+        "items": [
+          {
+            "predicates": {
+              "minecraft:enchantments": [
+                {
+                  "enchantments": "createringtoncurrency:capitalist_greed",
+                  "levels": {
+                    "min": 1
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.capitalist_greed.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "minecraft:golden_sword"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.capitalist_greed.title"
+    }
+  },
+  "requirements": [
+    [
+      "enchanted",
+      "book"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

@@ -1,0 +1,29 @@
+{
+  "parent": "createringtoncurrency:economy/root",
+  "criteria": {
+    "set_price": {
+      "conditions": {
+        "event": "set_price"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.set_price.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:depositor_terminal"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.set_price.title"
+    }
+  },
+  "requirements": [
+    [
+      "set_price"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

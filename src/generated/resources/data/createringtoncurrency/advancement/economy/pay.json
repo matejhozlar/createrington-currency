@@ -1,0 +1,29 @@
+{
+  "parent": "createringtoncurrency:economy/root",
+  "criteria": {
+    "paid": {
+      "conditions": {
+        "event": "pay"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.pay.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:bill_20"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.pay.title"
+    }
+  },
+  "requirements": [
+    [
+      "paid"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

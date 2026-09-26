@@ -1,0 +1,30 @@
+{
+  "parent": "createringtoncurrency:economy/set_price",
+  "criteria": {
+    "sold": {
+      "conditions": {
+        "event": "sale"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.sale.description"
+    },
+    "frame": "goal",
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:bill_50"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.sale.title"
+    }
+  },
+  "requirements": [
+    [
+      "sold"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

@@ -1,0 +1,33 @@
+{
+  "parent": "createringtoncurrency:economy/root",
+  "criteria": {
+    "has_bill_1000": {
+      "conditions": {
+        "items": [
+          {
+            "items": "createringtoncurrency:bill_1000"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.grand.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:bill_1000"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.grand.title"
+    }
+  },
+  "requirements": [
+    [
+      "has_bill_1000"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

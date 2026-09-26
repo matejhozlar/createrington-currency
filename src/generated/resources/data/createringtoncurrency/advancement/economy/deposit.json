@@ -1,0 +1,29 @@
+{
+  "parent": "createringtoncurrency:economy/bank_card",
+  "criteria": {
+    "deposited": {
+      "conditions": {
+        "event": "deposit"
+      },
+      "trigger": "createringtoncurrency:economy"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.createringtoncurrency.economy.deposit.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "createringtoncurrency:atm_blue"
+    },
+    "title": {
+      "translate": "advancements.createringtoncurrency.economy.deposit.title"
+    }
+  },
+  "requirements": [
+    [
+      "deposited"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

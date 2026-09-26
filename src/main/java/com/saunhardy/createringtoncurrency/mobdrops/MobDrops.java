@@ -2,6 +2,8 @@ package com.saunhardy.createringtoncurrency.mobdrops;
 
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.Config;
+import com.saunhardy.createringtoncurrency.advancement.EconomyTrigger;
+import com.saunhardy.createringtoncurrency.advancement.ModTriggers;
 import com.saunhardy.createringtoncurrency.enchantment.ModEnchantments;
 import com.saunhardy.createringtoncurrency.util.Bills;
 import net.minecraft.ChatFormatting;
@@ -119,6 +121,7 @@ public class MobDrops {
         dropBills(dead, Bills.breakdown(allowed));
 
         if (earnedSoFar + allowed >= dailyLimit) {
+            ModTriggers.economy(player, EconomyTrigger.Event.MOB_CAP, dailyLimit);
             player.sendSystemMessage(message(dailyLimit));
             warnedToday.add(uuid);
         }
