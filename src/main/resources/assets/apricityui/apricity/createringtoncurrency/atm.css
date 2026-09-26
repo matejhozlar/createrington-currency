@@ -1,3 +1,7 @@
+html {
+  user-select: none;
+}
+
 .ore-theme.atm-page {
   user-select: none;
   background: transparent;
