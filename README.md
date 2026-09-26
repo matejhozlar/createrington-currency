@@ -1,7 +1,7 @@
 # Createrington Currency – Minecraft Economy Mod
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-5E7C16?logo=minecraft&logoColor=white)
-![NeoForge](https://img.shields.io/badge/NeoForge-21.1.172-orange)
+![NeoForge](https://img.shields.io/badge/NeoForge-21.1.249-orange)
 ![Backend API](https://img.shields.io/badge/Backend-Required-critical)
 
 **Createrington Currency** is a fully‑fledged economy mod for Minecraft built on the NeoForge mod loader. It introduces physical currency items, player bank accounts, an ATM block and a suite of commands that all tie into a remote backend API. Unlike simple economy add‑ons, balances and transactions live on your own server so you can connect multiple game servers to the same economy.
@@ -73,9 +73,11 @@ Any command can be turned off in the config, see [Disabling commands](#disabling
 | Command                  | Description                                                                                                                                              |
 |--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/vote <type> [days]`    | Start a 30-second server-wide vote to change the time or weather. Types: `day`, `night`, `clear`, `rain`, `thunder`. `days` (1-7) only applies to weather |
-| `/vote yes` / `/vote no` | Cast your vote while one is running (typing `1` or `2` in chat also works)                                                                               |
+| `/vote yes` / `/vote no` | Cast your vote from chat while one is running                                                                                                            |
 
-A vote passes when at least half of the eligible players (rounded up) have voted yes **and** there are more yes votes than no votes. A vote everybody ignores fails, and so does a tie: with 10 players online, 5 yes and 5 silent passes but 5 yes and 5 no does not. The number of yes votes announced when the vote starts is the most it will ever ask for: players joining or coming back from AFK mid-vote cannot raise it, while players leaving can still lower it. Spectators cannot start or cast a vote and are never counted; if the [AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus) mod is installed AFK players are not counted either, unless they vote anyway. The vote ends the moment the result is certain instead of always waiting out the 30 seconds, and if you are the only eligible player it is applied straight away and announced to the server.
+A running vote is shown as a small strip at the top of everyone's screen instead of chat messages: what is being asked, the live yes/no counts, the countdown and the keys. Press **Y** to vote yes, **N** to vote no, or **H** to hide the strip (hiding counts as not voting). The keys only work while the strip is visible and no other screen is open, so they never interfere with a chest or the chat. The strip stays visible over your inventory and chat, shows late joiners the vote in progress, and switches to a PASSED / FAILED result for a few seconds when the vote ends. Nothing about a vote is posted to chat.
+
+A vote passes when at least half of the eligible players (rounded up) have voted yes **and** there are more yes votes than no votes. A vote everybody ignores fails, and so does a tie: with 10 players online, 5 yes and 5 silent passes but 5 yes and 5 no does not. The number of yes votes needed when the vote starts is the most it will ever ask for: players joining or coming back from AFK mid-vote cannot raise it, while players leaving can still lower it. Spectators cannot start or cast a vote and are never counted; if the [AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus) mod is installed AFK players are not counted either, unless they vote anyway. The vote ends the moment the result is certain instead of always waiting out the 30 seconds, and if you are the only eligible player it is applied straight away.
 
 The share required is `voteApprovalPercent` (50 by default) and the AFK exclusion can be turned off with `voteIgnoreAfk`.
 
@@ -83,7 +85,7 @@ The share required is `voteApprovalPercent` (50 by default) and the AFK exclusio
 
 | Command                             | Description                                                                                                                                                                                                                                                                                                               |
 |-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself; `on` / `off` set it explicitly. While it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills) and chat tells you whose terminal you opened; while it is off you pay like any other customer. It switches off again when you log out |
+| `/createringtoncurrency admin-mode` | Operators only. Toggles admin mode for yourself; `on` / `off` set it explicitly. While it is on, right-clicking any depositor terminal opens its owner menu (set price, take bills) and chat tells you whose terminal you opened; while it is off you pay like any other customer. A `/vote` you start while it is on is a test vote: you are not counted as an automatic yes, the vote stays open for the full 30 seconds even if you are alone, and no cooldown applies, so the whole vote flow can be tried out on an empty server. It switches off again when you log out |
 | `/createringtoncurrency audit`      | Operators only. Counts every bill on the server and reports where it is — see [Cash audit](#cash-audit)                                                                                                                                                                                                                    |
 
 ### Cash audit
@@ -107,10 +109,12 @@ The scan walks container NBT generically rather than looking for known tags, so 
 Because the mod's backend is the ledger and bills are ordinary items, comparing successive audits is the cheapest way to notice a duplication bug: a jump in the total with no withdrawals to explain it is the signal to look for. Only a full scan updates that baseline and only a full scan is compared against it, so using `audit players` never disturbs the comparison. Bills the backend has already debited but not yet handed to an offline player are reported separately, since they are a liability with no physical counterpart yet.
 
 ### ATM Block & GUI
-- **Interactive ATM:** Eight ATM variants can be crafted or given by operators. When right‑clicked it opens a custom GUI where players can deposit or withdraw money without typing commands.
-- **PIN & authentication:** The GUI guides players through a simple login flow; once authenticated it displays their balance, deposit buttons and withdraw options. The screen class organises the UI into views for deposit, withdraw total, withdraw single bills and withdraw bundles.
-- **Bundled withdrawals:** Players can specify denominations and counts for withdrawal, or enter a lump sum to automatically get the best combination of bills.
-- **Feedback:** After each deposit or withdrawal the server sends a success or error payload so the screen can display a coloured status message.
+- **Interactive ATM:** Eight ATM variants can be crafted or given by operators. Right-clicking one opens a screen where players can deposit or withdraw money and browse their history without typing commands.
+- **Designed screen:** The screen is an HTML/CSS page rendered by [ApricityUI](https://modrinth.com/mod/apricityui), which is why the mod requires it on the client. It scales to fill the window at any resolution, and home, deposit, withdraw and history are separate views with big buttons.
+- **Deposit:** Deposit everything you are carrying with one button, or type an amount; the ATM takes exactly that amount from your bills and refuses instead of guessing when you cannot make exact change.
+- **Withdraw:** Pick denominations and counts bill by bill, or enter a lump sum and let the ATM break it into the fewest bills. Your balance is checked first, so an unaffordable request is refused before anything moves.
+- **History:** Page through your recent transactions without leaving the screen.
+- **Out of service:** If the backend cannot be reached when the ATM is opened, the screen says so and offers a retry instead of failing silently. Your balance is refreshed after every deposit and withdrawal.
 
 ### Mob Drops
 
@@ -126,6 +130,25 @@ Because the mod's backend is the ledger and bills are ordinary items, comparing 
 - Increases the chance of mobs dropping money when killed.
 - Must be applied to weapons.
 
+### Economy Advancements
+
+The mod adds its own advancement tab, **Createrington Currency**, that opens once a player picks up their first bill:
+
+| Advancement          | How to earn it                                   |
+|----------------------|--------------------------------------------------|
+| A Grand              | Get hold of a $1000 bill                         |
+| High Roller          | Carry $10,000 in bills at once                   |
+| Plastic              | Get a Bank Card                                  |
+| Safe Keeping         | Deposit bills into your bank account             |
+| Cash Out             | Withdraw bills from your bank account            |
+| Paying Customer      | Pay at someone else's Depositor Terminal         |
+| Open for Business    | Set a price on your Depositor Terminal           |
+| First Sale           | Get paid at your Depositor Terminal              |
+| Greed Is Good        | Get Capitalist Greed on an item or book          |
+| A Hard Day's Work    | Earn your daily limit from mob drops             |
+
+Deposits, withdrawals and payments count whether they go through the commands, the ATM or a terminal. The economy events behind these are exposed as the `createringtoncurrency:economy` criterion (with an `event` and an optional `amount` range), so datapacks can add their own thresholds.
+
 ---
 
 ## ⚙ Requirements
@@ -133,8 +156,10 @@ Because the mod's backend is the ledger and bills are ordinary items, comparing 
 ### Minecraft
 
 - Minecraft version **1.21.1**
-- Requires **NeoForge** mod loader
+- Requires **NeoForge** `21.1.249` or newer
 - Requires **[CRNet](https://www.curseforge.com/minecraft/mc-mods/crnet)** `3.0.7` or newer - the shared library that handles all backend HTTP calls and JWT authentication
+- Requires **[ApricityUI](https://modrinth.com/mod/apricityui)** `1.2.5.1` or newer on the **client** - the HTML/CSS UI engine that renders the ATM screen and the vote strip. The server does not need it, and clients without it can still join a server running this mod, they just cannot use the ATM or see votes
+- Optional: **[Create](https://www.curseforge.com/minecraft/mc-mods/create)** `6.0.0` or newer enables the Stock Ticker shopping-list integration and the terminal trade overlay; **[AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus)** `1.2.0` or newer excludes AFK players from votes
 
 ### Backend API
 
