@@ -1,4 +1,4 @@
-## Version 1.14.1
+## Version 1.14.2
 
-### Changed
-- Downgraded ApricityUI to 1.2.5
+### Fixed
+- Fixed the Jade tooltip drawing over the vote popup at the top of the screen while a vote is running
