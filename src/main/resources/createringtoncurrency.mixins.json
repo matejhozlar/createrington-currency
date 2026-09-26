@@ -7,7 +7,8 @@
         "TrainCrashMixin"
     ],
     "client": [
-        "KeyboardHandlerMixin"
+        "KeyboardHandlerMixin",
+        "FontDrawerMixin"
     ],
     "minVersion": "0.8"
 }
