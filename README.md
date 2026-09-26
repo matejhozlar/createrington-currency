@@ -63,8 +63,6 @@ All planned features have been implemented and the mod is stable for production 
 | `/deposit`      | Convert bills into balance           |
 | `/withdraw`     | Withdraw bills from balance          |
 | `/daily`        | Daily money reward                   |
-| `/lottery`      | Start a server-wide lottery          |
-| `/join`         | Join a lottery in progress           |
 
 All commands enforce a global cooldown, configurable via `commandCooldownMs`. If a player executes a command too quickly, they will see a cooldown message.
 
@@ -128,12 +126,6 @@ Because the mod's backend is the ledger and bills are ordinary items, comparing 
 - Increases the chance of mobs dropping money when killed.
 - Must be applied to weapons.
 
-### Lottery System
-
-- Players can start and join lotteries with in-game currency.
-- The winner receives the entire pot.
-- Cooldown enforced between lottery rounds.
-
 ---
 
 ## ⚙ Requirements
@@ -156,8 +148,6 @@ POST   /currency/withdraw
 GET    /currency/top
 GET    /currency/mob-limit
 POST   /currency/daily
-POST   /currency/lottery/start
-POST   /currency/lottery/join
 ```
 
 > ⚠️ Without the backend API, this mod **will not function**.
@@ -174,7 +164,7 @@ Inside, you can set:
 - API base URL (`http://127.0.0.1:5000/` by default)
 - Mob drop table (`mobDrops.drops`) and the Capitalist Greed bonus per level
 - Daily mob earnings cap
-- Cooldowns for commands and lotteries
+- Command cooldown
 - Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
 - How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)
 - Per-command `disable*Command` toggles (see below)
@@ -190,7 +180,6 @@ Every chat command can be switched off individually. A disabled command is not r
 | `disableCashCommands`     | `/deposit`, `/withdraw`             |
 | `disableBaltopCommand`    | `/baltop`                           |
 | `disableDailyCommand`     | `/daily`                            |
-| `disableLotteryCommands`  | `/lottery`, `/join`                 |
 | `disableVoteCommand`      | `/vote`                             |
 | `disableAdminModeCommand` | `/createringtoncurrency admin-mode` |
 

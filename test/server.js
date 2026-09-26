@@ -21,9 +21,6 @@ const MAX_HISTORY_LIMIT = 20;
 const players = new Map();
 let txIdCounter = 1;
 
-// null | { entryAmount, endsAt, pot, participants: Set<uuid> }
-let lottery = null;
-
 function getOrCreatePlayer(uuid, name) {
   if (!players.has(uuid)) {
     players.set(uuid, {
@@ -284,75 +281,6 @@ app.post("/api/currency/daily", verifyJWT, (req, res) => {
   });
 });
 
-// POST /api/currency/lottery/start
-// Body: { amount: number }
-app.post("/api/currency/lottery/start", verifyJWT, (req, res) => {
-  const { uuid, name } = req.user;
-  const { amount } = req.body;
-  const player = getOrCreatePlayer(uuid, name);
-
-  if (lottery && lottery.endsAt > new Date()) {
-    return res.status(409).json({ success: false, message: "A lottery is already running", playerMessage: "A lottery is already in progress." });
-  }
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ success: false, message: "Invalid entry amount" });
-  }
-  if (player.balance < amount) {
-    return res.status(400).json({ success: false, message: "Insufficient balance", playerMessage: `You need ${fmt(amount)} to start a lottery.` });
-  }
-
-  const endsAt = new Date(Date.now() + 5 * 60 * 1000);
-  const before = player.balance;
-  player.balance -= amount;
-  addTx(player, -amount, before, player.balance, "lottery_entry", "Started lottery");
-
-  lottery = { entryAmount: amount, endsAt, pot: amount, participants: new Set([uuid]) };
-
-  console.log(`[lottery/start] ${player.name}: entry ${amount}, ends ${endsAt.toISOString()}`);
-  res.json({
-    success: true,
-    message: "Lottery started",
-    playerMessage: `Started a lottery! Entry: ${fmt(amount)}.`,
-    data: { entryAmount: amount, endsAt: endsAt.toISOString() },
-  });
-});
-
-// POST /api/currency/lottery/join
-// Body: { amount: number }
-app.post("/api/currency/lottery/join", verifyJWT, (req, res) => {
-  const { uuid, name } = req.user;
-  const { amount } = req.body;
-  const player = getOrCreatePlayer(uuid, name);
-
-  if (!lottery || lottery.endsAt <= new Date()) {
-    return res.status(404).json({ success: false, message: "No active lottery", playerMessage: "There's no active lottery to join." });
-  }
-  if (lottery.participants.has(uuid)) {
-    return res.status(409).json({ success: false, message: "Already joined", playerMessage: "You've already joined the lottery." });
-  }
-  if (amount !== lottery.entryAmount) {
-    return res.status(400).json({ success: false, message: `Entry amount must be ${lottery.entryAmount}`, playerMessage: `Entry amount is ${fmt(lottery.entryAmount)}.` });
-  }
-  if (player.balance < amount) {
-    return res.status(400).json({ success: false, message: "Insufficient balance", playerMessage: `You need ${fmt(amount)} to join.` });
-  }
-
-  const before = player.balance;
-  player.balance -= amount;
-  addTx(player, -amount, before, player.balance, "lottery_entry", "Joined lottery");
-
-  lottery.pot += amount;
-  lottery.participants.add(uuid);
-
-  console.log(`[lottery/join] ${player.name}: joined, pot ${lottery.pot}, participants: ${lottery.participants.size}`);
-  res.json({
-    success: true,
-    message: "Joined lottery",
-    playerMessage: `Joined! Pot: ${fmt(lottery.pot)}.`,
-    data: { entryAmount: lottery.entryAmount, totalPot: lottery.pot, participantCount: lottery.participants.size },
-  });
-});
-
 // ---- Trains endpoint -------------------------------------------------------
 
 // POST /api/trains/crash
@@ -408,8 +336,6 @@ Endpoints:
   GET  /api/currency/top
   GET  /api/currency/history      ?page=1&limit=10
   POST /api/currency/daily
-  POST /api/currency/lottery/start  { amount }
-  POST /api/currency/lottery/join   { amount }
   POST /api/trains/crash
   GET  /health
 `);

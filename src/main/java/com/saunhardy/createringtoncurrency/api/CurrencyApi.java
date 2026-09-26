@@ -8,10 +8,6 @@ import com.saunhardy.createrington.api.currency.DailyResponse;
 import com.saunhardy.createrington.api.currency.DepositRequest;
 import com.saunhardy.createrington.api.currency.DepositResponse;
 import com.saunhardy.createrington.api.currency.HistoryResponse;
-import com.saunhardy.createrington.api.currency.LotteryJoinRequest;
-import com.saunhardy.createrington.api.currency.LotteryJoinResponse;
-import com.saunhardy.createrington.api.currency.LotteryStartRequest;
-import com.saunhardy.createrington.api.currency.LotteryStartResponse;
 import com.saunhardy.createrington.api.currency.PayRequest;
 import com.saunhardy.createrington.api.currency.PayResponse;
 import com.saunhardy.createrington.api.currency.TopEntry;
@@ -112,20 +108,6 @@ public final class CurrencyApi {
         if (c == null) return unavailable();
         String path = Endpoints.CURRENCY_HISTORY + "?page=" + page + "&limit=" + limit;
         return c.get(path, HistoryResponse.class, playerUuid);
-    }
-
-    public static CompletableFuture<ApiResponse<LotteryStartResponse>> lotteryStart(UUID playerUuid, double amount) {
-        CRNetClient c = client;
-        if (c == null) return unavailable();
-        LotteryStartRequest req = new LotteryStartRequest(amount);
-        return c.post(Endpoints.CURRENCY_LOTTERY_START, GSON.toJson(req), LotteryStartResponse.class, playerUuid);
-    }
-
-    public static CompletableFuture<ApiResponse<LotteryJoinResponse>> lotteryJoin(UUID playerUuid, double amount) {
-        CRNetClient c = client;
-        if (c == null) return unavailable();
-        LotteryJoinRequest req = new LotteryJoinRequest(amount);
-        return c.post(Endpoints.CURRENCY_LOTTERY_JOIN, GSON.toJson(req), LotteryJoinResponse.class, playerUuid);
     }
 
     // ---- Trains ------------------------------------------------------------

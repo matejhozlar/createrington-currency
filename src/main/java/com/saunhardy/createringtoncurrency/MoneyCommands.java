@@ -30,14 +30,9 @@ public class MoneyCommands {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final Map<UUID, Long> COOLDOWNS = new ConcurrentHashMap<>();
-    private static long lastLotteryStartTime = 0L;
 
     private static long getCooldownMs() {
         return Config.COMMAND_COOLDOWN_MS.get();
-    }
-
-    private static long getLotteryCooldownMs() {
-        return Config.LOTTERY_COOLDOWN_MINUTES.get() * 60L * 1000L;
     }
 
     @SubscribeEvent
@@ -152,41 +147,6 @@ public class MoneyCommands {
                             return 1;
                         })
         );
-
-        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS.get(),
-                Commands.literal("lottery")
-                        .then(Commands.argument("amount", IntegerArgumentType.integer(10))
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
-                                    long now = System.currentTimeMillis();
-                                    long cooldownMs = getLotteryCooldownMs();
-                                    if (cooldownMs > 0 && now - lastLotteryStartTime < cooldownMs) {
-                                        long seconds = (cooldownMs - (now - lastLotteryStartTime)) / 1000;
-                                        player.sendSystemMessage(Component.literal("⏳ A lottery is already running or was recently started. Try again in " + seconds + "s.").withStyle(ChatFormatting.RED));
-                                        return 1;
-                                    }
-                                    CurrencyApi.lotteryStart(player.getUUID(), amount)
-                                            .thenAccept(resp -> handleLotteryStart(player, amount, resp))
-                                            .exceptionally(ex -> { sendException(player, "Lottery start", ex); return null; });
-                                    return 1;
-                                })
-                        )
-        );
-
-        registerUnlessDisabled(event, Config.DISABLE_LOTTERY_COMMANDS.get(),
-                Commands.literal("join")
-                        .then(Commands.argument("amount", IntegerArgumentType.integer(10))
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    int amount = IntegerArgumentType.getInteger(ctx, "amount");
-                                    CurrencyApi.lotteryJoin(player.getUUID(), amount)
-                                            .thenAccept(resp -> handleLotteryJoin(player, amount, resp))
-                                            .exceptionally(ex -> { sendException(player, "Join lottery", ex); return null; });
-                                    return 1;
-                                })
-                        )
-        );
     }
 
     private static void registerUnlessDisabled(RegisterCommandsEvent event,
@@ -245,29 +205,6 @@ public class MoneyCommands {
             player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
         } else {
             sendApiError(player, "Daily reward", resp);
-        }
-    }
-
-    private static void handleLotteryStart(ServerPlayer player, int amount, ApiResponse<?> resp) {
-        if (resp.isSuccess()) {
-            lastLotteryStartTime = System.currentTimeMillis();
-            String text = resp.getPlayerMessage() != null
-                    ? resp.getPlayerMessage()
-                    : "You successfully started a lottery with $" + amount + "!";
-            player.sendSystemMessage(message("🎲", text, ChatFormatting.GREEN));
-        } else {
-            sendApiError(player, "Lottery start", resp);
-        }
-    }
-
-    private static void handleLotteryJoin(ServerPlayer player, int amount, ApiResponse<?> resp) {
-        if (resp.isSuccess()) {
-            String text = resp.getPlayerMessage() != null
-                    ? resp.getPlayerMessage()
-                    : "You joined the lottery with $" + amount + ". Good luck!";
-            player.sendSystemMessage(message("✅", text, ChatFormatting.GREEN));
-        } else {
-            sendApiError(player, "Join lottery", resp);
         }
     }
 
