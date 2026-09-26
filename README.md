@@ -158,7 +158,7 @@ Deposits, withdrawals and payments count whether they go through the commands, t
 - Minecraft version **1.21.1**
 - Requires **NeoForge** `21.1.249` or newer
 - Requires **[CRNet](https://www.curseforge.com/minecraft/mc-mods/crnet)** `3.0.7` or newer - the shared library that handles all backend HTTP calls and JWT authentication
-- Requires **[ApricityUI](https://modrinth.com/mod/apricityui)** `1.2.5.1` or newer on the **client** - the HTML/CSS UI engine that renders the ATM screen and the vote strip. The server does not need it, and clients without it can still join a server running this mod, they just cannot use the ATM or see votes
+- Requires **[ApricityUI](https://modrinth.com/mod/apricityui)** `1.2.5` or newer on the **client** - the HTML/CSS UI engine that renders the ATM screen and the vote strip. The server does not need it, and clients without it can still join a server running this mod, they just cannot use the ATM or see votes
 - Optional: **[Create](https://www.curseforge.com/minecraft/mc-mods/create)** `6.0.0` or newer enables the Stock Ticker shopping-list integration and the terminal trade overlay; **[AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus)** `1.2.0` or newer excludes AFK players from votes
 
 ### Backend API
