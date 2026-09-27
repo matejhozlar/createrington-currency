@@ -1,5 +1,6 @@
 html {
   user-select: none;
+  pointer-events: none;
 }
 
 .vote-page {
@@ -17,6 +18,21 @@ html {
 
 .vote-page * {
   user-select: none;
+  pointer-events: none;
+}
+
+.vote-page .vote-button,
+.vote-page .vote-button * {
+  pointer-events: auto;
+}
+
+.vote-page .vote-strip.is-leaving .vote-button,
+.vote-page .vote-strip.is-leaving .vote-button *,
+.vote-page .vote-strip:not(.is-active) .vote-button,
+.vote-page .vote-strip:not(.is-active) .vote-button *,
+.vote-page .vote-strip.is-voted .vote-button,
+.vote-page .vote-strip.is-voted .vote-button * {
+  pointer-events: none;
 }
 
 .vote-layer {
@@ -53,7 +69,7 @@ html {
 }
 
 .vote-strip {
-  pointer-events: auto;
+  pointer-events: none;
   position: relative;
   box-sizing: border-box;
   display: flex;
