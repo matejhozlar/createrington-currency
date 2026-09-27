@@ -537,21 +537,22 @@ html {
 .status-popup {
   position: absolute;
   z-index: 30;
-  top: 0;
-  left: 0;
-  width: 960px;
-  height: 600px;
+  top: 151px;
+  left: 225px;
+  width: 510px;
+  height: 298px;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 17px;
   cursor: pointer;
 }
 
 .status-popup.is-info {
   box-sizing: border-box;
   align-items: flex-end;
-  padding-bottom: 155px;
+  padding-bottom: 4px;
   background-color: transparent;
   pointer-events: none;
   cursor: default;
