@@ -8,7 +8,8 @@
     ],
     "client": [
         "KeyboardHandlerMixin",
-        "FontDrawerMixin"
+        "FontDrawerMixin",
+        "NeoForgeLoadingOverlayMixin"
     ],
     "minVersion": "0.8"
 }

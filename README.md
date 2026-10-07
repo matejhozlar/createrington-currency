@@ -194,6 +194,10 @@ Inside, you can set:
 - How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)
 - Per-command `disable*Command` toggles (see below)
 
+Client-only options live in `/config/createringtoncurrency-client.toml`:
+
+- `loadingScreen.hideMojangLogo` (off by default) stops NeoForge from adding the Mojang logo to the early loading window while resources load. Meant for modpacks that draw their own startup screen in that window.
+
 ### Disabling commands
 
 Every chat command can be switched off individually. A disabled command is not registered at all, so it won't show up in tab completion:
