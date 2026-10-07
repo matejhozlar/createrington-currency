@@ -149,6 +149,10 @@ The mod adds its own advancement tab, **Createrington Currency**, that opens onc
 
 Deposits, withdrawals and payments count whether they go through the commands, the ATM or a terminal. The economy events behind these are exposed as the `createringtoncurrency:economy` criterion (with an `event` and an optional `amount` range), so datapacks can add their own thresholds.
 
+### Loading Screen
+
+On the client, the mod stops NeoForge from adding the Mojang logo to the early loading window while resources load, so a modpack's own startup screen is not drawn over. There is no option to turn this off.
+
 ---
 
 ## ⚙ Requirements
@@ -193,10 +197,6 @@ Inside, you can set:
 - Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
 - How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)
 - Per-command `disable*Command` toggles (see below)
-
-Client-only options live in `/config/createringtoncurrency-client.toml`:
-
-- `loadingScreen.hideMojangLogo` (off by default) stops NeoForge from adding the Mojang logo to the early loading window while resources load. Meant for modpacks that draw their own startup screen in that window.
 
 ### Disabling commands
 
