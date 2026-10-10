@@ -72,14 +72,34 @@ Any command can be turned off in the config, see [Disabling commands](#disabling
 
 | Command                  | Description                                                                                                                                              |
 |--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/vote <type> [days]`    | Start a 30-second server-wide vote to change the time or weather. Types: `day`, `night`, `clear`, `rain`, `thunder`. `days` (1-7) only applies to weather |
-| `/vote yes` / `/vote no` | Cast your vote from chat while one is running                                                                                                            |
+| `/vote <type> [days]`    | Start a 30-second server-wide vote. Types by default: `day`, `night`, `sunrise`, `sunset`, `clear`, `rain`, `thunder`. `days` (1-7) only applies to weather |
+| `/vote yes` / `/vote no` | Cast your vote from chat while one is running                                                                                                              |
 
 A running vote is shown as a small strip at the top of everyone's screen instead of chat messages: what is being asked, the live yes/no counts, the countdown and the keys. Press **Y** to vote yes, **N** to vote no, or **H** to hide the strip (hiding counts as not voting). The keys only work while the strip is visible and no other screen is open, so they never interfere with a chest or the chat. The strip stays visible over your inventory and chat, shows late joiners the vote in progress, and switches to a PASSED / FAILED result for a few seconds when the vote ends. Nothing about a vote is posted to chat.
 
 A vote passes when at least half of the eligible players (rounded up) have voted yes **and** there are more yes votes than no votes. A vote everybody ignores fails, and so does a tie: with 10 players online, 5 yes and 5 silent passes but 5 yes and 5 no does not. The number of yes votes needed when the vote starts is the most it will ever ask for: players joining or coming back from AFK mid-vote cannot raise it, while players leaving can still lower it. Spectators cannot start or cast a vote and are never counted; if the [AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus) mod is installed AFK players are not counted either, unless they vote anyway. The vote ends the moment the result is certain instead of always waiting out the 30 seconds, and if you are the only eligible player it is applied straight away.
 
 The share required is `voteApprovalPercent` (50 by default) and the AFK exclusion can be turned off with `voteIgnoreAfk`.
+
+#### Custom votes
+
+The votes themselves are a list in the config (`vote.votes`), one per line as `<id> | <group> | <label> | <command>`:
+
+```toml
+votes = [
+    "sunset | time | sunset | time set 12000",
+    "rain | weather | rain | weather rain {days:0.25}d"
+]
+```
+
+- `id` is what players type after `/vote` and what tab completion offers. Letters, digits and `_ . + -` only; `yes` and `no` are taken
+- `group` is the cooldown the vote belongs to: votes in the same group share one cooldown
+- `label` is shown in the vote strip and completes the sentence "*player* wants ..."
+- `command` is run by the server console when the vote passes. A vote runs one command, so put several steps in a datapack function and call it with `function`
+
+Write `{days:<default>}` in the command to let players add a number of days (1-7): `/vote rain 3` runs `weather rain 3d`, and plain `/vote rain` uses the default (`0.25d`, a quarter of a day). Votes without it refuse a number.
+
+A malformed line, a repeated id or a command the server cannot run is reported in the server log at startup and whenever the list changes; edits to the list apply without a restart.
 
 ### Admin Commands
 
@@ -194,7 +214,7 @@ Inside, you can set:
 - Mob drop table (`mobDrops.drops`) and the Capitalist Greed bonus per level
 - Daily mob earnings cap
 - Command cooldown
-- Vote approval share (`vote.voteApprovalPercent`) and whether AFK players count (`vote.voteIgnoreAfk`)
+- Vote approval share (`vote.voteApprovalPercent`), whether AFK players count (`vote.voteIgnoreAfk`) and the votes on offer (`vote.votes`, see [Custom votes](#custom-votes))
 - How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)
 - Per-command `disable*Command` toggles (see below)
 

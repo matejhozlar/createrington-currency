@@ -37,7 +37,7 @@ public final class VotePopup {
 
     private static boolean active;
     private static String starter = "";
-    private static String voteType = "";
+    private static String label = "";
     private static int durationDays;
     private static int yes;
     private static int no;
@@ -55,7 +55,7 @@ public final class VotePopup {
 
     public static void open(VoteOpenPayload pkt) {
         starter = pkt.starter();
-        voteType = pkt.voteType();
+        label = pkt.label();
         durationDays = pkt.durationDays();
         applyTally(pkt.tally());
         active = true;
@@ -278,7 +278,7 @@ public final class VotePopup {
     }
 
     private static void refreshVote() {
-        setText("vote-subtitle", starter + " wants " + describe(voteType, durationDays));
+        setText("vote-subtitle", starter + " wants " + describe(label, durationDays));
         setText("vote-yes-count", yes + " yes");
         setText("vote-no-count", no + " no");
         toggleClass("vote-card", "is-voted", status != VoteTallyPayload.STATUS_OPEN);
@@ -299,17 +299,9 @@ public final class VotePopup {
         setText("result-detail", result.yes() + " yes · " + result.no() + " no");
     }
 
-    private static String describe(String type, int days) {
-        String base = switch (type) {
-            case "day" -> "daytime";
-            case "night" -> "night";
-            case "clear" -> "clear skies";
-            case "rain" -> "rain";
-            case "thunder" -> "a thunderstorm";
-            default -> type;
-        };
-        if (days > 0) base += " for " + days + (days == 1 ? " day" : " days");
-        return base;
+    private static String describe(String what, int days) {
+        if (days <= 0) return what;
+        return what + " for " + days + (days == 1 ? " day" : " days");
     }
 
     private static String keyName(int key) {
