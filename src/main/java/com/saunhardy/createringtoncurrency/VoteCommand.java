@@ -13,6 +13,7 @@ import com.saunhardy.createringtoncurrency.util.VoteOption;
 import com.saunhardy.createringtoncurrency.util.VoteQuorum;
 import com.saunhardy.createringtoncurrency.util.VoteQuorum.Tally;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -22,10 +23,12 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
@@ -112,6 +115,37 @@ public class VoteCommand {
         options(event.getServer());
     }
 
+    public static void onConfigReloading(ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() != Config.SPEC) return;
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return;
+        server.execute(() -> {
+            if (!Config.DISABLE_VOTE_COMMAND.get()) options(server);
+        });
+    }
+
+    private record CommandFailures(String id, String command) implements CommandSource {
+        @Override
+        public void sendSystemMessage(Component message) {
+            LOGGER.warn("[VOTE] Vote '{}' command '{}' reported: {}", id, command, message.getString());
+        }
+
+        @Override
+        public boolean acceptsSuccess() {
+            return false;
+        }
+
+        @Override
+        public boolean acceptsFailure() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldInformAdmins() {
+            return false;
+        }
+    }
+
     private static Map<String, VoteOption> options(MinecraftServer server) {
         List<? extends String> raw = Config.VOTES.get();
         if (raw.equals(optionsSource)) return options;
@@ -136,6 +170,8 @@ public class VoteCommand {
 
         optionsSource = List.copyOf(raw);
         options = parsed;
+        LOGGER.info("[VOTE] {} vote{} configured: {}", parsed.size(), parsed.size() == 1 ? "" : "s",
+                String.join(", ", parsed.keySet()));
         return parsed;
     }
 
@@ -172,6 +208,15 @@ public class VoteCommand {
 
         if (durationDays > 0 && !option.takesDays()) {
             player.sendSystemMessage(Component.literal("❌ A duration does not apply to the " + option.id() + " vote.")
+                    .withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
+        String problem = commandProblem(server, option.commandFor(durationDays));
+        if (problem != null) {
+            LOGGER.warn("[VOTE] Refused to start vote '{}' for {}: its command '{}' cannot run: {}",
+                    option.id(), player.getName().getString(), option.commandFor(durationDays), problem);
+            player.sendSystemMessage(Component.literal("❌ The " + option.id() + " vote is not available right now.")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -373,13 +418,15 @@ public class VoteCommand {
             return;
         }
 
-        CommandSourceStack source = console(server).withCallback((success, result) -> {
-            if (success) {
-                LOGGER.info("[VOTE] Vote '{}' ran '{}'", id, command);
-            } else {
-                LOGGER.warn("[VOTE] Vote '{}' passed but its command '{}' failed", id, command);
-            }
-        });
+        CommandSourceStack source = server.createCommandSourceStack()
+                .withSource(new CommandFailures(id, command))
+                .withCallback((success, result) -> {
+                    if (success) {
+                        LOGGER.info("[VOTE] Vote '{}' ran '{}'", id, command);
+                    } else {
+                        LOGGER.warn("[VOTE] Vote '{}' passed but its command '{}' failed", id, command);
+                    }
+                });
         server.getCommands().performPrefixedCommand(source, command);
     }
 

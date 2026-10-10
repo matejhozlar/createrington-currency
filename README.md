@@ -99,7 +99,7 @@ votes = [
 
 Write `{days:<default>}` in the command to let players add a number of days (1-7): `/vote rain 3` runs `weather rain 3d`, and plain `/vote rain` uses the default (`0.25d`, a quarter of a day). Votes without it refuse a number.
 
-A malformed line, a repeated id or a command the server cannot run is reported in the server log at startup and whenever the list changes; edits to the list apply without a restart.
+Edits to the list apply without a restart. At startup and each time the file is saved, the server log lists the votes on offer and reports any malformed line, repeated id or command the server cannot run. A vote whose command cannot run is refused when a player tries to start it, and if a command fails after its vote passed the log gives the reason.
 
 ### Admin Commands
 
