@@ -225,6 +225,7 @@ public class CreateringtonCurrency {
             NeoForge.EVENT_BUS.register(MobDrops.class);
             NeoForge.EVENT_BUS.register(MoneyCommands.class);
             NeoForge.EVENT_BUS.register(VoteCommand.class);
+            modEventBus.addListener(VoteCommand::onConfigReloading);
         }
         
         // Register Create integration if Create is loaded

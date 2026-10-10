@@ -1,31 +1,41 @@
 package com.saunhardy.createringtoncurrency;
 
+import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import com.saunhardy.createringtoncurrency.network.VoteOpenPayload;
 import com.saunhardy.createringtoncurrency.network.VoteResultPayload;
 import com.saunhardy.createringtoncurrency.network.VoteTallyPayload;
 import com.saunhardy.createringtoncurrency.util.AfkStatus;
+import com.saunhardy.createringtoncurrency.util.VoteOption;
 import com.saunhardy.createringtoncurrency.util.VoteQuorum;
 import com.saunhardy.createringtoncurrency.util.VoteQuorum.Tally;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,20 +47,14 @@ public class VoteCommand {
     private static final long COOLDOWN_SUCCESS_MS = 577_100L;
     private static final long COOLDOWN_FAIL_MS = 3 * 60_000L;
     private static final long COOLDOWN_NO_TURNOUT_MS = 60_000L;
-    private static final List<String> VOTE_TYPES = List.of("day", "night", "clear", "thunder", "rain");
-
-    private static final Set<String> WEATHER_TYPES = Set.of("clear", "rain", "thunder");
-
-    private static final int MINECRAFT_DAY_TICKS = 24000;
-    private static final int DEFAULT_WEATHER_TICKS = 6000;
-    private static final int MAX_WEATHER_DAYS = 7;
 
     private static volatile ActiveVote activeVote = null;
-    private static long weatherCooldownUntil = 0L;
-    private static long timeCooldownUntil = 0L;
+    private static final Map<String, Long> cooldownUntil = new HashMap<>();
+    private static List<String> optionsSource = null;
+    private static Map<String, VoteOption> options = Map.of();
 
     private static class ActiveVote {
-        final String type;
+        final VoteOption option;
         final int durationDays;
         final UUID initiator;
         final String initiatorName;
@@ -60,8 +64,8 @@ public class VoteCommand {
         int ticksRemaining;
         int maxNeeded = Integer.MAX_VALUE;
 
-        ActiveVote(String type, int durationDays, UUID initiator, String initiatorName, boolean testMode) {
-            this.type = type;
+        ActiveVote(VoteOption option, int durationDays, UUID initiator, String initiatorName, boolean testMode) {
+            this.option = option;
             this.durationDays = durationDays;
             this.initiator = initiator;
             this.initiatorName = initiatorName;
@@ -86,13 +90,14 @@ public class VoteCommand {
                             return castVote(player, false);
                         }))
                         .then(Commands.argument("type", StringArgumentType.word())
-                                .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(VOTE_TYPES, builder))
+                                .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                        options(ctx.getSource().getServer()).keySet(), builder))
                                 .executes(context -> {
                                     ServerPlayer player = context.getSource().getPlayerOrException();
                                     String type = StringArgumentType.getString(context, "type").toLowerCase();
                                     return startVote(player, type, -1);
                                 })
-                                .then(Commands.argument("days", IntegerArgumentType.integer(1, MAX_WEATHER_DAYS))
+                                .then(Commands.argument("days", IntegerArgumentType.integer(1, VoteOption.MAX_DAYS))
                                         .executes(context -> {
                                             ServerPlayer player = context.getSource().getPlayerOrException();
                                             String type = StringArgumentType.getString(context, "type").toLowerCase();
@@ -104,15 +109,114 @@ public class VoteCommand {
         );
     }
 
+    @SubscribeEvent
+    public static void onServerStarted(ServerStartedEvent event) {
+        if (Config.DISABLE_VOTE_COMMAND.get()) return;
+        options(event.getServer());
+    }
+
+    public static void onConfigReloading(ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() != Config.SPEC) return;
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return;
+        server.execute(() -> {
+            if (!Config.DISABLE_VOTE_COMMAND.get()) options(server);
+        });
+    }
+
+    private record CommandFailures(String id, String command) implements CommandSource {
+        @Override
+        public void sendSystemMessage(Component message) {
+            LOGGER.warn("[VOTE] Vote '{}' command '{}' reported: {}", id, command, message.getString());
+        }
+
+        @Override
+        public boolean acceptsSuccess() {
+            return false;
+        }
+
+        @Override
+        public boolean acceptsFailure() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldInformAdmins() {
+            return false;
+        }
+    }
+
+    private static Map<String, VoteOption> options(MinecraftServer server) {
+        List<? extends String> raw = Config.VOTES.get();
+        if (raw.equals(optionsSource)) return options;
+
+        Map<String, VoteOption> parsed = new LinkedHashMap<>();
+        for (String line : raw) {
+            VoteOption option = VoteOption.parse(line);
+            if (option == null) {
+                LOGGER.warn("[VOTE] Ignoring malformed vote entry '{}'", line);
+                continue;
+            }
+            if (parsed.putIfAbsent(option.id(), option) != null) {
+                LOGGER.warn("[VOTE] Ignoring vote entry '{}': the id '{}' is already taken", line, option.id());
+                continue;
+            }
+            String problem = commandProblem(server, option.commandFor(0));
+            if (problem != null) {
+                LOGGER.warn("[VOTE] Vote '{}' runs '{}', which this server cannot run: {}",
+                        option.id(), option.commandFor(0), problem);
+            }
+        }
+
+        optionsSource = List.copyOf(raw);
+        options = parsed;
+        LOGGER.info("[VOTE] {} vote{} configured: {}", parsed.size(), parsed.size() == 1 ? "" : "s",
+                String.join(", ", parsed.keySet()));
+        return parsed;
+    }
+
+    private static CommandSourceStack console(MinecraftServer server) {
+        return server.createCommandSourceStack().withSuppressedOutput();
+    }
+
+    private static String commandProblem(MinecraftServer server, String command) {
+        ParseResults<CommandSourceStack> parse = server.getCommands().getDispatcher().parse(command, console(server));
+        CommandSyntaxException error = Commands.getParseException(parse);
+        if (error != null) return error.getMessage();
+        if (parse.getContext().getLastChild().getCommand() == null) return "the command is incomplete";
+        return null;
+    }
+
+    private static String cooldownName(VoteOption option) {
+        String group = option.group();
+        return Character.toUpperCase(group.charAt(0)) + group.substring(1);
+    }
+
     private static int startVote(ServerPlayer player, String type, int durationDays) {
-        if (!VOTE_TYPES.contains(type)) {
-            player.sendSystemMessage(Component.literal("❌ Invalid vote type. Use: " + String.join(", ", VOTE_TYPES))
+        MinecraftServer server = player.getServer();
+        if (server == null) return 0;
+
+        Map<String, VoteOption> available = options(server);
+        VoteOption option = available.get(type);
+        if (option == null) {
+            String message = available.isEmpty()
+                    ? "❌ No votes are set up on this server."
+                    : "❌ Invalid vote type. Use: " + String.join(", ", available.keySet());
+            player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
+        if (durationDays > 0 && !option.takesDays()) {
+            player.sendSystemMessage(Component.literal("❌ A duration does not apply to the " + option.id() + " vote.")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
 
-        if (durationDays > 0 && !WEATHER_TYPES.contains(type)) {
-            player.sendSystemMessage(Component.literal("❌ Duration only applies to weather votes (clear, rain, thunder).")
+        String problem = commandProblem(server, option.commandFor(durationDays));
+        if (problem != null) {
+            LOGGER.warn("[VOTE] Refused to start vote '{}' for {}: its command '{}' cannot run: {}",
+                    option.id(), player.getName().getString(), option.commandFor(durationDays), problem);
+            player.sendSystemMessage(Component.literal("❌ The " + option.id() + " vote is not available right now.")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -126,11 +230,10 @@ public class VoteCommand {
         boolean testMode = AdminMode.isActive(player);
 
         long now = System.currentTimeMillis();
-        long cooldownUntil = WEATHER_TYPES.contains(type) ? weatherCooldownUntil : timeCooldownUntil;
-        if (!testMode && now < cooldownUntil) {
-            long secsLeft = (cooldownUntil - now) / 1000;
-            String category = WEATHER_TYPES.contains(type) ? "Weather" : "Time";
-            player.sendSystemMessage(Component.literal("❌ " + category + " vote is on cooldown! " + secsLeft + "s remaining")
+        long until = cooldownUntil.getOrDefault(option.group(), 0L);
+        if (!testMode && now < until) {
+            long secsLeft = (until - now) / 1000;
+            player.sendSystemMessage(Component.literal("❌ " + cooldownName(option) + " vote is on cooldown! " + secsLeft + "s remaining")
                     .withStyle(ChatFormatting.RED));
             return 0;
         }
@@ -141,10 +244,7 @@ public class VoteCommand {
             return 0;
         }
 
-        MinecraftServer server = player.getServer();
-        if (server == null) return 0;
-
-        ActiveVote vote = new ActiveVote(type, durationDays, player.getUUID(), player.getName().getString(), testMode);
+        ActiveVote vote = new ActiveVote(option, durationDays, player.getUUID(), player.getName().getString(), testMode);
         Tally tally = tally(server, vote);
 
         if (tally.decided()) {
@@ -154,7 +254,7 @@ public class VoteCommand {
 
         vote.maxNeeded = tally.needed();
         activeVote = vote;
-        LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed{}", player.getName().getString(), type,
+        LOGGER.info("Vote started by {} for '{}'{}, {} of {} eligible players needed{}", player.getName().getString(), option.id(),
                 durationDays > 0 ? " (" + durationDays + " day" + (durationDays == 1 ? "" : "s") + ")" : "",
                 tally.needed(), tally.eligible(), testMode ? " (admin test vote: phantom voter, no cooldown)" : "");
 
@@ -297,40 +397,41 @@ public class VoteCommand {
         } else {
             cooldown = COOLDOWN_NO_TURNOUT_MS;
         }
-        if (!vote.testMode) setCooldown(vote.type, cooldown);
-
-        if (passed) {
-            applyVote(vote.type, vote.durationDays, server);
-        }
+        if (!vote.testMode) cooldownUntil.put(vote.option.group(), System.currentTimeMillis() + cooldown);
 
         LOGGER.info("Vote for '{}' by {} {} ({} yes, {} no, {} of {} needed)",
-                vote.type, vote.initiatorName, passed ? "passed" : "failed",
+                vote.option.id(), vote.initiatorName, passed ? "passed" : "failed",
                 tally.yes(), tally.no(), tally.needed(), tally.eligible());
-    }
 
-    private static void setCooldown(String type, long durationMs) {
-        long until = System.currentTimeMillis() + durationMs;
-        if (WEATHER_TYPES.contains(type)) {
-            weatherCooldownUntil = until;
-        } else {
-            timeCooldownUntil = until;
+        if (passed) {
+            applyVote(vote, server);
         }
     }
 
-    private static void applyVote(String type, int durationDays, MinecraftServer server) {
-        ServerLevel overworld = server.overworld();
-        int ticks = durationDays > 0 ? durationDays * MINECRAFT_DAY_TICKS : DEFAULT_WEATHER_TICKS;
-        switch (type) {
-            case "day" -> overworld.setDayTime(1000);
-            case "night" -> overworld.setDayTime(13000);
-            case "clear" -> overworld.setWeatherParameters(ticks, 0, false, false);
-            case "rain" -> overworld.setWeatherParameters(0, ticks, true, false);
-            case "thunder" -> overworld.setWeatherParameters(0, ticks, true, true);
+    private static void applyVote(ActiveVote vote, MinecraftServer server) {
+        String id = vote.option.id();
+        String command = vote.option.commandFor(vote.durationDays);
+
+        String problem = commandProblem(server, command);
+        if (problem != null) {
+            LOGGER.warn("[VOTE] Vote '{}' passed but its command '{}' was not run: {}", id, command, problem);
+            return;
         }
+
+        CommandSourceStack source = server.createCommandSourceStack()
+                .withSource(new CommandFailures(id, command))
+                .withCallback((success, result) -> {
+                    if (success) {
+                        LOGGER.info("[VOTE] Vote '{}' ran '{}'", id, command);
+                    } else {
+                        LOGGER.warn("[VOTE] Vote '{}' passed but its command '{}' failed", id, command);
+                    }
+                });
+        server.getCommands().performPrefixedCommand(source, command);
     }
 
     private static VoteOpenPayload openPayload(ActiveVote vote, Tally tally, ServerPlayer player) {
-        return new VoteOpenPayload(vote.initiatorName, vote.type, vote.durationDays, tallyPayload(vote, tally, player));
+        return new VoteOpenPayload(vote.initiatorName, vote.option.label(), vote.durationDays, tallyPayload(vote, tally, player));
     }
 
     private static VoteTallyPayload tallyPayload(ActiveVote vote, Tally tally, ServerPlayer player) {

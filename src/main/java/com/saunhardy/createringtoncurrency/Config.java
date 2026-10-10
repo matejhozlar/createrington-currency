@@ -27,6 +27,7 @@ public class Config {
 
     public static final ModConfigSpec.IntValue VOTE_APPROVAL_PERCENT;
     public static final ModConfigSpec.BooleanValue VOTE_IGNORE_AFK;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> VOTES;
 
     public static final ModConfigSpec.IntValue AUDIT_CHAT_SITES;
     public static final ModConfigSpec.IntValue AUDIT_THREADS;
@@ -132,6 +133,23 @@ public class Config {
         VOTE_IGNORE_AFK = BUILDER
                 .comment("If true, AFK players do not count towards the votes needed unless they vote (requires the AFKStatus mod)")
                 .define("voteIgnoreAfk", true);
+
+        VOTES = BUILDER
+                .comment("The votes players can start with /vote <id>. One entry per line: '<id> | <group> | <label> | <command>'",
+                        "<id> is what players type: letters, digits and _ . + - only; 'yes' and 'no' are taken",
+                        "<group> is the cooldown the vote belongs to; votes in the same group share one cooldown",
+                        "<label> is shown to players in the vote strip and completes the sentence '<player> wants ...'",
+                        "<command> is run by the server console when the vote passes. A vote can only run one command, so put several steps in a datapack function",
+                        "Write '{days:<default>}' in the command to let players add a number of days (1-7), eg. '/vote rain 3'; <default> is used when they leave it out")
+                .defineListAllowEmpty("votes", List.of(
+                                "day | time | daytime | time set day",
+                                "night | time | night | time set night",
+                                "sunrise | time | sunrise | time set 23000",
+                                "sunset | time | sunset | time set 12000",
+                                "clear | weather | clear skies | weather clear {days:0.25}d",
+                                "rain | weather | rain | weather rain {days:0.25}d",
+                                "thunder | weather | a thunderstorm | weather thunder {days:0.25}d"),
+                        () -> "day | time | daytime | time set day", value -> value instanceof String);
 
         BUILDER.pop();
 

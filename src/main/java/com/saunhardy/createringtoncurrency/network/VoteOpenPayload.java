@@ -7,7 +7,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
-public record VoteOpenPayload(String starter, String voteType, int durationDays, VoteTallyPayload tally)
+public record VoteOpenPayload(String starter, String label, int durationDays, VoteTallyPayload tally)
         implements CustomPacketPayload {
     public static final Type<VoteOpenPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath("createringtoncurrency", "vote_open"));
@@ -15,7 +15,7 @@ public record VoteOpenPayload(String starter, String voteType, int durationDays,
     public static final StreamCodec<ByteBuf, VoteOpenPayload> STREAM_CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.STRING_UTF8, VoteOpenPayload::starter,
-                    ByteBufCodecs.STRING_UTF8, VoteOpenPayload::voteType,
+                    ByteBufCodecs.STRING_UTF8, VoteOpenPayload::label,
                     ByteBufCodecs.VAR_INT, VoteOpenPayload::durationDays,
                     VoteTallyPayload.STREAM_CODEC, VoteOpenPayload::tally,
                     VoteOpenPayload::new
