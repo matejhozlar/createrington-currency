@@ -1,5 +1,4 @@
-## Version 1.14.6
+## Version 1.15.0
 
 ### Added
-- Added sunrise and sunset votes, so players can vote to set the time to sunrise or sunset
-- The votes available through `/vote` are now configurable by server owners, including each vote's name, cooldown group, label and the command it runs
+- Added Ponder scenes (with Create installed) explaining the Depositor Terminal (taking payments, collecting the takings, and redstone signals) and the ATMs, plus a Createrington Currency category in the Ponder index
