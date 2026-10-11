@@ -219,6 +219,9 @@ public class CreateringtonCurrency {
             if (ModList.get().isLoaded("create")) {
                 NeoForge.EVENT_BUS.register(com.saunhardy.createringtoncurrency.client.DepositorShopOverlay.class);
             }
+            if (ModList.get().isLoaded("ponder")) {
+                com.saunhardy.createringtoncurrency.client.ponder.CurrencyPonderPlugin.register();
+            }
         }
 
         if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {

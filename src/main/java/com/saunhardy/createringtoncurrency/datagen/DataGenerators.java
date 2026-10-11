@@ -21,5 +21,7 @@ public class DataGenerators {
         generator.addProvider(event.includeServer(), new ModRecipeProvider(packOutput, lookupProvider));
 
         generator.addProvider(event.includeServer(), new ModBlockTags(packOutput, lookupProvider, efh));
+
+        generator.addProvider(event.includeClient(), new ModPonderSchematics(packOutput));
     }
 }
