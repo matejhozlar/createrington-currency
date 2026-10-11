@@ -169,6 +169,17 @@ The mod adds its own advancement tab, **Createrington Currency**, that opens onc
 
 Deposits, withdrawals and payments count whether they go through the commands, the ATM or a terminal. The economy events behind these are exposed as the `createringtoncurrency:economy` criterion (with an `event` and an optional `amount` range), so datapacks can add their own thresholds.
 
+### Ponder Scenes
+
+With [Create](https://www.curseforge.com/minecraft/mc-mods/create) installed, the Depositor Terminal and every ATM explain themselves through Create's Ponder: hover the item and hold the Ponder key (**W** by default).
+
+| Item               | Scenes                                                                                                                       |
+|--------------------|------------------------------------------------------------------------------------------------------------------------------|
+| Depositor Terminal | Taking payments (owner, price, cash and card), collecting the takings (storage, the red light, hoppers), and redstone signals |
+| ATM (all colours)  | Banking at an ATM: deposit, withdraw and history                                                                             |
+
+Both are also listed under **Createrington Currency** in the Ponder index.
+
 ### Loading Screen
 
 On the client, the mod stops NeoForge from adding the Mojang logo to the early loading window while resources load, so a modpack's own startup screen is not drawn over. There is no option to turn this off.
@@ -183,7 +194,7 @@ On the client, the mod stops NeoForge from adding the Mojang logo to the early l
 - Requires **NeoForge** `21.1.249` or newer
 - Requires **[CRNet](https://www.curseforge.com/minecraft/mc-mods/crnet)** `3.0.7` or newer - the shared library that handles all backend HTTP calls and JWT authentication
 - Requires **[ApricityUI](https://modrinth.com/mod/apricityui)** `1.2.5` or newer on the **client** - the HTML/CSS UI engine that renders the ATM screen and the vote strip. The server does not need it, and clients without it can still join a server running this mod, they just cannot use the ATM or see votes
-- Optional: **[Create](https://www.curseforge.com/minecraft/mc-mods/create)** `6.0.0` or newer enables the Stock Ticker shopping-list integration and the terminal trade overlay; **[AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus)** `1.2.0` or newer excludes AFK players from votes
+- Optional: **[Create](https://www.curseforge.com/minecraft/mc-mods/create)** `6.0.0` or newer enables the Stock Ticker shopping-list integration, the terminal trade overlay and the Ponder scenes; **[AFKStatus](https://www.curseforge.com/minecraft/mc-mods/afkstatus)** `1.2.0` or newer excludes AFK players from votes
 
 ### Backend API
 
