@@ -117,7 +117,7 @@ public class Config {
 
         CAPITALIST_GREED_BONUS = BUILDER
                 .comment("Percentage points added to every drop chance per level of Capitalist Greed (first entry = level I)")
-                .<Number>defineListAllowEmpty("capitalistGreedBonus", List.of(5.0, 8.0, 10.0),
+                .<Number>defineListAllowEmpty("capitalistGreedBonus", List.of(5.0, 8.0, 10.0, 12.0),
                         () -> 0.0, value -> value instanceof Number n && n.doubleValue() >= 0.0);
 
         BUILDER.pop();
