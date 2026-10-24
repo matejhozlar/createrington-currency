@@ -1,4 +1,5 @@
-## Version 1.16.0
+## Version 1.17.0
 
 ### Changed
-- Capitalist Greed IV (reachable by over-enchanting with Create Enchantment Industry) now gives its own larger mob drop bonus instead of matching level III
+- The daily mob kill limit now resets at the same UTC hour as the daily reward instead of at the server's local midnight, and the limit message shows how long is left until it resets
+- Added a `mobDailyResetHourUtc` config option (default 0) to set the reset hour
