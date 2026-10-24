@@ -109,6 +109,7 @@ html {
   font-size: 20px;
   color: #b0b0b0;
   margin-bottom: 4px;
+  white-space: nowrap;
 }
 
 .alt-button {
@@ -374,6 +375,7 @@ html {
   font-size: 14px;
   color: #a0a0a0;
   margin-bottom: 10px;
+  white-space: nowrap;
 }
 
 .atm-span-small {
