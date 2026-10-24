@@ -59,7 +59,7 @@ public class MobDrops {
     public static void onServerTick(ServerTickEvent.Post event) {
         if (earningsData == null) return;
         LocalDate now = today();
-        if (!now.equals(cachedToday)) {
+        if (cachedToday == null || now.isAfter(cachedToday)) {
             cachedToday = now;
             warnedToday.clear();
             earningsData.pruneStaleEntries(now);
