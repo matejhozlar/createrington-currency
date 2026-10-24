@@ -22,6 +22,7 @@ public class Config {
     public static final ModConfigSpec.ConfigValue<String> JWT_SECRET;
 
     public static final ModConfigSpec.IntValue MOB_DAILY_LIMIT;
+    public static final ModConfigSpec.IntValue MOB_DAILY_RESET_HOUR;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> MOB_DROPS;
     public static final ModConfigSpec.ConfigValue<List<? extends Number>> CAPITALIST_GREED_BONUS;
 
@@ -97,6 +98,10 @@ public class Config {
         MOB_DAILY_LIMIT = BUILDER
                 .comment("Maximum amount of currency a player can earn from mob kills per day (0 = no mob drops)")
                 .defineInRange("mobDailyLimit", 1000, 0, Integer.MAX_VALUE);
+
+        MOB_DAILY_RESET_HOUR = BUILDER
+                .comment("Hour of the day, in UTC, at which the mob kill limit resets (0 = midnight UTC). Keep it equal to the backend's daily reward reset hour so both reset together")
+                .defineInRange("mobDailyResetHourUtc", 0, 0, 23);
 
         MOB_DROPS = BUILDER
                 .comment("Bills dropped when a player kills a mob. One entry per line: '<entity>=<denomination>:<chance>'",

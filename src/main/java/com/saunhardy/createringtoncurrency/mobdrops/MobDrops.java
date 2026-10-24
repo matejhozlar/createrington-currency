@@ -22,6 +22,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +36,7 @@ public class MobDrops {
     private static final int PRUNE_INTERVAL_TICKS = 24000;
 
     private static MobEarningsData earningsData;
-    private static LocalDate cachedToday = LocalDate.now();
+    private static LocalDate cachedToday;
     private static int tickCounter = 0;
 
     @SubscribeEvent
@@ -43,7 +44,8 @@ public class MobDrops {
         MinecraftServer server = event.getServer();
         earningsData = server.overworld().getDataStorage()
                 .computeIfAbsent(MobEarningsData.factory(), MobEarningsData.dataName());
-        cachedToday = LocalDate.now();
+        cachedToday = today();
+        earningsData.pruneStaleEntries(cachedToday);
         warnedToday.clear();
     }
 
@@ -55,20 +57,17 @@ public class MobDrops {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        LocalDate now = LocalDate.now();
+        if (earningsData == null) return;
+        LocalDate now = today();
         if (!now.equals(cachedToday)) {
             cachedToday = now;
             warnedToday.clear();
-            if (earningsData != null) {
-                earningsData.pruneStaleEntries(now);
-            }
+            earningsData.pruneStaleEntries(now);
         }
 
         if (++tickCounter >= PRUNE_INTERVAL_TICKS) {
             tickCounter = 0;
-            if (earningsData != null) {
-                earningsData.pruneStaleEntries(cachedToday);
-            }
+            earningsData.pruneStaleEntries(cachedToday);
         }
     }
 
@@ -149,7 +148,13 @@ public class MobDrops {
         }
     }
 
+    private static LocalDate today() {
+        return DailyPeriod.key(Instant.now(), Config.MOB_DAILY_RESET_HOUR.get());
+    }
+
     private static Component message(int limit) {
-        return Component.literal("⚠ You've reached today's mob farming limit ($" + limit + ").").withStyle(ChatFormatting.RED);
+        String resetsIn = DailyPeriod.formatRemaining(DailyPeriod.untilReset(Instant.now(), Config.MOB_DAILY_RESET_HOUR.get()));
+        return Component.literal("⚠ You've reached today's mob farming limit ($" + limit + "). It resets in " + resetsIn + ".")
+                .withStyle(ChatFormatting.RED);
     }
 }

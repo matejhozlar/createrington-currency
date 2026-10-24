@@ -142,7 +142,7 @@ Because the mod's backend is the ledger and bills are ordinary items, comparing 
 - Each matching line is rolled on its own, so one kill can drop several bills; what drops is handed out as the largest bills that fit the amount.
 - By default zombies, spiders, creepers, skeletons, wither skeletons and blazes roll for a $1 bill, and skeletons, wither skeletons and blazes also roll for a $5.
 - Drop chances increase with the **Capitalist Greed** enchantment (`capitalistGreedBonus`, percentage points per level).
-- Daily mob drop earnings are capped (`mobDailyLimit`) to maintain balance.
+- Daily mob drop earnings are capped (`mobDailyLimit`) to maintain balance. The cap resets at a fixed hour in UTC (`mobDailyResetHourUtc`, midnight by default), the same moment the `/daily` reward resets, and the limit message says how long is left.
 
 ### Enchantment: Capitalist Greed
 
@@ -223,7 +223,7 @@ Inside, you can set:
 
 - API base URL (`http://127.0.0.1:5000/` by default)
 - Mob drop table (`mobDrops.drops`) and the Capitalist Greed bonus per level
-- Daily mob earnings cap
+- Daily mob earnings cap (`mobDrops.mobDailyLimit`) and the UTC hour it resets at (`mobDrops.mobDailyResetHourUtc`)
 - Command cooldown
 - Vote approval share (`vote.voteApprovalPercent`), whether AFK players count (`vote.voteIgnoreAfk`) and the votes on offer (`vote.votes`, see [Custom votes](#custom-votes))
 - How many audit locations are listed in chat (`audit.auditChatSites`) and how many threads a full audit reads region files with (`audit.auditThreads`, 0 = automatic)

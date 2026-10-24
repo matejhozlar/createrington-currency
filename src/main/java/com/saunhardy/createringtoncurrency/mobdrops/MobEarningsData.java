@@ -21,18 +21,13 @@ public class MobEarningsData extends SavedData {
 
     public static MobEarningsData load(CompoundTag tag, HolderLookup.Provider registries) {
         MobEarningsData data = new MobEarningsData();
-        LocalDate today = LocalDate.now();
         CompoundTag earningsTag = tag.getCompound("earnings");
         for (String key : earningsTag.getAllKeys()) {
             try {
                 UUID uuid = UUID.fromString(key);
                 CompoundTag entry = earningsTag.getCompound(key);
-                String dateStr = entry.getString("date");
-                int earned = entry.getInt("earned");
-                LocalDate date = LocalDate.parse(dateStr);
-                if (date.equals(today)) {
-                    data.earnings.put(uuid, new DailyEarnings(date, earned));
-                }
+                LocalDate date = LocalDate.parse(entry.getString("date"));
+                data.earnings.put(uuid, new DailyEarnings(date, entry.getInt("earned")));
             } catch (Exception e) {
                 LOGGER.warn("Skipping invalid mob earnings entry '{}': {}", key, e.getMessage());
             }
@@ -44,15 +39,12 @@ public class MobEarningsData extends SavedData {
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         CompoundTag earningsTag = new CompoundTag();
-        LocalDate today = LocalDate.now();
         for (Map.Entry<UUID, DailyEarnings> entry : earnings.entrySet()) {
             DailyEarnings de = entry.getValue();
-            if (de.date.equals(today)) {
-                CompoundTag entryTag = new CompoundTag();
-                entryTag.putString("date", de.date.toString());
-                entryTag.putInt("earned", de.earnedToday);
-                earningsTag.put(entry.getKey().toString(), entryTag);
-            }
+            CompoundTag entryTag = new CompoundTag();
+            entryTag.putString("date", de.date.toString());
+            entryTag.putInt("earned", de.earnedToday);
+            earningsTag.put(entry.getKey().toString(), entryTag);
         }
         tag.put("earnings", earningsTag);
         return tag;
