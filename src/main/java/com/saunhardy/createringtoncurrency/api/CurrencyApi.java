@@ -72,10 +72,10 @@ public final class CurrencyApi {
         return c == null ? unavailable() : c.get(Endpoints.CURRENCY_BALANCE, BalanceResponse.class, playerUuid);
     }
 
-    public static CompletableFuture<ApiResponse<PayResponse>> pay(UUID fromUuid, String toUuid, double amount) {
+    public static CompletableFuture<ApiResponse<PayResponse>> pay(UUID fromUuid, String toUuid, double amount, String idempotencyKey) {
         CRNetClient c = client;
         if (c == null) return unavailable();
-        PayRequest req = new PayRequest(toUuid, amount);
+        PayRequest req = new PayRequest(toUuid, amount, idempotencyKey);
         return c.post(Endpoints.CURRENCY_PAY, GSON.toJson(req), PayResponse.class, fromUuid);
     }
 
