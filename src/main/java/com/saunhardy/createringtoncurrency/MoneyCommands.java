@@ -68,7 +68,7 @@ public class MoneyCommands {
                                             if (isOnCooldown(sender)) return 0;
                                             ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
                                             int amount = IntegerArgumentType.getInteger(ctx, "amount");
-                                            CurrencyApi.pay(sender.getUUID(), target.getUUID().toString(), amount)
+                                            CurrencyApi.pay(sender.getUUID(), target.getUUID().toString(), amount, CurrencyApi.newIdempotencyKey())
                                                     .thenAccept(resp -> handlePay(sender, target, amount, resp))
                                                     .exceptionally(ex -> { sendException(sender, "Pay", ex); return null; });
                                             return 1;
