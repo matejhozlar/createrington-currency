@@ -68,9 +68,10 @@ public class MoneyCommands {
                                             if (isOnCooldown(sender)) return 0;
                                             ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
                                             int amount = IntegerArgumentType.getInteger(ctx, "amount");
-                                            CurrencyApi.pay(sender.getUUID(), target.getUUID().toString(), amount, CurrencyApi.newIdempotencyKey())
-                                                    .thenAccept(resp -> handlePay(sender, target, amount, resp))
-                                                    .exceptionally(ex -> { sendException(sender, "Pay", ex); return null; });
+                                            String key = CurrencyApi.newIdempotencyKey();
+                                            CurrencyApi.pay(sender.getUUID(), target.getUUID().toString(), amount, key)
+                                                    .thenAccept(resp -> handlePay(sender, target, amount, key, resp))
+                                                    .exceptionally(ex -> { sendException(sender, "Pay key=" + key, ex); return null; });
                                             return 1;
                                         })))
         );
@@ -169,14 +170,14 @@ public class MoneyCommands {
         }
     }
 
-    private static void handlePay(ServerPlayer sender, ServerPlayer target, int amount, ApiResponse<?> resp) {
+    private static void handlePay(ServerPlayer sender, ServerPlayer target, int amount, String key, ApiResponse<?> resp) {
         if (resp.isSuccess()) {
             String formatted = NumberFormat.getInstance().format(amount);
             sender.sendSystemMessage(message("✅", "Sent $" + formatted + " to " + target.getName().getString(), ChatFormatting.GREEN));
             target.sendSystemMessage(message("💸", "You received $" + formatted + " from " + sender.getName().getString(), ChatFormatting.GOLD));
-            LOGGER.info("[PAY] {} ({}) -> {} ({}): ${}", sender.getName().getString(), sender.getUUID(), target.getName().getString(), target.getUUID(), formatted);
+            LOGGER.info("[PAY] {} ({}) -> {} ({}): ${} key={}", sender.getName().getString(), sender.getUUID(), target.getName().getString(), target.getUUID(), formatted, key);
         } else {
-            sendApiError(sender, "Pay", resp);
+            sendApiError(sender, "Pay key=" + key, resp);
         }
     }
 
